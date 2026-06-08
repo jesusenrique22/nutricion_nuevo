@@ -1,0 +1,288 @@
+// Esquema PostgreSQL — fuente de verdad relacional
+// docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────
+// ENUMS (Reglas de negocio a nivel de tipo)
+// ──────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN // Nutricionista
+  PATIENT
+}
+
+enum ConsultationCode {
+  NUT_01 // Nutricional
+  ENT_02 // Entrenamiento
+  ANT_03 // Antropometría
+}
+
+enum ConsultationModality {
+  ONLINE
+  PRESENCIAL
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentFlow {
+  INTAKE // Primera cita -> Anamnesis completa
+  FOLLOW_UP // Cita de seguimiento
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+// ──────────────────────────────────────────────
+// AUTENTICACIÓN Y USUARIOS
+// ──────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String?
+  name          String
+  phone         String?
+  role          UserRole  @default(PATIENT)
+  emailVerified DateTime?
+  image         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patientProfile PatientProfile?
+  appointments   Appointment[]      @relation("PatientAppointments")
+  purchases      ResourcePurchase[]
+
+  accounts Account[]
+  sessions Session[]
+
+  @@index([role])
+}
+
+model PatientProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  birthDate      DateTime?
+  gender         String?
+  height         Float?
+  occupation     String?
+  emergencyPhone String?
+
+  // Flag clave para decidir Intake vs Follow-up (Módulo 1)
+  hasCompletedIntake Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  intakeForm   IntakeForm?
+  measurements AnthropometryMeasurement[]
+}
+
+// ──────────────────────────────────────────────
+// CATÁLOGO DE CONSULTAS (Módulo 1)
+// ──────────────────────────────────────────────
+
+model ConsultationType {
+  id              String           @id @default(cuid())
+  code            ConsultationCode @unique
+  name            String
+  description     String?
+  durationMinutes Int              @default(60)
+  price           Decimal          @db.Decimal(10, 2)
+
+  // Reglas de negocio como datos:
+  allowsOnline     Boolean @default(true)
+  allowsPresencial Boolean @default(true)
+  morningOnly      Boolean @default(false) // ANT_03 = true
+  morningStart     String? // "08:00"
+  morningEnd       String? // "12:00"
+
+  appointments Appointment[]
+}
+
+// ──────────────────────────────────────────────
+// AGENDAMIENTO (Módulo 2)
+// ──────────────────────────────────────────────
+
+model Appointment {
+  id                 String               @id @default(cuid())
+  patientId          String
+  patient            User                 @relation("PatientAppointments", fields: [patientId], references: [id])
+  consultationTypeId String
+  consultationType   ConsultationType     @relation(fields: [consultationTypeId], references: [id])
+  startTime          DateTime
+  endTime            DateTime
+  modality           ConsultationModality
+  status             AppointmentStatus    @default(PENDING)
+  flow               AppointmentFlow
+  notes              String?
+
+  payment Payment?
+
+  followUpSubmission FollowUpSubmission?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startTime, endTime])
+  @@index([patientId])
+  @@index([status])
+  @@index([consultationTypeId])
+}
+
+// ──────────────────────────────────────────────
+// ANAMNESIS Y MEDICIONES (Módulo 1)
+// ──────────────────────────────────────────────
+
+model IntakeForm {
+  id               String         @id @default(cuid())
+  patientProfileId String         @unique
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  medicalHistory   Json
+  allergies        Json
+  dietaryHabits    Json
+  physicalActivity Json
+  goals            String?
+  supplementsUse   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AnthropometryMeasurement {
+  id               String         @id @default(cuid())
+  patientProfileId String
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+
+  measuredAt DateTime @default(now())
+  weight     Float?
+  bodyFatPct Float?
+  muscleMass Float?
+  waist      Float?
+  hip        Float?
+  rawData    Json?
+
+  @@index([patientProfileId, measuredAt])
+}
+
+// Formulario rápido de seguimiento (vinculado a una cita FOLLOW_UP)
+model FollowUpSubmission {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  currentWeight Float?
+  energyLevel   String? // baja | normal | alta
+  adherence     String? // cómo siguió el plan
+  symptoms      String?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────
+// PAGOS / TRANSACCIONES
+// ──────────────────────────────────────────────
+
+model Payment {
+  id            String        @id @default(cuid())
+  appointmentId String        @unique
+  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  provider      String?
+  providerRef   String?
+  createdAt     DateTime      @default(now())
+}
+
+// ──────────────────────────────────────────────
+// E-RESOURCES / LIBRERÍA (Módulo 5)
+// ──────────────────────────────────────────────
+
+model Resource {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String // EBOOK | VIDEO | PACKAGE
+  coverUrl    String?
+  contentUrl  String?
+  price       Decimal  @db.Decimal(10, 2)
+  isPublished Boolean  @default(false)
+  category    String?
+
+  createdAt DateTime           @default(now())
+  purchases ResourcePurchase[]
+}
+
+model ResourcePurchase {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  pricePaid  Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, resourceId])
+}
+
+// ──────────────────────────────────────────────
+// NextAuth (tablas estándar)
+// ──────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
