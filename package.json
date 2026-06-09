@@ -7,12 +7,16 @@
     "build": "next build",
     "start": "next start",
     "db:generate": "prisma generate",
+    "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
+    "db:seed": "prisma generate && prisma db seed",
     "db:studio": "prisma studio",
     "db:check": "node scripts/check-db.mjs",
-    "socket": "tsx src/server/socket/server.ts"
+    "db:check:mongo": "node --env-file=.env scripts/check-mongo.mjs",
+    "email:check": "tsx --env-file=.env scripts/check-smtp.ts",
+    "socket": "tsx src/server/socket/server.ts",
+    "reminders": "node scripts/reminders.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -28,6 +32,7 @@
     "mongodb": "^7.2.0",
     "next": "16.2.7",
     "next-auth": "^5.0.0-beta.31",
+    "nodemailer": "^8.0.10",
     "react": "19.2.4",
     "react-big-calendar": "^1.20.0",
     "react-dom": "19.2.4",
@@ -39,6 +44,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19",
     "@types/react-big-calendar": "^1.16.3",
     "@types/react-dom": "^19",

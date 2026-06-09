@@ -19,24 +19,49 @@
 
 # production
 /build
+/dist
 
-# misc
-.DS_Store
-*.pem
+# typescript
+*.tsbuildinfo
+next-env.d.ts
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
+# env files (secrets — nunca subir)
 .env*
 !.env.example
 
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# debug / logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# caches
+.eslintcache
+.turbo
+
+# misc
+.DS_Store
+Thumbs.db
+*.pem
+*.tmp
+_tmp_*
+
+# IDE / editor
+.vscode/
+.idea/
+.cursor/
+
+# archivos locales de sesión / handoff
+HANDOFF-CONTEXTO-CHAT.txt
+
+# assets de diseño (fuentes pesadas; en web se usa public/brand/)
+Anttova-Diseños/
+Anttova _ Brandbook/
+
+# uploads generados en runtime
+/public/uploads/
+/uploads/

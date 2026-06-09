@@ -1,14 +1,17 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { Server } from "socket.io";
 
 /**
- * Servidor de Socket.io independiente (Módulo 3 — chat en vivo).
- * Ejecuta con: npm run socket
- * El frontend se conecta vía NEXT_PUBLIC_SOCKET_URL.
+ * Servidor de Socket.io independiente.
+ * Ejecuta con: pnpm run socket
+ * - Chat en vivo (salas por conversación)
+ * - Actualizaciones del dashboard (salas por usuario y rol)
  */
 const PORT = Number(process.env.SOCKET_PORT ?? 3001);
+const SOCKET_SECRET =
+  process.env.SOCKET_INTERNAL_SECRET ?? "dev-socket-secret";
 
-const httpServer = createServer();
+const httpServer = createServer(handleHttpRequest);
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.NEXTAUTH_URL ?? "http://localhost:3000",
@@ -16,14 +19,69 @@ const io = new Server(httpServer, {
   },
 });
 
+function userRoom(userId: string) {
+  return `user:${userId}`;
+}
+
+function roleRoom(role: string) {
+  return `role:${role}`;
+}
+
+function handleHttpRequest(req: IncomingMessage, res: ServerResponse) {
+  if (req.method === "POST" && req.url === "/internal/emit") {
+    const auth = req.headers.authorization;
+    if (auth !== `Bearer ${SOCKET_SECRET}`) {
+      res.writeHead(401);
+      res.end("Unauthorized");
+      return;
+    }
+
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      try {
+        const parsed = JSON.parse(body) as {
+          event: string;
+          data?: unknown;
+          userIds?: string[];
+          roles?: string[];
+        };
+
+        const rooms = new Set<string>();
+        for (const id of parsed.userIds ?? []) rooms.add(userRoom(id));
+        for (const role of parsed.roles ?? []) rooms.add(roleRoom(role));
+
+        for (const room of rooms) {
+          io.to(room).emit(parsed.event, parsed.data ?? {});
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, rooms: [...rooms] }));
+      } catch {
+        res.writeHead(400);
+        res.end("Bad request");
+      }
+    });
+    return;
+  }
+
+  res.writeHead(404);
+  res.end("Not found");
+}
+
 io.on("connection", (socket) => {
-  // El cliente se une a la sala de su conversación
+  socket.on("join_user", (payload: { userId: string; role: string }) => {
+    if (!payload?.userId) return;
+    socket.join(userRoom(payload.userId));
+    if (payload.role) socket.join(roleRoom(payload.role));
+  });
+
   socket.on("join", (conversationId: string) => {
     socket.join(conversationId);
   });
 
-  // Reenvía el mensaje a la sala. La persistencia en MongoDB
-  // se hace vía Server Action antes de emitir, o aquí mismo.
   socket.on(
     "message",
     (payload: { conversationId: string; [k: string]: unknown }) => {

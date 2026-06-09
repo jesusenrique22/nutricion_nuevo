@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -70,6 +71,7 @@ model User {
   patientProfile PatientProfile?
   appointments   Appointment[]      @relation("PatientAppointments")
   purchases      ResourcePurchase[]
+  weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
 
   accounts Account[]
   sessions Session[]
@@ -136,10 +138,15 @@ model Appointment {
   status             AppointmentStatus    @default(PENDING)
   flow               AppointmentFlow
   notes              String?
+  reminderSentAt     DateTime?
 
   payment Payment?
 
-  followUpSubmission FollowUpSubmission?
+  followUpSubmission          FollowUpSubmission?
+  anthropometryFormSubmission AnthropometryFormSubmission?
+  nutritionFormSubmission     NutritionFormSubmission?
+  trainingFormSubmission      TrainingFormSubmission?
+  anthropometryMeasurement    AnthropometryMeasurement?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -165,6 +172,7 @@ model IntakeForm {
   physicalActivity Json
   goals            String?
   supplementsUse   Json?
+  extendedPayload  Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -174,6 +182,8 @@ model AnthropometryMeasurement {
   id               String         @id @default(cuid())
   patientProfileId String
   patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  appointmentId    String?        @unique
+  appointment      Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
   measuredAt DateTime @default(now())
   weight     Float?
@@ -198,6 +208,103 @@ model FollowUpSubmission {
   symptoms      String?
   notes         String?
 
+  extendedPayload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Formulario pre-evaluación antropométrica (ActiveAnto — 5 páginas)
+model AnthropometryFormSubmission {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  consentAccepted Boolean @default(false)
+
+  fullName             String?
+  consultationReason   String?
+  phone                String?
+  gender               String?
+  birthDate            DateTime?
+
+  previousAnthropometry Boolean?
+  dominantHand          String?
+  dominantFoot          String?
+  activityLevel         String?
+  activityFrequency     String?
+  sportsPracticed       String?
+
+  reportAnalysisTypes Json // string[]
+  mainObjective       String?
+  evaluationFrequency String?
+  reservedSlotNote      String?
+
+  procedureQuestions String?
+
+  extendedPayload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Primera consulta nutricional (Anttova — 4 páginas)
+model NutritionFormSubmission {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  fullName   String?
+  phone      String?
+  gender     String?
+  birthDate  DateTime?
+
+  consultationReason    String?
+  dietDescription       String?
+  dietaryRestrictions   String?
+  activityLevel         String?
+  activityFrequency     String?
+  sportsPracticed       String?
+
+  reservedSlotNote      String?
+  continuationPreference String?
+
+  extendedPayload Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Formulario pre-evaluación entrenamiento (5 páginas — mismo protocolo evaluación)
+model TrainingFormSubmission {
+  id            String      @id @default(cuid())
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  consentAccepted Boolean @default(false)
+
+  fullName           String?
+  consultationReason String?
+  phone              String?
+  gender             String?
+  birthDate          DateTime?
+
+  previousAnthropometry Boolean?
+  dominantHand          String?
+  dominantFoot          String?
+  activityLevel         String?
+  activityFrequency     String?
+  sportsPracticed       String?
+
+  reportAnalysisTypes Json // string[]
+  mainObjective       String?
+  evaluationFrequency String?
+  reservedSlotNote    String?
+
+  procedureQuestions String?
+
+  extendedPayload Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -213,8 +320,10 @@ model Payment {
   amount        Decimal       @db.Decimal(10, 2)
   currency      String        @default("USD")
   status        PaymentStatus @default(PENDING)
-  provider      String?
+  provider      String?       @default("manual")
   providerRef   String?
+  adminNote     String?
+  paidAt        DateTime?
   createdAt     DateTime      @default(now())
 }
 
@@ -225,16 +334,61 @@ model Payment {
 model Resource {
   id          String   @id @default(cuid())
   title       String
-  description String?
-  type        String // EBOOK | VIDEO | PACKAGE
+  description String?  @db.Text
+  type        String // EBOOK | VIDEO | LINK | PACKAGE
   coverUrl    String?
-  contentUrl  String?
+  contentUrl  String? // PDF, archivo descargable
+  videoUrl    String?
+  linkUrl     String?
+  body        String?  @db.Text
   price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("ARS")
   isPublished Boolean  @default(false)
   category    String?
+  sortOrder   Int      @default(0)
 
   createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
   purchases ResourcePurchase[]
+}
+
+// ──────────────────────────────────────────────
+// CMS — Contenido editable (Módulo personalización)
+// ──────────────────────────────────────────────
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String?
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model FormTemplate {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  fields    Json
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model PatientWeeklyPlan {
+  id          String    @id @default(cuid())
+  patientId   String
+  patient     User      @relation("PatientWeeklyPlans", fields: [patientId], references: [id], onDelete: Cascade)
+  title       String    @default("Plan semanal")
+  weekLabel   String?
+  imageUrl    String?
+  notes       String?   @db.Text
+  days        Json
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([patientId, isPublished])
 }
 
 model ResourcePurchase {

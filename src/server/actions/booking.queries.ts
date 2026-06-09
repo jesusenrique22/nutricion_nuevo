@@ -57,6 +57,12 @@ export interface AppointmentDTO {
   modality: string;
   flow: string;
   patientName?: string;
+  patientId?: string;
+  consultationCode?: string;
+  consultationName?: string;
+  price?: string;
+  paymentStatus?: string | null;
+  notes?: string | null;
 }
 
 /** Citas del paciente autenticado. */
@@ -66,7 +72,7 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
 
   const appts = await prisma.appointment.findMany({
     where: { patientId: session.user.id },
-    include: { consultationType: true },
+    include: { consultationType: true, payment: true },
     orderBy: { startTime: "desc" },
   });
 
@@ -78,6 +84,11 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
     status: a.status,
     modality: a.modality,
     flow: a.flow,
+    consultationCode: a.consultationType.code,
+    consultationName: a.consultationType.name,
+    price: a.consultationType.price.toString(),
+    paymentStatus: a.payment?.status ?? null,
+    notes: a.notes,
   }));
 }
 
@@ -87,7 +98,7 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
   if (session?.user?.role !== "ADMIN") return [];
 
   const appts = await prisma.appointment.findMany({
-    include: { consultationType: true, patient: true },
+    include: { consultationType: true, patient: true, payment: true },
     orderBy: { startTime: "asc" },
   });
 
@@ -100,5 +111,11 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
     modality: a.modality,
     flow: a.flow,
     patientName: a.patient.name,
+    patientId: a.patientId,
+    consultationCode: a.consultationType.code,
+    consultationName: a.consultationType.name,
+    price: a.consultationType.price.toString(),
+    paymentStatus: a.payment?.status ?? null,
+    notes: a.notes,
   }));
 }

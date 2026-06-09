@@ -1,17 +1,23 @@
-import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const nunito = Nunito({
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "NutriVida — Plataforma de Nutrición",
+  title: "Anttova — Nutrición · Fitness · Wellness",
   description:
-    "Gestiona tus consultas de nutrición, entrenamiento y antropometría. Citas, chat con tu nutricionista y recursos exclusivos.",
+    "Consultas de nutrición, entrenamiento y antropometría con Lic. Ma Antonieta Lanza. Agenda citas, completa tu anamnesis y accede a recursos exclusivos.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -20,7 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${nunito.variable} h-full antialiased`}>
+    <html
+      lang="es"
+      data-scroll-behavior="smooth"
+      className={`${inter.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
       </body>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitFollowUpForm } from "@/server/actions/follow-up.actions";
 import {
@@ -26,7 +26,7 @@ export function FollowUpFormClient({
     const fd = new FormData(e.currentTarget);
 
     const payload = {
-      currentWeight: fd.get("currentWeight") || undefined,
+      currentWeight: fd.get("currentWeight"),
       energyLevel: fd.get("energyLevel"),
       adherence: fd.get("adherence"),
       symptoms: fd.get("symptoms"),
@@ -48,13 +48,14 @@ export function FollowUpFormClient({
     <form onSubmit={handleSubmit} className="space-y-6">
       <FormSection
         title="Cita de seguimiento"
-        description="Cuéntanos cómo te has sentido desde tu última consulta. Solo toma un minuto."
+        description="Cuéntanos cómo te has sentido desde tu última consulta. Todos los campos son obligatorios."
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Peso actual (kg)" hint="Opcional">
+          <Field label="Peso actual (kg)">
             <input
               name="currentWeight"
               type="number"
+              required
               min={20}
               max={300}
               step={0.1}
@@ -62,16 +63,30 @@ export function FollowUpFormClient({
             />
           </Field>
           <Field label="Nivel de energía">
-            <select name="energyLevel" required className={selectClass}>
-              <option value="">Seleccionar…</option>
+            <select
+              name="energyLevel"
+              required
+              className={selectClass}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Seleccionar…
+              </option>
               <option value="baja">Baja</option>
               <option value="normal">Normal</option>
               <option value="alta">Alta</option>
             </select>
           </Field>
           <Field label="¿Cómo seguiste el plan?">
-            <select name="adherence" required className={selectClass}>
-              <option value="">Seleccionar…</option>
+            <select
+              name="adherence"
+              required
+              className={selectClass}
+              defaultValue=""
+            >
+              <option value="" disabled>
+                Seleccionar…
+              </option>
               <option value="muy_bien">Muy bien</option>
               <option value="bien">Bien</option>
               <option value="regular">Regular</option>
@@ -82,14 +97,18 @@ export function FollowUpFormClient({
         <Field label="Síntomas o molestias">
           <textarea
             name="symptoms"
-            placeholder="Ej: hinchazón, fatiga, dolor de cabeza…"
+            required
+            minLength={3}
+            placeholder="Ej: hinchazón, fatiga, dolor de cabeza… o escribe «ninguno»"
             className={textareaClass}
           />
         </Field>
         <Field label="Algo más que quieras comentar">
           <textarea
             name="notes"
-            placeholder="Cambios en rutina, viajes, estrés…"
+            required
+            minLength={3}
+            placeholder="Cambios en rutina, viajes, estrés… o escribe «ninguno»"
             className={textareaClass}
           />
         </Field>

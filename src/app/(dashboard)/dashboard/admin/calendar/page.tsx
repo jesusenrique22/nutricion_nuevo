@@ -1,30 +1,29 @@
-import { DoctorCalendar } from "@/components/calendar/doctor-calendar";
+import { CalendarWithPanel } from "@/components/calendar/calendar-with-panel";
 import { getAllAppointments } from "@/server/actions/booking.queries";
+
+export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
   const appointments = await getAllAppointments();
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold">Calendario</h1>
-      <p className="mt-2 text-foreground/60">
-        Tus citas en vista mes / semana / día.
-      </p>
-
-      <div className="mt-6 flex flex-wrap gap-4 text-sm">
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-accent" /> Pendiente
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-primary" /> Confirmada
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-foreground/40" /> Completada
-        </span>
+    <div className="mx-auto max-w-7xl">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">
+            anttova · admin
+          </p>
+          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            Calendario de citas
+          </h1>
+        </div>
+        <p className="max-w-md text-xs text-foreground/55 sm:text-right">
+          Mini calendario + agenda sincronizados. Toca una cita para gestionarla.
+        </p>
       </div>
 
-      <div className="mt-6">
-        <DoctorCalendar appointments={appointments} />
+      <div className="mt-4">
+        <CalendarWithPanel appointments={appointments} />
       </div>
     </div>
   );

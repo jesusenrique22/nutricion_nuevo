@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import {
+  AuthFooterLink,
+  AuthFormCard,
+  AuthShell,
+} from "@/components/auth/auth-shell";
 import { registerPatient } from "@/server/actions/auth.actions";
 
 export default function RegisterPage() {
@@ -23,38 +26,37 @@ export default function RegisterPage() {
     };
 
     const res = await registerPatient(payload);
+    setLoading(false);
+
     if (!res.ok) {
       setError(res.message);
-      setLoading(false);
       return;
     }
 
-    // Auto-login tras registro
-    await signIn("credentials", {
-      email: payload.email,
-      password: payload.password,
-      redirect: false,
-    });
-    setLoading(false);
-    router.push("/dashboard");
-    router.refresh();
+    if (res.skipVerification) {
+      router.push("/login?registered=1");
+      return;
+    }
+
+    const email =
+      typeof payload.email === "string" ? payload.email : res.email ?? "";
+    router.push(`/check-email?email=${encodeURIComponent(email)}`);
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md rounded-3xl border border-foreground/10 bg-white p-8 shadow-lg">
-        <h1 className="text-2xl font-bold">Crea tu cuenta</h1>
-        <p className="mt-1 text-sm text-foreground/60">
-          Empieza tu camino hacia una vida más saludable.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+    <AuthShell
+      title="Empezá hoy"
+      subtitle="Creá tu cuenta y accedé a consultas, formularios y seguimiento personalizado con Anttova."
+    >
+      <AuthFormCard>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-sm font-semibold">Nombre completo</label>
             <input
               name="name"
               required
-              className="mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary"
+              autoComplete="name"
+              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
             />
           </div>
           <div>
@@ -63,7 +65,8 @@ export default function RegisterPage() {
               name="email"
               type="email"
               required
-              className="mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary"
+              autoComplete="email"
+              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
             />
           </div>
           <div>
@@ -73,26 +76,29 @@ export default function RegisterPage() {
               type="password"
               required
               minLength={8}
-              className="mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary"
+              autoComplete="new-password"
+              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
             />
           </div>
+          <p className="text-xs text-foreground/55">
+            Te enviaremos un email para confirmar tu cuenta antes de ingresar.
+          </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground transition hover:scale-[1.02] disabled:opacity-60"
+            className="flex w-full items-center justify-center rounded-[28px] bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-md transition hover:scale-[1.02] disabled:opacity-50"
           >
-            {loading ? "Creando cuenta..." : "Registrarme"}
+            {loading ? "Creando cuenta…" : "Registrarme"}
           </button>
         </form>
+      </AuthFormCard>
 
-        <p className="mt-6 text-center text-sm text-foreground/60">
-          ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="font-semibold text-primary">
-            Inicia sesión
-          </Link>
-        </p>
-      </div>
-    </div>
+      <AuthFooterLink
+        prompt="¿Ya tenés cuenta?"
+        href="/login"
+        label="Iniciá sesión"
+      />
+    </AuthShell>
   );
 }

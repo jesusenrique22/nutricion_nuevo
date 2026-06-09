@@ -2,51 +2,81 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
+import {
+  type ConsultationFormType,
+  isConsultationFormCompleted,
+  resolveConsultationFormType,
+} from "@/lib/form-routing";
 
 export interface AppointmentFormContext {
   appointmentId: string;
   flow: "INTAKE" | "FOLLOW_UP";
+  consultationCode: string;
   consultationName: string;
   startTime: string;
   isCompleted: boolean;
+  formType: ConsultationFormType;
+  patientEmail: string;
 }
 
-/** Contexto para renderizar Intake vs Follow-up en la página de formulario. */
-export async function getAppointmentFormContext(
-  appointmentId: string,
+/** Contexto del formulario pendiente por índice (0 = próxima cita). Sin exponer ID en URL. */
+export async function getPendingFormContext(
+  slot = 0,
+  preferLatest = false,
 ): Promise<AppointmentFormContext | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const appointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId, patientId: session.user.id },
+  const profile = await prisma.patientProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { hasCompletedIntake: true },
+  });
+
+  const appts = await prisma.appointment.findMany({
+    where: {
+      patientId: session.user.id,
+      status: { in: ["PENDING", "CONFIRMED"] },
+      startTime: { gte: new Date() },
+    },
     include: {
       consultationType: true,
       patient: { include: { patientProfile: true } },
       followUpSubmission: true,
+      anthropometryFormSubmission: true,
+      nutritionFormSubmission: true,
+      trainingFormSubmission: true,
     },
+    orderBy: preferLatest
+      ? { createdAt: "desc" }
+      : { startTime: "asc" },
   });
 
-  if (!appointment) return null;
-  if (!["PENDING", "CONFIRMED"].includes(appointment.status)) return null;
+  const pending = appts.filter(
+    (a) =>
+      !isConsultationFormCompleted(a, profile?.hasCompletedIntake ?? false),
+  );
 
-  const isCompleted =
-    appointment.flow === "INTAKE"
-      ? (appointment.patient.patientProfile?.hasCompletedIntake ?? false)
-      : Boolean(appointment.followUpSubmission);
+  const appointment = pending[slot] ?? pending[0];
+  if (!appointment) return null;
+
+  const formType = resolveConsultationFormType(appointment);
 
   return {
     appointmentId: appointment.id,
     flow: appointment.flow,
+    consultationCode: appointment.consultationType.code,
     consultationName: appointment.consultationType.name,
     startTime: appointment.startTime.toISOString(),
-    isCompleted,
+    isCompleted: false,
+    formType,
+    patientEmail: appointment.patient.email,
   };
 }
 
 export interface PendingFormAppointment {
   id: string;
   flow: "INTAKE" | "FOLLOW_UP";
+  formType: ConsultationFormType;
   title: string;
   start: string;
 }
@@ -72,18 +102,22 @@ export async function getPendingFormAppointments(): Promise<
     include: {
       consultationType: true,
       followUpSubmission: true,
+      anthropometryFormSubmission: true,
+      nutritionFormSubmission: true,
+      trainingFormSubmission: true,
     },
     orderBy: { startTime: "asc" },
   });
 
   return appts
-    .filter((a) => {
-      if (a.flow === "INTAKE") return !profile?.hasCompletedIntake;
-      return !a.followUpSubmission;
-    })
+    .filter(
+      (a) =>
+        !isConsultationFormCompleted(a, profile?.hasCompletedIntake ?? false),
+    )
     .map((a) => ({
       id: a.id,
       flow: a.flow,
+      formType: resolveConsultationFormType(a),
       title: a.consultationType.name,
       start: a.startTime.toISOString(),
     }));
@@ -140,6 +174,7 @@ export interface PatientDetailDTO {
     physicalActivity: unknown;
     goals: string | null;
     supplementsUse: unknown;
+    extendedPayload: unknown;
     createdAt: string;
   } | null;
   measurements: {
@@ -147,6 +182,7 @@ export interface PatientDetailDTO {
     measuredAt: string;
     weight: number | null;
     bodyFatPct: number | null;
+    muscleMass: number | null;
     waist: number | null;
     hip: number | null;
   }[];
@@ -158,6 +194,27 @@ export interface PatientDetailDTO {
     symptoms: string | null;
     notes: string | null;
     currentWeight: number | null;
+  }[];
+  anthropometryForms: {
+    appointmentDate: string;
+    fullName: string | null;
+    mainObjective: string | null;
+    evaluationFrequency: string | null;
+    reportAnalysisTypes: unknown;
+    procedureQuestions: string | null;
+  }[];
+  nutritionForms: {
+    appointmentDate: string;
+    consultationReason: string | null;
+    continuationPreference: string | null;
+  }[];
+  trainingForms: {
+    appointmentDate: string;
+    fullName: string | null;
+    mainObjective: string | null;
+    evaluationFrequency: string | null;
+    reportAnalysisTypes: unknown;
+    procedureQuestions: string | null;
   }[];
 }
 
@@ -178,6 +235,7 @@ export async function getMyMeasurements() {
     measuredAt: m.measuredAt.toISOString(),
     weight: m.weight,
     bodyFatPct: m.bodyFatPct,
+    muscleMass: m.muscleMass,
     waist: m.waist,
     hip: m.hip,
   }));
@@ -196,17 +254,19 @@ export async function getPatientDetail(
       patientProfile: {
         include: {
           intakeForm: true,
-          measurements: { orderBy: { measuredAt: "desc" }, take: 10 },
+          measurements: { orderBy: { measuredAt: "desc" }, take: 30 },
         },
       },
       appointments: {
-        where: { flow: "FOLLOW_UP" },
         include: {
           consultationType: true,
           followUpSubmission: true,
+          anthropometryFormSubmission: true,
+          nutritionFormSubmission: true,
+          trainingFormSubmission: true,
         },
         orderBy: { startTime: "desc" },
-        take: 5,
+        take: 10,
       },
     },
   });
@@ -238,6 +298,7 @@ export async function getPatientDetail(
           physicalActivity: profile.intakeForm.physicalActivity,
           goals: profile.intakeForm.goals,
           supplementsUse: profile.intakeForm.supplementsUse,
+          extendedPayload: profile.intakeForm.extendedPayload,
           createdAt: profile.intakeForm.createdAt.toISOString(),
         }
       : null,
@@ -246,6 +307,7 @@ export async function getPatientDetail(
       measuredAt: m.measuredAt.toISOString(),
       weight: m.weight,
       bodyFatPct: m.bodyFatPct,
+      muscleMass: m.muscleMass,
       waist: m.waist,
       hip: m.hip,
     })),
@@ -259,6 +321,41 @@ export async function getPatientDetail(
         symptoms: a.followUpSubmission!.symptoms,
         notes: a.followUpSubmission!.notes,
         currentWeight: a.followUpSubmission!.currentWeight,
+      })),
+    anthropometryForms: patient.appointments
+      .filter((a) => a.anthropometryFormSubmission)
+      .map((a) => ({
+        appointmentDate: a.startTime.toISOString(),
+        fullName: a.anthropometryFormSubmission!.fullName,
+        mainObjective: a.anthropometryFormSubmission!.mainObjective,
+        evaluationFrequency:
+          a.anthropometryFormSubmission!.evaluationFrequency,
+        reportAnalysisTypes:
+          a.anthropometryFormSubmission!.reportAnalysisTypes,
+        procedureQuestions:
+          a.anthropometryFormSubmission!.procedureQuestions,
+      })),
+    nutritionForms: patient.appointments
+      .filter((a) => a.nutritionFormSubmission)
+      .map((a) => ({
+        appointmentDate: a.startTime.toISOString(),
+        consultationReason:
+          a.nutritionFormSubmission!.consultationReason,
+        continuationPreference:
+          a.nutritionFormSubmission!.continuationPreference,
+      })),
+    trainingForms: patient.appointments
+      .filter((a) => a.trainingFormSubmission)
+      .map((a) => ({
+        appointmentDate: a.startTime.toISOString(),
+        fullName: a.trainingFormSubmission!.fullName,
+        mainObjective: a.trainingFormSubmission!.mainObjective,
+        evaluationFrequency:
+          a.trainingFormSubmission!.evaluationFrequency,
+        reportAnalysisTypes:
+          a.trainingFormSubmission!.reportAnalysisTypes,
+        procedureQuestions:
+          a.trainingFormSubmission!.procedureQuestions,
       })),
   };
 }

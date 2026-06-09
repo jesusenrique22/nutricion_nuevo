@@ -49,15 +49,33 @@ export async function submitFollowUpForm(
 
   const data = parsed.data;
 
-  await prisma.followUpSubmission.create({
-    data: {
-      appointmentId,
-      currentWeight: data.currentWeight ?? null,
-      energyLevel: data.energyLevel,
-      adherence: data.adherence,
-      symptoms: data.symptoms || null,
-      notes: data.notes || null,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.followUpSubmission.create({
+      data: {
+        appointmentId,
+        currentWeight: data.currentWeight ?? null,
+        energyLevel: data.energyLevel,
+        adherence: data.adherence,
+        symptoms: data.symptoms || null,
+        notes: data.notes || null,
+      },
+    });
+
+    if (data.currentWeight != null) {
+      const profile = await tx.patientProfile.findUnique({
+        where: { userId: session.user!.id },
+      });
+      if (profile) {
+        await tx.anthropometryMeasurement.create({
+          data: {
+            patientProfileId: profile.id,
+            appointmentId,
+            weight: data.currentWeight,
+            measuredAt: new Date(),
+          },
+        });
+      }
+    }
   });
 
   return { ok: true };

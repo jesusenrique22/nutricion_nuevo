@@ -1,11 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import { limitByKey } from "@/lib/ratelimit";
 import { createAppointmentSchema } from "@/lib/validators/appointment";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import { syncPatientAndAdmins } from "@/server/realtime/sync";
+import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
 
 export type CreateAppointmentResult =
   | { ok: true; appointmentId: string; flow: "INTAKE" | "FOLLOW_UP" }
@@ -68,18 +71,47 @@ export async function createAppointment(
   });
   const flow = profile?.hasCompletedIntake ? "FOLLOW_UP" : "INTAKE";
 
-  // 6) Persistencia
-  const appointment = await prisma.appointment.create({
-    data: {
-      patientId,
-      consultationTypeId,
-      startTime: new Date(startTime),
-      endTime: validation.endTime,
-      modality,
-      flow,
-      status: "PENDING",
-    },
-    select: { id: true },
+  // 6) Persistencia + registro de pago manual pendiente
+  const appointment = await prisma.$transaction(async (tx) => {
+    const created = await tx.appointment.create({
+      data: {
+        patientId,
+        consultationTypeId,
+        startTime: new Date(startTime),
+        endTime: validation.endTime,
+        modality,
+        flow,
+        status: "PENDING",
+      },
+      select: { id: true },
+    });
+
+    await tx.payment.create({
+      data: {
+        appointmentId: created.id,
+        amount: consultationType.price,
+        status: "PENDING",
+        provider: "manual",
+      },
+    });
+
+    return created;
+  });
+
+  await notifyAppointmentBooked({
+    patientId,
+    patientName: session.user.name ?? "Paciente",
+    consultationName: consultationType.name,
+    startTime: new Date(startTime),
+    appointmentId: appointment.id,
+  });
+
+  revalidatePath("/dashboard/patient/appointments");
+  revalidatePath("/dashboard/admin/calendar");
+  revalidatePath("/dashboard");
+
+  await syncPatientAndAdmins(patientId, "appointments", {
+    appointmentId: appointment.id,
   });
 
   return { ok: true, appointmentId: appointment.id, flow };

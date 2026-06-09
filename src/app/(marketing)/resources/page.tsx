@@ -1,37 +1,32 @@
-import { Reveal } from "@/components/motion/reveal";
+import Link from "next/link";
+import { ContentLobbyShell } from "@/components/brand/content-lobby-shell";
+import { ResourceCatalog } from "@/components/resources/resource-catalog";
+import { getPublishedResources } from "@/server/actions/resource.queries";
+import { auth } from "@/lib/auth";
 
-const items = Array.from({ length: 8 }).map((_, i) => ({
-  id: i,
-  title: `Recurso ${i + 1}`,
-  type: i % 2 === 0 ? "E-book" : "Video",
-}));
+export const dynamic = "force-dynamic";
 
-export default function ResourcesPage() {
+export default async function ResourcesPage() {
+  const session = await auth();
+  const resources = await getPublishedResources();
+
   return (
     <div className="px-6 py-16">
       <div className="mx-auto max-w-6xl">
-        <Reveal>
-          <h1 className="text-4xl font-extrabold">E-Resources</h1>
-          <p className="mt-2 text-foreground/60">
-            E-books y videos exclusivos de tu nutricionista.
-          </p>
-        </Reveal>
-
-        <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
-          {items.map((item, i) => (
-            <Reveal key={item.id} delay={i * 0.05}>
-              <div className="group cursor-pointer overflow-hidden rounded-2xl border border-foreground/10 bg-white transition hover:-translate-y-1 hover:shadow-xl">
-                <div className="aspect-[3/4] bg-gradient-to-br from-primary/20 to-accent/30" />
-                <div className="p-4">
-                  <span className="text-xs font-bold text-accent">
-                    {item.type}
-                  </span>
-                  <h3 className="mt-1 font-bold">{item.title}</h3>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+        <ContentLobbyShell
+          title="E-Resources"
+          description="E-books, videos y material exclusivo Anttova."
+        >
+          {!session?.user && (
+            <p className="mb-6 rounded-xl bg-accent/10 px-4 py-3 text-sm">
+              <Link href="/login" className="font-semibold text-primary">
+                Inicia sesión
+              </Link>{" "}
+              para solicitar acceso a recursos de pago.
+            </p>
+          )}
+          <ResourceCatalog resources={resources} />
+        </ContentLobbyShell>
       </div>
     </div>
   );

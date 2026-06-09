@@ -26,7 +26,7 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
         birthDate: fd.get("birthDate"),
         gender: fd.get("gender"),
         height: fd.get("height"),
-        occupation: fd.get("occupation") || undefined,
+        occupation: fd.get("occupation"),
         emergencyPhone: fd.get("emergencyPhone"),
       },
       medicalHistory: {
@@ -101,7 +101,7 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
             />
           </Field>
           <Field label="Ocupación">
-            <input name="occupation" type="text" className={inputClass} />
+            <input name="occupation" type="text" required minLength={2} className={inputClass} />
           </Field>
           <Field label="Teléfono de emergencia">
             <input
@@ -121,30 +121,32 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
         <Field label="Enfermedades o condiciones actuales">
           <textarea
             name="conditions"
+            required
+            minLength={2}
             placeholder="Ej: hipotiroidismo, diabetes… (escribe 'ninguna' si aplica)"
             className={textareaClass}
           />
         </Field>
         <Field label="Cirugías previas">
-          <textarea name="surgeries" className={textareaClass} />
+          <textarea name="surgeries" required minLength={2} className={textareaClass} />
         </Field>
         <Field label="Medicamentos actuales">
-          <textarea name="medications" className={textareaClass} />
+          <textarea name="medications" required minLength={2} className={textareaClass} />
         </Field>
         <Field label="Antecedentes familiares relevantes">
-          <textarea name="familyHistory" className={textareaClass} />
+          <textarea name="familyHistory" required minLength={2} className={textareaClass} />
         </Field>
       </FormSection>
 
       <FormSection title="Alergias e intolerancias">
         <Field label="Alimentarias">
-          <textarea name="allergyFood" className={textareaClass} />
+          <textarea name="allergyFood" required minLength={2} className={textareaClass} />
         </Field>
         <Field label="Medicamentos">
-          <textarea name="allergyDrug" className={textareaClass} />
+          <textarea name="allergyDrug" required minLength={2} className={textareaClass} />
         </Field>
         <Field label="Otras">
-          <textarea name="allergyOther" className={textareaClass} />
+          <textarea name="allergyOther" required minLength={2} className={textareaClass} />
         </Field>
       </FormSection>
 
@@ -189,7 +191,7 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
           </Field>
         </div>
         <Field label="Notas adicionales sobre alimentación">
-          <textarea name="dietNotes" className={textareaClass} />
+          <textarea name="dietNotes" required minLength={2} className={textareaClass} />
         </Field>
       </FormSection>
 
@@ -206,6 +208,8 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
           <Field label="Tipo de actividad">
             <input
               name="activityType"
+              required
+              minLength={2}
               placeholder="Ej: caminata, gym, yoga…"
               className={inputClass}
             />
@@ -248,12 +252,14 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
         <Field label="Suplementos que consumes">
           <textarea
             name="supplements"
-            placeholder="Ej: proteína, multivitamínico…"
+            required
+            minLength={2}
+            placeholder="Ej: proteína, multivitamínico… o «ninguno»"
             className={textareaClass}
           />
         </Field>
         <Field label="Notas sobre suplementos">
-          <textarea name="supplementsNotes" className={textareaClass} />
+          <textarea name="supplementsNotes" required minLength={2} className={textareaClass} />
         </Field>
       </FormSection>
 

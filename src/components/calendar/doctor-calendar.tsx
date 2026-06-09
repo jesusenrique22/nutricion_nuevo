@@ -1,86 +1,262 @@
 "use client";
 
-import { useMemo } from "react";
-import {
-  Calendar,
-  dateFnsLocalizer,
-  Views,
-  type Event,
-} from "react-big-calendar";
-import { format } from "date-fns/format";
-import { parse } from "date-fns/parse";
-import { startOfWeek } from "date-fns/startOfWeek";
-import { getDay } from "date-fns/getDay";
+import { useEffect, useMemo, useState } from "react";
+import { format, isSameDay, isToday, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale/es";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
-import "react-big-calendar/lib/css/react-big-calendar.css";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { CalendarMiniMonth } from "@/components/calendar/calendar-mini-month";
+import { CalendarDayView } from "@/components/calendar/calendar-day-view";
+import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
+import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
+import { STATUS_UI, statusLabel } from "@/components/calendar/calendar-status";
+import {
+  appointmentsOnDay,
+  headerLabel,
+  navigateDate,
+  type CalendarView,
+} from "@/components/calendar/calendar-utils";
 
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { locale: es }),
-  getDay,
-  locales: { es },
-});
-
-const statusColor: Record<string, string> = {
-  PENDING: "#e8a33d",
-  CONFIRMED: "#4f7942",
-  COMPLETED: "#9ca3af",
-  CANCELLED: "#dc2626",
-  NO_SHOW: "#dc2626",
-};
+const VIEWS: { id: CalendarView; label: string }[] = [
+  { id: "day", label: "Día" },
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mes" },
+];
 
 export function DoctorCalendar({
   appointments,
+  onSelectAppointment,
 }: {
   appointments: AppointmentDTO[];
+  onSelectAppointment?: (appointment: AppointmentDTO) => void;
 }) {
-  const events: (Event & { status: string })[] = useMemo(
-    () =>
-      appointments.map((a) => ({
-        title: a.title,
-        start: new Date(a.start),
-        end: new Date(a.end),
-        status: a.status,
-      })),
+  const isMobile = useMediaQuery("(max-width: 1023px)");
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [view, setView] = useState<CalendarView>(() =>
+    isMobile ? "day" : "week",
+  );
+  const [miniMonth, setMiniMonth] = useState(() =>
+    startOfMonth(new Date()),
+  );
+
+  useEffect(() => {
+    setMiniMonth(startOfMonth(selectedDate));
+  }, [selectedDate]);
+
+  const todayCount = useMemo(
+    () => appointmentsOnDay(appointments, new Date()).length,
     [appointments],
   );
 
+  const selectedCount = useMemo(
+    () => appointmentsOnDay(appointments, selectedDate).length,
+    [appointments, selectedDate],
+  );
+
+  function goToday() {
+    const now = new Date();
+    setSelectedDate(now);
+    setMiniMonth(startOfMonth(now));
+  }
+
+  function pickDay(day: Date) {
+    setSelectedDate(day);
+    setMiniMonth(startOfMonth(day));
+    if (view === "month") setView("day");
+  }
+
+  function navigate(direction: "prev" | "next") {
+    setSelectedDate((d) => navigateDate(d, view, direction));
+  }
+
+  const realToday = new Date();
+  const isSelectedToday = isSameDay(selectedDate, realToday);
+  const focusDayLabel = isSelectedToday
+    ? "Hoy"
+    : format(selectedDate, "d MMM", { locale: es });
+
   return (
-    <div className="rounded-2xl border border-foreground/10 bg-white p-4">
-      <div style={{ height: 640 }}>
-        <Calendar
-          localizer={localizer}
-          culture="es"
-          events={events}
-          startAccessor="start"
-          endAccessor="end"
-          defaultView={Views.WEEK}
-          views={[Views.MONTH, Views.WEEK, Views.DAY]}
-          min={new Date(1970, 0, 1, 7, 0)}
-          max={new Date(1970, 0, 1, 20, 0)}
-          messages={{
-            month: "Mes",
-            week: "Semana",
-            day: "Día",
-            today: "Hoy",
-            previous: "Anterior",
-            next: "Siguiente",
-            noEventsInRange: "Sin citas en este rango.",
-          }}
-          eventPropGetter={(event) => ({
-            style: {
-              backgroundColor:
-                statusColor[(event as { status: string }).status] ?? "#4f7942",
-              borderRadius: "6px",
-              border: "none",
-              color: "white",
-              fontSize: "0.8rem",
-            },
-          })}
-        />
+    <div className="anttova-calendar">
+      <div className="grid items-start gap-3 lg:grid-cols-[228px_1fr] lg:gap-5">
+        <aside className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-3">
+          <CalendarMiniMonth
+            month={miniMonth}
+            selected={selectedDate}
+            appointments={appointments}
+            onSelectDay={pickDay}
+            onChangeMonth={setMiniMonth}
+            compact
+          />
+
+          <StatPill
+            label="Hoy"
+            day={format(realToday, "d")}
+            detail={format(realToday, "EEE", { locale: es })}
+            count={todayCount}
+            active={isSelectedToday}
+          />
+          <StatPill
+            label="Seleccionado"
+            day={format(selectedDate, "d")}
+            detail={format(selectedDate, "EEE", { locale: es })}
+            count={selectedCount}
+            active={!isSelectedToday}
+          />
+        </aside>
+
+        <div className="anttova-calendar__main min-w-0">
+          <header className="anttova-calendar__header">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">
+                Agenda
+              </p>
+              <h2 className="truncate text-base font-bold capitalize sm:text-lg">
+                {headerLabel(selectedDate, view)}
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="flex rounded-full border border-foreground/10 bg-surface p-0.5">
+                {VIEWS.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setView(v.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition sm:px-4 ${
+                      view === v.id
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-foreground/55 hover:text-primary"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <NavBtn label="Anterior" onClick={() => navigate("prev")}>
+                  ←
+                </NavBtn>
+                <button
+                  type="button"
+                  onClick={goToday}
+                  title={
+                    isSelectedToday
+                      ? "Día actual"
+                      : "Volver al día de hoy"
+                  }
+                  className={`min-w-[3.25rem] rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                    isSelectedToday
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-accent-soft text-primary hover:bg-accent"
+                  }`}
+                >
+                  {focusDayLabel}
+                </button>
+                <NavBtn label="Siguiente" onClick={() => navigate("next")}>
+                  →
+                </NavBtn>
+              </div>
+            </div>
+          </header>
+
+          <div className="anttova-calendar__body">
+            {view === "day" && (
+              <CalendarDayView
+                date={selectedDate}
+                appointments={appointments}
+                onSelect={onSelectAppointment}
+              />
+            )}
+            {view === "week" && (
+              <CalendarWeekView
+                date={selectedDate}
+                selected={selectedDate}
+                appointments={appointments}
+                onSelectDay={pickDay}
+                onSelect={onSelectAppointment}
+              />
+            )}
+            {view === "month" && (
+              <CalendarMonthView
+                month={selectedDate}
+                selected={selectedDate}
+                appointments={appointments}
+                onSelectDay={pickDay}
+              />
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-foreground/6 pt-3">
+              {Object.entries(STATUS_UI).map(([key, ui]) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-foreground/60"
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${ui.dot}`} />
+                  {statusLabel(key)}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function NavBtn({
+  children,
+  label,
+  onClick,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/10 bg-surface text-sm font-semibold text-foreground/70 transition hover:border-primary/30 hover:text-primary"
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatPill({
+  label,
+  day,
+  detail,
+  count,
+  active,
+}: {
+  label: string;
+  day: string;
+  detail: string;
+  count: number;
+  active?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border px-3 py-2.5 ${
+        active
+          ? "border-primary/20 bg-primary/8 ring-1 ring-primary/15"
+          : "border-foreground/8 bg-surface"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-wider text-foreground/45">
+          {label}
+        </p>
+        <p className="text-xl font-bold tabular-nums leading-none text-primary">
+          {day}
+        </p>
+      </div>
+      <p className="mt-1 truncate text-[10px] capitalize text-foreground/50">
+        {detail} · {count} cita{count !== 1 ? "s" : ""}
+      </p>
     </div>
   );
 }

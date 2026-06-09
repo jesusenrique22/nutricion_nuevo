@@ -1,0 +1,85 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+
+export function BrandLinkButton({
+  href,
+  label,
+  subtitle,
+  external = false,
+  onClick,
+  selected = false,
+  delay = 0,
+  type = "link",
+  disabled = false,
+  wide = false,
+}: {
+  href?: string;
+  label: string;
+  subtitle?: string;
+  external?: boolean;
+  onClick?: () => void;
+  selected?: boolean;
+  delay?: number;
+  type?: "link" | "button";
+  disabled?: boolean;
+  wide?: boolean;
+}) {
+  const widthClass = wide ? "w-full" : "w-full max-w-[344px]";
+  const className = `group flex ${widthClass} flex-col items-center justify-center rounded-[28px] px-6 py-4 text-center transition-shadow disabled:pointer-events-none disabled:opacity-50 ${
+    selected
+      ? "bg-[#5a1728] text-primary-foreground shadow-lg ring-2 ring-accent-soft/50"
+      : "bg-primary text-primary-foreground shadow-md hover:shadow-xl"
+  }`;
+
+  const inner = (
+    <>
+      <span className="text-base font-semibold tracking-wide">{label}</span>
+      {subtitle && (
+        <span className="mt-0.5 text-xs font-normal text-primary-foreground/75">
+          {subtitle}
+        </span>
+      )}
+    </>
+  );
+
+  const motionProps = {
+    initial: { opacity: 0, y: 22, scale: 0.96 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    transition: {
+      delay,
+      duration: 0.45,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
+    whileHover: { scale: 1.02, y: -2 },
+    whileTap: { scale: 0.98 },
+  };
+
+  if (type === "button" || onClick) {
+    return (
+      <motion.button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={className}
+        {...motionProps}
+      >
+        {inner}
+      </motion.button>
+    );
+  }
+
+  return (
+    <motion.div {...motionProps} className={wide ? "w-full" : "w-full max-w-[344px]"}>
+      <Link
+        href={href ?? "#"}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+        className={className}
+      >
+        {inner}
+      </Link>
+    </motion.div>
+  );
+}

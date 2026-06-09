@@ -1,6 +1,6 @@
-# NutriVida
+# Anttova
 
-Plataforma de nutrición para agendar consultas, completar anamnesis, hacer seguimiento clínico y (en desarrollo) chat en vivo y recursos digitales.
+Plataforma de nutrición, entrenamiento y antropometría para agendar consultas, completar anamnesis, hacer seguimiento clínico y (en desarrollo) chat en vivo y recursos digitales.
 
 ## Inicio rápido
 
@@ -14,10 +14,20 @@ pnpm run dev
 
 Abre [http://localhost:3000](http://localhost:3000).
 
-Para el chat en tiempo real (opcional, módulo en progreso):
+Para el chat en tiempo real (requiere MongoDB en marcha):
 
 ```bash
-pnpm run socket   # puerto 3001
+pnpm run socket   # puerto 3001 — en otra terminal junto a dev
+```
+
+Variables: `MONGODB_URI`, `MONGODB_DB`, `NEXT_PUBLIC_SOCKET_URL` (ej. `http://localhost:3001`).
+
+### Recordatorios de citas (sin servicios pagos)
+
+```bash
+npm run reminders          # script directo (usa PostgreSQL + MongoDB)
+# o cron del sistema cada hora:
+# 0 * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/reminders
 ```
 
 ## Documentación

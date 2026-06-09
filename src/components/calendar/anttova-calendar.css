@@ -1,0 +1,66 @@
+/* Calendario Anttova — agenda moderna */
+
+.anttova-calendar {
+  font-family: var(--font-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.anttova-calendar__main {
+  border-radius: 1.25rem;
+  border: 1px solid rgb(116 30 49 / 0.08);
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(8px);
+  padding: 0.875rem 1rem;
+  box-shadow:
+    0 4px 24px -4px rgb(116 30 49 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+@media (min-width: 640px) {
+  .anttova-calendar__main {
+    padding: 1rem 1.25rem;
+    border-radius: 1.5rem;
+  }
+}
+
+.anttova-calendar__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgb(116 30 49 / 0.06);
+}
+
+@media (min-width: 640px) {
+  .anttova-calendar__header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.anttova-calendar__body {
+  margin-top: 0.75rem;
+}
+
+/* Vista semana — altura acotada, scroll solo si hay muchas citas */
+.anttova-week__body {
+  max-height: min(220px, calc(100dvh - 22rem));
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  .anttova-week__body {
+    max-height: min(260px, calc(100dvh - 19rem));
+  }
+}
+
+@media (max-width: 639px) {
+  .anttova-week {
+    overflow-x: auto;
+  }
+
+  .anttova-week__body,
+  .anttova-week > .grid:first-child {
+    min-width: 560px;
+  }
+}

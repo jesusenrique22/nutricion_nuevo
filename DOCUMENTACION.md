@@ -1,27 +1,49 @@
-# NutriVida — Documentación del proyecto
+# Anttova — Documentación del proyecto
 
-Plataforma web para consultorio de nutrición: agendamiento de citas, anamnesis, seguimiento de pacientes, chat en vivo y tienda de recursos digitales.
+Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendamiento, formularios clínicos, seguimiento, chat, recursos digitales y panel de personalización (CMS).
 
-**Stack:** Next.js 16 · React 19 · TypeScript · PostgreSQL (Prisma) · MongoDB (chat) · NextAuth v5 · Socket.io · Tailwind CSS 4 · Zod
+**Stack:** Next.js 16 · React 19 · TypeScript · PostgreSQL (Prisma) · MongoDB (chat/notificaciones) · NextAuth v5 · Socket.io · Tailwind CSS 4 · Zod
 
 ---
 
 ## Índice
 
-1. [Arquitectura general](#1-arquitectura-general)
-2. [Módulos y estado de implementación](#2-módulos-y-estado-de-implementación)
-3. [Lo que está hecho (detalle)](#3-lo-que-está-hecho-detalle)
-4. [Lo que falta por implementar](#4-lo-que-falta-por-implementar)
+1. [Estado general del proyecto](#1-estado-general-del-proyecto)
+2. [Arquitectura](#2-arquitectura)
+3. [Módulos implementados](#3-módulos-implementados)
+4. [Panel Personalizar (CMS)](#4-panel-personalizar-cms)
 5. [Modelo de datos](#5-modelo-de-datos)
 6. [Rutas de la aplicación](#6-rutas-de-la-aplicación)
 7. [Variables de entorno](#7-variables-de-entorno)
 8. [Comandos útiles](#8-comandos-útiles)
 9. [Credenciales de desarrollo](#9-credenciales-de-desarrollo)
-10. [Orden sugerido para continuar](#10-orden-sugerido-para-continuar)
+10. [Pendiente / próximos pasos](#10-pendiente--próximos-pasos)
 
 ---
 
-## 1. Arquitectura general
+## 1. Estado general del proyecto
+
+**Progreso global estimado: ~85%** para un MVP funcional en local. Falta sobre todo producción (deploy, email SMTP, pasarela de pago) y algunos pulidos de admin.
+
+| Área | Estado | Notas |
+|------|--------|-------|
+| Infraestructura | ✅ ~95% | Next.js, Prisma, seed, scripts cron/reminders |
+| Auth | ✅ ~90% | Login, registro, recuperar contraseña (dev: link en pantalla) |
+| Landing / marketing | ✅ ~85% | Brand Anttova, imágenes editables desde CMS |
+| Formularios clínicos | ✅ ~95% | **100% dinámicos** vía CMS (5 plantillas) |
+| Agendamiento | ✅ ~90% | Slots, reservas, confirmar/cancelar/completar, recordatorios |
+| Panel admin | ✅ ~80% | Pacientes, calendario, analytics, mediciones |
+| Chat | ✅ ~85% | UI + Socket.io + MongoDB + badges unread |
+| Recursos digitales | ✅ ~85% | CRUD, tienda, librería; pagos manuales |
+| CMS / Personalizar | ✅ ~90% | Imágenes, precios, textos, formularios, plan semanal |
+| Pagos online | 🔴 ~10% | Modelo `Payment` + registro manual; sin Stripe |
+| Deploy / prod | 🔴 0% | Pendiente VPS, dominio, SMTP |
+
+**Leyenda:** ✅ funcional · 🟡 parcial · 🔴 pendiente
+
+---
+
+## 2. Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,231 +53,160 @@ Plataforma web para consultorio de nutrición: agendamiento de citas, anamnesis,
 │  │  (público)   │  │ login/reg    │  │ admin / patient  │  │
 │  └──────────────┘  └──────────────┘  └──────────────────┘  │
 │                          │                    │             │
-│                    Server Actions         Server Actions      │
-│                          │                    │             │
+│                    Server Actions         Server Actions    │
 └──────────────────────────┼────────────────────┼─────────────┘
                            ▼                    ▼
               ┌────────────────────┐  ┌───────────────────┐
               │   PostgreSQL       │  │     MongoDB       │
-              │   (Prisma)         │  │  chat, archivos,  │
-              │   datos core       │  │  notificaciones   │
+              │   (Prisma)         │  │  chat, notifs     │
               └────────────────────┘  └───────────────────┘
                                               ▲
               ┌────────────────────┐          │
               │  Socket.io server  │──────────┘
-              │  (proceso aparte)  │
+              │  pnpm run socket   │
               └────────────────────┘
 ```
 
 | Capa | Ubicación | Responsabilidad |
 |------|-----------|-----------------|
-| Páginas | `src/app/` | UI por rol y zona (marketing, auth, dashboard) |
-| Componentes | `src/components/` | Formularios, calendario, booking |
-| Server Actions | `src/server/actions/` | Mutaciones y queries desde el servidor |
-| Servicios | `src/server/services/` | Reglas de negocio (slots, validación) |
+| Páginas | `src/app/` | UI por rol (marketing, auth, dashboard) |
+| Componentes | `src/components/` | Formularios, CMS, calendario, chat, brand |
+| Server Actions | `src/server/actions/` | Mutaciones y queries |
+| Servicios | `src/server/services/` | Slots, disponibilidad |
+| CMS | `src/lib/form-templates-catalog.ts`, `SiteContent` | Plantillas y contenido editable |
 | Auth | `src/lib/auth.ts` + `src/proxy.ts` | NextAuth + protección de rutas |
-| Validación | `src/lib/validators/` | Esquemas Zod |
 | BD relacional | `prisma/schema.prisma` | PostgreSQL |
-| BD documental | `src/server/db/mongo.ts` | MongoDB para chat |
+| BD documental | `src/server/db/mongo.ts` | MongoDB |
+
+**Decisión:** monolito Next.js (no backend separado). Uploads locales en `public/uploads/`.
 
 ---
 
-## 2. Módulos y estado de implementación
+## 3. Módulos implementados
 
-| Módulo | Descripción | Estado | Progreso estimado |
-|--------|-------------|--------|-------------------|
-| **0 — Infraestructura** | Next.js, Prisma, Tailwind, seed, scripts | ✅ Hecho | ~95% |
-| **1 — Catálogo y formularios** | Tipos de consulta, intake, follow-up | ✅ Hecho | ~90% |
-| **2 — Agendamiento** | Slots, reservas, rate limit, calendario admin | ✅ Hecho | ~85% |
-| **3 — Chat en vivo** | Socket.io + MongoDB | 🟡 Parcial | ~30% |
-| **4 — Panel admin** | Pacientes, ficha clínica | ✅ Hecho | ~75% |
-| **5 — E-Resources** | Tienda de e-books/videos | 🔴 Pendiente | ~10% |
-| **6 — Pagos** | Stripe/similar | 🔴 Pendiente | ~5% |
-| **7 — Analítica** | Estadísticas por tipo de consulta | 🔴 Pendiente | ~0% |
-| **8 — Notificaciones** | Recordatorios, mensajes | 🔴 Pendiente | ~0% |
+### 3.1 Autenticación
 
-**Leyenda:** ✅ funcional · 🟡 backend o esquema listo, UI incompleta · 🔴 solo diseño/esquema
+- NextAuth v5 (Credentials, bcrypt).
+- Roles: `ADMIN` (nutricionista) · `PATIENT`.
+- Registro de pacientes con `PatientProfile`.
+- **Recuperar contraseña:** `/forgot-password`, `/reset-password` (en dev el enlace aparece en pantalla/consola; falta SMTP en producción).
+- Protección de rutas en `src/proxy.ts`.
 
----
+### 3.2 Marketing
 
-## 3. Lo que está hecho (detalle)
+- **Landing** (`/`): hero carrusel, galería, servicios, paquetes — imágenes desde CMS (`landing_images`).
+- **Recursos públicos** (`/resources`): catálogo real desde PostgreSQL.
+- **Perfil nutricionista** (`/nutricionista`).
+- Brand assets en `public/brand/`.
 
-### 3.1 Autenticación y autorización
+### 3.3 Formularios clínicos (dinámicos)
 
-- **NextAuth v5** con proveedor Credentials (email + contraseña bcrypt).
-- Sesión JWT con rol (`ADMIN` | `PATIENT`) en token y sesión.
-- **Registro de pacientes** (`registerPatient`): crea `User` + `PatientProfile`.
-- **Protección de rutas** en `src/proxy.ts`:
-  - `/dashboard/*` requiere sesión.
-  - `/dashboard/admin/*` solo accesible por `ADMIN`.
-  - Redirección automática si ya hay sesión en `/login` o `/register`.
-- Seed incluye cuenta admin de prueba (ver [§9](#9-credenciales-de-desarrollo)).
+Todos los formularios de cita usan plantillas editables en **Personalizar → Formularios** y el componente `DynamicConsultationForm`.
 
-### 3.2 Marketing (sitio público)
+| Código plantilla | Cuándo se usa | Pasos |
+|------------------|---------------|-------|
+| `intake` | Primera cita (`flow = INTAKE`) | 6 |
+| `nutrition` | Primera consulta NUT-01 | 4 |
+| `training` | Primera consulta ENT-02 | 5 |
+| `anthropometry` | Primera consulta ANT-03 | 5 |
+| `follow_up` | Citas de seguimiento | 1 |
 
-- **Landing** (`/`): hero, perfil del nutricionista, tarjetas de paquetes (NUT-01, ENT-02, ANT-03).
-- **Layout marketing**: navbar con enlaces a recursos, paquetes e inicio de sesión.
-- **Página de recursos** (`/resources`): grid visual con datos **mock** (8 placeholders).
-- Animaciones con Framer Motion (`Reveal`).
+**Tipos de campo soportados:** texto, párrafo, email, teléfono, fecha, hora, URL, número, select, radio, checkbox, checkbox-group.
 
-### 3.3 Módulo 1 — Catálogo de consultas y formularios clínicos
+- Validación dinámica: `src/lib/dynamic-form-schema.ts`
+- Envío unificado: `src/server/actions/form-submission.actions.ts`
+- Campos custom → `extendedPayload` (JSON) en cada submission
+- Peso en seguimiento → crea `AnthropometryMeasurement`
+- URL del formulario **sin ID de cita:** `/dashboard/patient/appointments/form?slot=N`
 
-**Base de datos (seed):**
+### 3.4 Agendamiento
 
-| Código | Nombre | Modalidad | Horario | Precio |
-|--------|--------|-----------|---------|--------|
-| `NUT_01` | Consulta Nutricional | Online + Presencial | 08:00–18:00 | $50 |
-| `ENT_02` | Entrenamiento | Online + Presencial | 08:00–18:00 | $40 |
-| `ANT_03` | Antropometría | Solo presencial | 08:00–12:00 (matutino) | $35 |
+- Tipos de consulta con reglas (ANT-03 solo presencial matutino).
+- Precios editables desde CMS (seed: $35.000 / $40.000 / $25.000 ARS).
+- Crear cita, slots disponibles, rate limit (Upstash opcional).
+- **Admin:** confirmar, cancelar, completar, no-show desde calendario.
+- **Paciente:** cancelar citas propias.
+- **Recordatorios:** notificaciones in-app + `GET /api/cron/reminders` + `pnpm run reminders`.
+- Pagos **manuales** (`payment.actions.ts`); sin Stripe.
 
-**Formulario de ingreso (INTAKE):**
+### 3.5 Panel admin
 
-- Anamnesis completa: perfil personal, historial médico, alergias, hábitos alimenticios, actividad física, objetivos, suplementos.
-- Validación Zod en `src/lib/validators/intake.ts`.
-- Al enviar: actualiza `PatientProfile`, crea `IntakeForm`, marca `hasCompletedIntake = true`.
-- UI: `IntakeFormClient` + página `/dashboard/patient/appointments/[id]/form`.
+- **Calendario** semanal/mensual con panel al clic.
+- **Pacientes:** listado + ficha con anamnesis, formularios, seguimientos, mediciones, **plan semanal**.
+- **Analytics:** stats por tipo de consulta.
+- **Recursos:** CRUD + upload (portada, PDF, video).
+- **Registrar mediciones** ISAK + gráficas de evolución.
+- **Personalizar:** ver §4.
 
-**Formulario de seguimiento (FOLLOW_UP):**
+### 3.6 Panel paciente
 
-- Formulario breve: peso, energía, adherencia, síntomas, notas.
-- Vinculado a cita con `flow = FOLLOW_UP`.
-- Validación en `src/lib/validators/follow-up.ts`.
+- Agendar citas + historial + alertas de formularios pendientes.
+- **Progreso:** mediciones y gráficas SVG.
+- **Librería:** recursos adquiridos + tienda; **plan semanal** si está publicado.
+- **Chat** + **notificaciones** con badges en sidebar.
 
-**Detección automática de flujo:**
+### 3.7 Chat y notificaciones
 
-- Primera cita del paciente → `INTAKE`.
-- Paciente con intake completado → `FOLLOW_UP`.
+- MongoDB: conversaciones, mensajes, notificaciones.
+- Socket.io (`pnpm run socket`, puerto 3001).
+- Upload adjuntos chat → `public/uploads/chat/`.
+- UI en `/dashboard/chat` y `/dashboard/notifications`.
 
-### 3.4 Módulo 2 — Agendamiento
+### 3.8 Recursos digitales (Módulo 5)
 
-**Servicios:**
+- Admin CRUD en `/dashboard/admin/resources`.
+- Tienda pública y librería del paciente.
+- Acceso gratis si `price = 0`; compra manual → admin otorga acceso (`grantResourceAccess` en backend; UI de otorgar pendiente de pulir).
 
-- `validateAppointmentSlot`: modalidad permitida, ventana matutina (ANT-03), detección de solapamiento.
-- `getAvailableSlots`: genera bloques horarios respetando duración, citas ocupadas y horas pasadas.
+### 3.9 Plan semanal
 
-**Server Action `createAppointment`:**
-
-- Autenticación + rate limit (Upstash Redis, opcional en dev).
-- Validación Zod + reglas de negocio.
-- Crea cita en estado `PENDING`.
-
-**UI paciente:**
-
-- `BookingForm`: selector de tipo, modalidad, fecha y slots disponibles.
-- Historial de citas con badges de estado.
-- Alertas de formularios pendientes antes de la cita.
-
-**UI admin:**
-
-- Calendario semanal/mensual/diario con `react-big-calendar`.
-- Colores por estado (Pendiente, Confirmada, Completada).
-
-### 3.5 Panel admin — Pacientes
-
-- **Listado** (`/dashboard/admin/patients`): nombre, email, estado de ingreso, número de citas.
-- **Ficha detallada** (`/dashboard/admin/patients/[id]`):
-  - Datos personales del perfil.
-  - Anamnesis completa (JSON renderizado).
-  - Seguimientos recientes (últimos 5).
-  - Tabla de mediciones antropométricas (solo lectura).
-
-### 3.6 Panel paciente — Progreso
-
-- **Mi progreso** (`/dashboard/patient/progress`): tarjetas con últimas mediciones + tabla histórica.
-- Lee de `AnthropometryMeasurement` (requiere datos en BD; aún no hay UI para registrarlos).
-
-### 3.7 Chat (backend parcial)
-
-**Implementado:**
-
-- Tipos TypeScript para conversaciones, mensajes, archivos y notificaciones (`src/types/chat.ts`).
-- Conexión MongoDB con singleton en dev (`src/server/db/mongo.ts`).
-- Server Actions: `getOrCreateConversation`, `sendMessage`, `getMessages`.
-- Servidor Socket.io independiente (`pnpm run socket`): salas por conversación, eventos `message` y `typing`.
-
-**No implementado:** UI de chat, cliente Socket.io en frontend, subida de archivos, indicadores de lectura en UI.
-
-### 3.8 Infraestructura y utilidades
-
-- Migración Prisma inicial (`prisma/migrations/`).
-- Script `pnpm run db:check` para verificar PostgreSQL.
-- Rate limit con fallback permisivo si no hay Upstash configurado.
-- Manejo de errores de BD (`withDb` en registro).
-- Layout dashboard con sidebar por rol.
+- Modelo `PatientWeeklyPlan` (días + comidas JSON).
+- Admin edita/publica desde ficha del paciente.
+- Paciente lo ve en `/dashboard/patient/library`.
 
 ---
 
-## 4. Lo que falta por implementar
+## 4. Panel Personalizar (CMS)
 
-### 4.1 Prioridad alta
+Ruta: `/dashboard/admin/personalizar`
 
-| Funcionalidad | Detalle | Archivos / notas |
-|---------------|---------|------------------|
-| **Gestión de citas (admin)** | Confirmar, cancelar, marcar completada/no-show | No existe `updateAppointmentStatus` |
-| **Registro de antropometría** | Crear `AnthropometryMeasurement` tras consulta ANT-03 | Modelo y lectura listos; falta action + formulario admin |
-| **UI de chat** | Componente de conversación, lista de chats, Socket.io client | `chat/page.tsx` es placeholder |
-| **Integración Socket ↔ MongoDB** | Persistir en server action y emitir; o persistir en socket server | Flujo documentado pero no conectado |
-
-### 4.2 Prioridad media
-
-| Funcionalidad | Detalle |
-|---------------|---------|
-| **Pagos** | Modelo `Payment` existe; falta pasarela (Stripe), webhook, flujo post-pago |
-| **Dashboard inicio** | Tarjetas muestran `0` fijo; conectar citas próximas, mensajes, notificaciones |
-| **Cancelación por paciente** | No puede cancelar/reagendar citas propias |
-| **Confirmación automática o manual** | Citas quedan en `PENDING` sin flujo de confirmación |
-| **E-Resources — Admin CRUD** | Crear/editar/publicar recursos en `/dashboard/admin/resources` |
-| **E-Resources — Tienda** | Catálogo real en `/resources`, compra, acceso en `/dashboard/patient/library` |
-| **Analítica admin** | Gráficos por código NUT/ENT/ANT, ingresos, ocupación |
-
-### 4.3 Prioridad baja / mejoras
-
-| Funcionalidad | Detalle |
-|---------------|---------|
-| **Notificaciones** | Tipos en MongoDB; sin cron, push ni UI |
-| **Subida de archivos** | Cloudinary/S3 tipado en `FileDoc`; sin implementación |
-| **OAuth** | Tablas NextAuth listas; solo Credentials activo |
-| **Verificación de email** | Campo `emailVerified` sin flujo |
-| **Recordatorios de cita** | Email/SMS antes de la consulta |
-| **Gráficos de progreso** | Evolución de peso/% grasa en paciente |
-| **Tests** | Sin suite de tests unitarios/e2e |
-| **CI/CD** | Sin pipeline configurado |
-| **i18n** | Textos en español hardcodeados |
-| **Responsive móvil del sidebar** | Sidebar oculto en móvil (`hidden md:flex`) sin menú alternativo |
-
-### 4.4 Deuda técnica conocida
-
-- `mongo.ts` lanza error al importar si falta `MONGODB_URI` — puede romper build si chat no se usa aún.
-- No hay `middleware.ts`; la protección está en `src/proxy.ts` (convención Next.js 16).
-- Landing enlaza a registro para agendar, pero el flujo real de reserva está dentro del dashboard autenticado.
-- Página pública de recursos usa datos ficticios, no consulta `Resource` de PostgreSQL.
+| Pestaña | Qué edita |
+|---------|-----------|
+| **Imágenes** | Hero, galería, paquetes, servicios, filosofía, CTA — subida a `public/uploads/site/` |
+| **Precios y consultas** | Nombre, descripción, precio, duración (NUT/ENT/ANT) |
+| **Contenido web** | Bloques de texto: hero, paquetes, bio |
+| **Formularios** | Preguntas de las 5 plantillas (tipos, opciones, pasos) |
+| **Recursos** | Acceso al CRUD de recursos |
 
 ---
 
 ## 5. Modelo de datos
 
-### PostgreSQL (Prisma) — fuente de verdad
+### PostgreSQL (Prisma)
 
 ```
 User ──┬── PatientProfile ──┬── IntakeForm (1:1)
        │                    └── AnthropometryMeasurement (1:N)
        ├── Appointment ──┬── Payment (1:1)
-       │                 └── FollowUpSubmission (1:1, solo FOLLOW_UP)
-       └── ResourcePurchase ── Resource
+       │                 ├── FollowUpSubmission (1:1)
+       │                 ├── AnthropometryFormSubmission (1:1)
+       │                 ├── NutritionFormSubmission (1:1)
+       │                 └── TrainingFormSubmission (1:1)
+       ├── ResourcePurchase ── Resource
+       └── PatientWeeklyPlan (1:N)
 
 ConsultationType ── Appointment (1:N)
+SiteContent (slug + JSON) — CMS textos e imágenes landing
+FormTemplate (code + fields JSON) — formularios editables
 ```
 
-**Enums clave:** `UserRole`, `ConsultationCode`, `AppointmentStatus`, `AppointmentFlow`, `PaymentStatus`, `ConsultationModality`.
+### MongoDB
 
-### MongoDB — datos en tiempo real
-
-| Colección | Uso previsto | Estado |
-|-----------|--------------|--------|
-| `conversations` | Hilos paciente ↔ nutricionista | Actions listas |
-| `messages` | Mensajes de chat | Actions listas |
-| `files` | Adjuntos (chat, fotos progreso, planes) | Solo tipos |
-| `notifications` | Alertas in-app | Solo tipos |
+| Colección | Uso |
+|-----------|-----|
+| `conversations` | Hilos paciente ↔ nutricionista |
+| `messages` | Mensajes de chat |
+| `notifications` | Alertas in-app |
 
 ---
 
@@ -263,38 +214,41 @@ ConsultationType ── Appointment (1:N)
 
 ### Públicas
 
-| Ruta | Estado | Descripción |
-|------|--------|-------------|
-| `/` | ✅ | Landing |
-| `/resources` | 🟡 | Catálogo mock |
-| `/login` | ✅ | Inicio de sesión |
-| `/register` | ✅ | Registro paciente |
+| Ruta | Descripción |
+|------|-------------|
+| `/` | Landing Anttova (imágenes CMS) |
+| `/resources` | Tienda de recursos |
+| `/nutricionista` | Perfil / CV |
+| `/login` · `/register` | Auth |
+| `/forgot-password` · `/reset-password` | Recuperar contraseña |
 
 ### Dashboard — común
 
-| Ruta | Estado | Descripción |
-|------|--------|-------------|
-| `/dashboard` | 🟡 | Inicio (datos estáticos) |
-| `/dashboard/chat` | 🔴 | Placeholder |
+| Ruta | Descripción |
+|------|-------------|
+| `/dashboard` | Inicio (métricas reales admin/paciente) |
+| `/dashboard/chat` | Chat en vivo |
+| `/dashboard/notifications` | Notificaciones |
 
 ### Dashboard — paciente
 
-| Ruta | Estado | Descripción |
-|------|--------|-------------|
-| `/dashboard/patient/appointments` | ✅ | Agendar + historial |
-| `/dashboard/patient/appointments/[id]/form` | ✅ | Intake o follow-up |
-| `/dashboard/patient/progress` | 🟡 | Lectura de mediciones |
-| `/dashboard/patient/library` | 🔴 | Placeholder |
+| Ruta | Descripción |
+|------|-------------|
+| `/dashboard/patient/appointments` | Agendar + historial |
+| `/dashboard/patient/appointments/form` | Formularios dinámicos |
+| `/dashboard/patient/progress` | Mediciones + gráficas |
+| `/dashboard/patient/library` | Recursos + plan semanal |
 
 ### Dashboard — admin
 
-| Ruta | Estado | Descripción |
-|------|--------|-------------|
-| `/dashboard/admin/calendar` | ✅ | Calendario de citas |
-| `/dashboard/admin/patients` | ✅ | Listado |
-| `/dashboard/admin/patients/[id]` | ✅ | Ficha clínica |
-| `/dashboard/admin/analytics` | 🔴 | Placeholder |
-| `/dashboard/admin/resources` | 🔴 | Placeholder |
+| Ruta | Descripción |
+|------|-------------|
+| `/dashboard/admin/calendar` | Calendario + gestión citas |
+| `/dashboard/admin/patients` | Listado |
+| `/dashboard/admin/patients/[id]` | Ficha + mediciones + plan semanal |
+| `/dashboard/admin/analytics` | Estadísticas |
+| `/dashboard/admin/resources` | CRUD recursos |
+| `/dashboard/admin/personalizar` | CMS |
 
 ---
 
@@ -302,31 +256,41 @@ ConsultationType ── Appointment (1:N)
 
 | Variable | Requerida | Uso |
 |----------|-----------|-----|
-| `DATABASE_URL` | ✅ | PostgreSQL para Prisma |
-| `AUTH_SECRET` | ✅ | NextAuth (JWT) |
-| `NEXTAUTH_URL` | ✅ | URL base de la app |
-| `MONGODB_URI` | ⚠️ | Chat (obligatoria si se importa mongo) |
-| `MONGODB_DB` | Opcional | Nombre de BD Mongo (default: `nutricion_chat`) |
-| `UPSTASH_REDIS_REST_URL` | Opcional | Rate limit en producción |
-| `UPSTASH_REDIS_REST_TOKEN` | Opcional | Rate limit en producción |
-| `SOCKET_PORT` | Opcional | Puerto Socket.io (default: `3001`) |
-| `NEXT_PUBLIC_SOCKET_URL` | Pendiente | URL del cliente Socket.io |
+| `DATABASE_URL` | ✅ | PostgreSQL |
+| `AUTH_SECRET` | ✅ | NextAuth JWT |
+| `NEXTAUTH_URL` | ✅ | URL base (links en emails) |
+| `SMTP_HOST` | ⚠️ prod | Envío de correo propio (ver `docs/EMAIL.md`) |
+| `SMTP_PORT` | Opcional | Default 587 (25 si host local) |
+| `SMTP_USER` / `SMTP_PASS` | Opcional | Vacío si usás Postfix local |
+| `EMAIL_FROM` | Recomendado | Remitente, ej. `Anttova <consultas@tudominio.com>` |
+| `MONGODB_URI` | ⚠️ | Chat |
+| `UPSTASH_*` | Opcional | Rate limit |
+| `SOCKET_PORT` / `NEXT_PUBLIC_SOCKET_URL` | Opcional | Chat en tiempo real |
+| `CRON_SECRET` | Opcional | Recordatorios |
+
+**Email:** solo SMTP (VPS Postfix, buzón del dominio o Gmail gratuito). Sin Resend/SendGrid. Guía completa: [`docs/EMAIL.md`](docs/EMAIL.md).
 
 ---
 
 ## 8. Comandos útiles
 
 ```bash
-# Desarrollo
+# Desarrollo (3 terminales si usás chat + reminders)
 pnpm install
-pnpm run dev              # Next.js en http://localhost:3000
-pnpm run socket           # Socket.io en puerto 3001 (aparte)
+pnpm run dev              # http://localhost:3000
+pnpm run socket           # Socket.io :3001
 
 # Base de datos
-pnpm run db:check         # Verificar conexión PostgreSQL
-pnpm run db:migrate       # Aplicar migraciones
-pnpm run db:seed          # Tipos de consulta + admin
+pnpm run db:push          # Sincronizar schema (dev)
+pnpm run db:migrate       # Migraciones formales
+pnpm run db:seed          # Consultas, admin, CMS, recurso demo
 pnpm run db:studio        # Prisma Studio
+pnpm run db:check         # Verificar PostgreSQL
+pnpm run db:check:mongo   # Verificar MongoDB
+pnpm run email:check      # Verificar SMTP (antes de prod)
+
+# Recordatorios (cron manual o externo)
+pnpm run reminders
 
 # Producción
 pnpm run build
@@ -337,26 +301,47 @@ pnpm run start
 
 ## 9. Credenciales de desarrollo
 
-Tras ejecutar `pnpm run db:seed`:
+Tras `pnpm run db:seed`:
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
-| Admin (nutricionista) | `admin@nutricion.local` | `Admin1234!` |
+| Admin | `admin@gmail.com` | `Admin123` |
 
-Los pacientes se registran en `/register`.
+Pacientes: registro en `/register`.
+
+**PostgreSQL local (ejemplo):** `NutricionSQL` en `localhost:5432`.
 
 ---
 
-## 10. Orden sugerido para continuar
+## 10. Pendiente / próximos pasos
 
-1. **Gestión de citas admin** — confirmar/cancelar/completar desde calendario o ficha.
-2. **Registro de antropometría** — formulario admin al completar cita ANT-03.
-3. **Chat UI** — conectar actions + Socket.io client; probar flujo paciente ↔ admin.
-4. **Dashboard inicio** — métricas reales (próxima cita, formularios pendientes).
-5. **Pagos** — Stripe Checkout al agendar; actualizar `Payment` y estado de cita.
-6. **E-Resources** — CRUD admin, catálogo público, compra y librería del paciente.
-7. **Analítica** — agregaciones por `ConsultationCode` y periodo.
-8. **Notificaciones** — recordatorios de cita y mensajes nuevos.
+### Prioridad alta (producción)
+
+| Tarea | Detalle |
+|-------|---------|
+| Deploy VPS + dominio | HTTPS, variables de entorno, procesos PM2/systemd |
+| Email SMTP propio | Postfix en VPS o buzón `@tudominio` — ver `docs/EMAIL.md` |
+| Migraciones formales | Usar `db:migrate` en prod (hoy mucho `db push` en dev) |
+
+### Prioridad media (producto)
+
+| Tarea | Detalle |
+|-------|---------|
+| Pasarela de pago | Stripe u otra; hoy pagos manuales |
+| Otorgar recursos desde admin | Action existe; falta UI clara en ficha o recursos |
+| Reagendar citas | Cambiar fecha/hora sin cancelar |
+| Ficha admin completa | Mostrar todos los campos de formularios (incl. `extendedPayload`) |
+| Landing textos 100% CMS | Algunos bloques de copy siguen hardcodeados en componentes |
+| Sidebar móvil | Menú hamburguesa en pantallas pequeñas |
+
+### Prioridad baja
+
+| Tarea | Detalle |
+|-------|---------|
+| OAuth / verificación email | Tablas NextAuth listas |
+| Tests + CI/CD | Sin suite configurada |
+| Cloud storage | Uploads locales; migrar a S3/Cloudinary si escala |
+| i18n | Textos en español hardcodeados |
 
 ---
 
@@ -365,29 +350,33 @@ Los pacientes se registran en `/register`.
 ```
 src/
 ├── app/
-│   ├── (auth)/           login, register
-│   ├── (dashboard)/      panel admin y paciente
-│   ├── (marketing)/      landing, recursos públicos
-│   └── api/auth/         NextAuth route handler
+│   ├── (auth)/              login, register, forgot/reset password
+│   ├── (dashboard)/         panel admin y paciente
+│   ├── (marketing)/         landing, recursos, nutricionista
+│   └── api/                 auth, upload, cron/reminders
 ├── components/
-│   ├── booking/          formulario de reserva
-│   ├── calendar/         calendario admin
-│   ├── forms/            intake, follow-up, primitivos
-│   └── motion/           animaciones
-├── lib/                  auth, validators, ratelimit
+│   ├── cms/                 personalizar, formularios, imágenes
+│   ├── forms/               dynamic-consultation-form, wizard
+│   ├── resources/           tienda, admin CRUD
+│   ├── weekly-plan/         editor admin + vista paciente
+│   └── marketing/           landing brand Anttova
+├── lib/
+│   ├── form-templates-catalog.ts   plantillas default
+│   ├── dynamic-form-schema.ts      validación CMS
+│   └── validators/
 ├── server/
-│   ├── actions/          server actions por dominio
-│   ├── db/               prisma, mongo
-│   ├── services/         scheduling, availability
-│   └── socket/           servidor Socket.io
-├── types/                chat, next-auth
-└── proxy.ts              protección de rutas (auth)
+│   ├── actions/             dominio (auth, cms, chat, forms…)
+│   ├── queries/             landing, analytics
+│   └── socket/              servidor Socket.io
 prisma/
-├── schema.prisma         modelo relacional
-├── seed.ts               datos iniciales
-└── migrations/           migración init
+├── schema.prisma
+├── seed.ts                  importa plantillas desde src/
+└── seed-data.ts               SiteContent para seed
+public/
+├── brand/                   assets brandbook
+└── uploads/                 site, resources, chat, weekly-plans
 ```
 
 ---
 
-*Última actualización: junio 2026 — refleja el estado del repositorio en la rama `main`.*
+*Última actualización: junio 2026 — refleja el estado del repositorio tras CMS, formularios dinámicos, recursos, chat y plan semanal.*

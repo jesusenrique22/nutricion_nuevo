@@ -1,12 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fbf8f3;
-  --foreground: #2f3b30;
-  --primary: #4f7942; /* verde nutrición */
+  /* Anttova brandbook — export Figma */
+  --background: #f2f0ed;
+  --foreground: #741e31;
+  --primary: #741e31;
   --primary-foreground: #ffffff;
-  --accent: #e8a33d; /* dorado cálido */
-  --muted: #f1ede4;
+  --accent: #e8b4c8;
+  --accent-soft: #f2b5cc;
+  --muted: #fad4e4;
+  --surface: #ffffff;
+  --ink: #000000;
+  --ink-muted: rgb(116 30 49 / 0.6);
 }
 
 @theme inline {
@@ -15,12 +20,59 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
   --font-sans: var(--font-sans);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html.landing-lobby {
+  scroll-snap-type: y proximity;
+}
+
+.lobby-panel {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+@keyframes brand-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.brand-marquee {
+  animation: brand-marquee 42s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-marquee {
+    animation: none;
+  }
+
+  [data-flow-motion] {
+    animation: none !important;
+    transition: none !important;
+  }
 }

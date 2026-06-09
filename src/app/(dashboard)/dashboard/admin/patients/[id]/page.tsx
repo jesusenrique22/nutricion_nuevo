@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ProfileEmojiBanner } from "@/components/brand/profile-emoji-banner";
+import { AdminWeeklyPlanEditor } from "@/components/weekly-plan/admin-weekly-plan-editor";
+import { getWeeklyPlanForPatientAdmin } from "@/server/actions/weekly-plan.actions";
 import { getPatientDetail } from "@/server/actions/patient.queries";
+import { RegisterMeasurementForm } from "@/components/measurements/register-measurement-form";
+import {
+  ProgressLineChart,
+  buildChartPoints,
+} from "@/components/measurements/progress-line-chart";
 
 function fmt(iso: string | null) {
   if (!iso) return "—";
@@ -48,8 +56,32 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const patient = await getPatientDetail(id);
+  const [patient, weeklyPlan] = await Promise.all([
+    getPatientDetail(id),
+    getWeeklyPlanForPatientAdmin(id),
+  ]);
   if (!patient) notFound();
+
+  const weightChart = buildChartPoints(
+    patient.measurements.map((m) => ({
+      measuredAt: m.measuredAt,
+      value: m.weight,
+    })),
+  );
+  const fatChart = buildChartPoints(
+    patient.measurements.map((m) => ({
+      measuredAt: m.measuredAt,
+      value: m.bodyFatPct,
+    })),
+  );
+
+  const intakeExtra =
+    patient.intakeForm?.extendedPayload &&
+    typeof patient.intakeForm.extendedPayload === "object"
+      ? (patient.intakeForm.extendedPayload as Record<string, unknown>)
+      : null;
+  const hasIntakeExtra =
+    intakeExtra != null && Object.keys(intakeExtra).length > 0;
 
   return (
     <div>
@@ -60,25 +92,30 @@ export default async function PatientDetailPage({
         ← Volver a pacientes
       </Link>
 
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">{patient.name}</h1>
-          <p className="mt-1 text-foreground/60">
-            {patient.email}
-            {patient.phone && ` · ${patient.phone}`}
-          </p>
-        </div>
-        <span
-          className={`rounded-full px-4 py-1.5 text-sm font-bold ${
+      <div className="mt-4">
+        <ProfileEmojiBanner
+          name={patient.name}
+          subtitle={
+            [patient.email, patient.phone].filter(Boolean).join(" · ") ||
+            undefined
+          }
+          hasCompletedIntake={patient.profile?.hasCompletedIntake ?? false}
+          appointmentCount={
+            patient.recentFollowUps.length +
+            patient.nutritionForms.length +
+            patient.trainingForms.length +
+            patient.anthropometryForms.length
+          }
+          measurementCount={patient.measurements.length}
+          statusLabel={
             patient.profile?.hasCompletedIntake
-              ? "bg-primary/15 text-primary"
-              : "bg-accent/15 text-accent"
-          }`}
-        >
-          {patient.profile?.hasCompletedIntake
-            ? "Ingreso completado"
-            : "Ingreso pendiente"}
-        </span>
+              ? "Ingreso completado"
+              : "Ingreso pendiente"
+          }
+          statusTone={
+            patient.profile?.hasCompletedIntake ? "primary" : "accent"
+          }
+        />
       </div>
 
       {/* Datos del perfil */}
@@ -123,7 +160,9 @@ export default async function PatientDetailPage({
         <h2 className="text-lg font-bold">Anamnesis (formulario de ingreso)</h2>
         {!patient.intakeForm ? (
           <p className="mt-3 text-sm text-foreground/50">
-            El paciente aún no ha completado su ingreso.
+            {patient.profile?.hasCompletedIntake
+              ? "Ingreso completado vía formulario de consulta (nutrición, entrenamiento o antropometría). No hay anamnesis general separada."
+              : "El paciente aún no ha completado su ingreso."}
           </p>
         ) : (
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -161,6 +200,133 @@ export default async function PatientDetailPage({
                 <JsonBlock data={patient.intakeForm.supplementsUse} />
               </div>
             </div>
+            {hasIntakeExtra && (
+                <div className="lg:col-span-2">
+                  <h3 className="font-semibold text-primary">
+                    Campos adicionales
+                  </h3>
+                  <div className="mt-2">
+                    <JsonBlock data={intakeExtra} />
+                  </div>
+                </div>
+              )}
+          </div>
+        )}
+      </section>
+
+      {/* Consultas nutricionales */}
+      <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
+        <h2 className="text-lg font-bold">Consultas nutricionales</h2>
+        {patient.nutritionForms.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground/50">
+            Sin formularios de primera consulta nutricional.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {patient.nutritionForms.map((f, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-foreground/10 p-4 text-sm"
+              >
+                <div className="font-semibold">{fmt(f.appointmentDate)}</div>
+                <p className="mt-1 text-foreground/70">{f.consultationReason}</p>
+                {f.continuationPreference && (
+                  <p className="mt-1 text-xs text-foreground/50">
+                    Seguimiento: {f.continuationPreference.replace(/_/g, " ")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Consultas de entrenamiento */}
+      <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
+        <h2 className="text-lg font-bold">Formularios de entrenamiento</h2>
+        {patient.trainingForms.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground/50">
+            Sin formularios de evaluación de entrenamiento.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {patient.trainingForms.map((f, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-foreground/10 p-4 text-sm"
+              >
+                <div className="font-semibold">
+                  {f.fullName ?? patient.name} · {fmt(f.appointmentDate)}
+                </div>
+                <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-foreground/50">Objetivo principal</dt>
+                    <dd className="capitalize">
+                      {f.mainObjective?.replace(/_/g, " ") ?? "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-foreground/50">
+                      Frecuencia de evaluación
+                    </dt>
+                    <dd className="capitalize">
+                      {f.evaluationFrequency?.replace(/_/g, " ") ?? "—"}
+                    </dd>
+                  </div>
+                  {f.procedureQuestions && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-foreground/50">Dudas / inquietudes</dt>
+                      <dd>{f.procedureQuestions}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Formularios de antropometría */}
+      <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
+        <h2 className="text-lg font-bold">Formularios de antropometría</h2>
+        {patient.anthropometryForms.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground/50">
+            Sin formularios de antropometría completados.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {patient.anthropometryForms.map((f, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-foreground/10 p-4 text-sm"
+              >
+                <div className="font-semibold">
+                  {f.fullName ?? patient.name} · {fmt(f.appointmentDate)}
+                </div>
+                <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-foreground/50">Objetivo principal</dt>
+                    <dd className="capitalize">
+                      {f.mainObjective?.replace(/_/g, " ") ?? "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-foreground/50">
+                      Frecuencia de evaluación
+                    </dt>
+                    <dd className="capitalize">
+                      {f.evaluationFrequency?.replace(/_/g, " ") ?? "—"}
+                    </dd>
+                  </div>
+                  {f.procedureQuestions && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-foreground/50">Dudas / inquietudes</dt>
+                      <dd>{f.procedureQuestions}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -220,21 +386,63 @@ export default async function PatientDetailPage({
         )}
       </section>
 
+      {/* Plan semanal */}
+      <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
+        <h2 className="text-lg font-bold">Plan semanal de alimentación</h2>
+        <AdminWeeklyPlanEditor
+          patientId={patient.id}
+          patientName={patient.name}
+          initial={weeklyPlan}
+        />
+      </section>
+
       {/* Mediciones antropométricas */}
       <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
         <h2 className="text-lg font-bold">Mediciones antropométricas</h2>
+        <p className="mt-1 text-sm text-foreground/50">
+          Registra los resultados ISAK después de cada consulta ANT-03.
+        </p>
+
+        <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <h3 className="text-sm font-bold">Nueva medición</h3>
+          <div className="mt-3">
+            <RegisterMeasurementForm patientId={patient.id} />
+          </div>
+        </div>
+
+        {(weightChart.length > 0 || fatChart.length > 0) && (
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            {weightChart.length > 0 && (
+              <ProgressLineChart
+                title="Evolución de peso"
+                unit="kg"
+                data={weightChart}
+              />
+            )}
+            {fatChart.length > 0 && (
+              <ProgressLineChart
+                title="Evolución % grasa"
+                unit="%"
+                data={fatChart}
+                color="#e879a9"
+              />
+            )}
+          </div>
+        )}
+
         {patient.measurements.length === 0 ? (
-          <p className="mt-3 text-sm text-foreground/50">
+          <p className="mt-6 text-sm text-foreground/50">
             Sin mediciones registradas.
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-6 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-foreground/10">
                   <th className="py-2 pr-4">Fecha</th>
                   <th className="py-2 pr-4">Peso</th>
                   <th className="py-2 pr-4">% Grasa</th>
+                  <th className="py-2 pr-4">Músculo</th>
                   <th className="py-2 pr-4">Cintura</th>
                   <th className="py-2">Cadera</th>
                 </tr>
@@ -244,16 +452,19 @@ export default async function PatientDetailPage({
                   <tr key={m.id} className="border-b border-foreground/5">
                     <td className="py-2 pr-4">{fmt(m.measuredAt)}</td>
                     <td className="py-2 pr-4">
-                      {m.weight ? `${m.weight} kg` : "—"}
+                      {m.weight != null ? `${m.weight} kg` : "—"}
                     </td>
                     <td className="py-2 pr-4">
-                      {m.bodyFatPct ? `${m.bodyFatPct}%` : "—"}
+                      {m.bodyFatPct != null ? `${m.bodyFatPct}%` : "—"}
                     </td>
                     <td className="py-2 pr-4">
-                      {m.waist ? `${m.waist} cm` : "—"}
+                      {m.muscleMass != null ? `${m.muscleMass} kg` : "—"}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {m.waist != null ? `${m.waist} cm` : "—"}
                     </td>
                     <td className="py-2">
-                      {m.hip ? `${m.hip} cm` : "—"}
+                      {m.hip != null ? `${m.hip} cm` : "—"}
                     </td>
                   </tr>
                 ))}
