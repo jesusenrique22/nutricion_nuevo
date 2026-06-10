@@ -1,0 +1,11 @@
+{
+  "buildCommand": "pnpm run vercel-build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
