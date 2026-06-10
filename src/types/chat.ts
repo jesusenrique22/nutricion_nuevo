@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 
-export type MessageType = "TEXT" | "FILE" | "IMAGE" | "VIDEO" | "PDF";
+export type MessageType = "TEXT" | "FILE" | "IMAGE" | "VIDEO" | "PDF" | "STICKER";
 export type FileContext = "CHAT" | "PROGRESS_PHOTO" | "DIET_PLAN" | "RESOURCE";
 export type NotificationType =
   | "APPOINTMENT_REMINDER"
@@ -8,10 +8,15 @@ export type NotificationType =
   | "PAYMENT"
   | "SYSTEM";
 
+export type ConsultationChatCode = "NUT_01" | "ENT_02" | "ANT_03";
+
 export interface ConversationDoc {
   _id?: ObjectId;
-  participants: string[]; // userIds de Postgres
+  participants: string[]; // [adminId, patientId] — User.id de Postgres
   patientId: string;
+  consultationTypeId: string; // ConsultationType.id de Postgres
+  consultationCode: ConsultationChatCode;
+  appointmentId?: string | null; // Appointment.id opcional (contexto de cita)
   lastMessage?: {
     text: string;
     senderId: string;

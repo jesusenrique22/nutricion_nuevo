@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { getMongoDb, Collections } from "@/server/db/mongo";
 import type { ConversationDoc } from "@/types/chat";
+import { prepareChatStorage } from "@/server/services/chat-conversation.service";
 
 export async function assertConversationAccess(
   conversationId: string,
@@ -8,6 +9,7 @@ export async function assertConversationAccess(
   userRole: "ADMIN" | "PATIENT",
 ): Promise<ConversationDoc | null> {
   const db = await getMongoDb();
+  await prepareChatStorage(db);
   const conv = await db
     .collection<ConversationDoc>(Collections.conversations)
     .findOne({ _id: new ObjectId(conversationId) });

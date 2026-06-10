@@ -8,9 +8,16 @@ import {
   updateConsultationPriceSchema,
   updateFormTemplateSchema,
   updateSiteContentSchema,
+  nutricionistaPageSchema,
+  paymentChatPolicySchema,
 } from "@/lib/validators/cms";
+import { paymentChatPolicyToRecord, parsePaymentChatPolicy } from "@/lib/payment-chat-policy";
+import { PAYMENT_CHAT_POLICY_SLUG } from "@/types/payment-chat-policy";
 import { DEFAULT_FORM_TEMPLATES } from "@/lib/form-templates-catalog";
 import { SITE_CONTENT_DEFAULTS } from "@/lib/form-templates-defaults";
+import { nutricionistaPageToRecord } from "@/lib/nutricionista-cv-parse";
+import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
+import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 import type { FormFieldDefinition } from "@/types/form-template";
 
 export type CmsActionResult =
@@ -154,6 +161,40 @@ export async function updateSiteContent(
   return { ok: true };
 }
 
+export async function updateNutricionistaPage(
+  formData: unknown,
+): Promise<CmsActionResult> {
+  if (!(await requireAdmin())) {
+    return { ok: false, message: "No autorizado." };
+  }
+
+  const parsed = nutricionistaPageSchema.safeParse(formData);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    };
+  }
+
+  await prisma.siteContent.upsert({
+    where: { slug: NUTRICIONISTA_PAGE_SLUG },
+    create: {
+      slug: NUTRICIONISTA_PAGE_SLUG,
+      title: "Conóceme más / CV",
+      data: nutricionistaPageToRecord(parsed.data) as Prisma.InputJsonValue,
+    },
+    update: {
+      data: nutricionistaPageToRecord(parsed.data) as Prisma.InputJsonValue,
+    },
+  });
+
+  revalidatePath("/nutricionista");
+  revalidatePath("/dashboard/admin/personalizar");
+  return { ok: true };
+}
+
+export type NutricionistaPageDTO = NutricionistaPageData;
+
 export interface FormTemplateDTO {
   code: string;
   name: string;
@@ -250,5 +291,44 @@ export async function updateFormTemplate(
   });
 
   revalidatePath("/dashboard/admin/personalizar");
+  return { ok: true };
+}
+
+export async function getPaymentChatPolicyAdmin() {
+  if (!(await requireAdmin())) return parsePaymentChatPolicy(undefined);
+  const row = await getSiteContentBySlug(PAYMENT_CHAT_POLICY_SLUG);
+  return parsePaymentChatPolicy(row?.data);
+}
+
+export async function updatePaymentChatPolicy(
+  formData: unknown,
+): Promise<CmsActionResult> {
+  if (!(await requireAdmin())) {
+    return { ok: false, message: "No autorizado." };
+  }
+
+  const parsed = paymentChatPolicySchema.safeParse(formData);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    };
+  }
+
+  await prisma.siteContent.upsert({
+    where: { slug: PAYMENT_CHAT_POLICY_SLUG },
+    create: {
+      slug: PAYMENT_CHAT_POLICY_SLUG,
+      title: "Pagos y acceso al chat",
+      data: paymentChatPolicyToRecord(parsed.data) as Prisma.InputJsonValue,
+    },
+    update: {
+      data: paymentChatPolicyToRecord(parsed.data) as Prisma.InputJsonValue,
+    },
+  });
+
+  revalidatePath("/dashboard/admin/personalizar");
+  revalidatePath("/dashboard/chat");
+  revalidatePath("/dashboard/patient/appointments");
   return { ok: true };
 }

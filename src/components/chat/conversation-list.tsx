@@ -46,7 +46,12 @@ export function ConversationList({
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold">{c.patientName}</span>
+            <div className="min-w-0">
+              <span className="font-semibold">{c.patientName}</span>
+              <span className="mt-0.5 block text-[11px] font-medium text-accent">
+                {c.consultationLabel}
+              </span>
+            </div>
             {c.unread > 0 && (
               <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-white">
                 {c.unread}

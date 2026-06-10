@@ -14,6 +14,39 @@ export const updateSiteContentSchema = z.object({
   data: z.record(z.string(), z.unknown()),
 });
 
+const cvEducationSchema = z.object({
+  year: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  place: z.string().trim().min(1),
+});
+
+const cvExperienceSchema = z.object({
+  year: z.string().trim().min(1),
+  role: z.string().trim().min(1),
+  company: z.string().trim().min(1),
+  bullets: z.array(z.string()),
+});
+
+export const nutricionistaPageSchema = z.object({
+  pageTitle: z.string().trim().min(1),
+  pageDescription: z.string().trim().min(1),
+  cv: z.object({
+    name: z.string().trim().min(1),
+    title: z.string().trim().min(1),
+    bio: z.string().trim().min(1),
+    est: z.string().trim().min(1),
+    city: z.string().trim().min(1),
+    contact: z.object({
+      phone: z.string().trim().min(1),
+      email: z.string().trim().email(),
+      location: z.string().trim().min(1),
+    }),
+    skills: z.array(z.string().trim().min(1)),
+    education: z.array(cvEducationSchema).min(1),
+    experience: z.array(cvExperienceSchema),
+  }),
+});
+
 const formFieldOptionSchema = z.object({
   value: z.string().min(1),
   label: z.string().min(1),
@@ -76,3 +109,15 @@ export const upsertWeeklyPlanSchema = z.object({
   isPublished: z.boolean(),
   days: z.array(weeklyDaySchema).min(1),
 });
+
+export const paymentChatPolicySchema = z
+  .object({
+    advancePercent: z.coerce.number().int().min(0).max(100),
+    remainderPercent: z.coerce.number().int().min(0).max(100),
+    chatUnlockOnAppointment: z.coerce.boolean(),
+    chatUnlockOnAdvancePaid: z.coerce.boolean(),
+    chatUnlockOnRemainderPaid: z.coerce.boolean(),
+  })
+  .refine((d) => d.advancePercent + d.remainderPercent === 100, {
+    message: "Adelanto + saldo deben sumar 100%",
+  });

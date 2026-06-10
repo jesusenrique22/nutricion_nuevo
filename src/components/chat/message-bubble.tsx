@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { MessageDTO } from "@/server/actions/chat.actions";
 
 function fmtTime(iso: string) {
@@ -9,6 +10,31 @@ function fmtTime(iso: string) {
 
 export function MessageBubble({ message }: { message: MessageDTO }) {
   const isMine = message.isMine;
+  const isSticker = message.type === "STICKER";
+
+  if (isSticker && message.attachment) {
+    return (
+      <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+        <div className="max-w-[140px]">
+          <Image
+            src={message.attachment.url}
+            alt={message.attachment.fileName}
+            width={120}
+            height={120}
+            className="h-auto w-[120px] object-contain"
+            unoptimized
+          />
+          <span
+            className={`mt-1 block text-right text-[10px] ${
+              isMine ? "text-foreground/40" : "text-foreground/40"
+            }`}
+          >
+            {fmtTime(message.createdAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>

@@ -2,6 +2,8 @@ import type { FormFieldDefinition } from "@/types/form-template";
 import { DEFAULT_FORM_TEMPLATES } from "@/lib/form-templates-catalog";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { landingImagesToRecord } from "@/lib/landing-images-parse";
+import { nutricionistaPageToRecord } from "@/lib/nutricionista-cv-parse";
+import { DEFAULT_NUTRICIONISTA_PAGE } from "@/lib/nutricionista-cv-defaults";
 
 export { DEFAULT_FORM_TEMPLATES };
 
@@ -38,5 +40,19 @@ export const SITE_CONTENT_DEFAULTS: Record<
   landing_images: {
     title: "Imágenes landing",
     data: landingImagesToRecord(DEFAULT_LANDING_IMAGES),
+  },
+  nutricionista_page: {
+    title: "Conóceme más / CV",
+    data: nutricionistaPageToRecord(DEFAULT_NUTRICIONISTA_PAGE),
+  },
+  payment_chat_policy: {
+    title: "Pagos y acceso al chat",
+    data: {
+      advancePercent: 50,
+      remainderPercent: 50,
+      chatUnlockOnAppointment: true,
+      chatUnlockOnAdvancePaid: true,
+      chatUnlockOnRemainderPaid: true,
+    },
   },
 };

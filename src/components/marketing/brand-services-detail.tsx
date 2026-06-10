@@ -6,23 +6,13 @@ import { Reveal, RevealScale } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import type { LandingImagesData } from "@/types/landing-images";
 
-const SERVICE_COPY = [
-  {
-    key: "anthropometry" as const,
-    title: "Antropometría ISAK",
-    desc: "Conoce tu composición corporal real. Alimentate y entrena con estrategia.",
-  },
-  {
-    key: "nutrition" as const,
-    title: "Consulta nutricional",
-    desc: "Aprende a comer mejor, sin dietas extremas. Un plan que se adapta a vos.",
-  },
-  {
-    key: "training" as const,
-    title: "Plan de entrenamiento",
-    desc: "Entrena con un plan pensado para tu cuerpo, tus objetivos y tu estilo de vida.",
-  },
-];
+const SERVICES = [
+  { key: "anthropometry" as const, alt: "Antropometría ISAK — qué incluye" },
+  { key: "nutrition" as const, alt: "Consulta nutricional — qué incluye" },
+  { key: "training" as const, alt: "Plan de entrenamiento — qué incluye" },
+] as const;
+
+const SERVICE_IMAGE = { width: 2831, height: 1435 } as const;
 
 export function BrandServicesDetail({
   images,
@@ -32,8 +22,8 @@ export function BrandServicesDetail({
   const serviceImages = images ?? DEFAULT_LANDING_IMAGES.services;
 
   return (
-    <section className="bg-muted/30 px-6 py-16 sm:py-20">
-      <div className="mx-auto max-w-6xl">
+    <section className="bg-muted/30 px-4 py-14 sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-4xl">
         <Reveal>
           <p className="text-center text-xs font-semibold uppercase tracking-[0.28em] text-foreground/50">
             ¿Qué incluye?
@@ -41,51 +31,36 @@ export function BrandServicesDetail({
           <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
             Servicios integrales
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-foreground/65">
+          <p className="mx-auto mt-4 max-w-xl text-center text-sm text-foreground/65 sm:text-base">
             Nutrición + evaluación corporal + entrenamiento, con seguimiento real
             y educación para adherir a largo plazo.
           </p>
         </Reveal>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-3">
-          {SERVICE_COPY.map((service, i) => (
-            <RevealScale key={service.title} delay={i * 0.08}>
-              <article className="overflow-hidden rounded-3xl bg-white shadow-lg shadow-primary/5 ring-1 ring-foreground/5 transition hover:-translate-y-1 hover:shadow-xl">
-                <div className="relative aspect-[4/3] overflow-hidden bg-muted/20">
-                  <Image
-                    src={serviceImages[service.key]}
-                    alt={service.title}
-                    fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 1024px) 100vw, 33vw"
-                    unoptimized={serviceImages[service.key].startsWith(
-                      "/uploads/",
-                    )}
-                  />
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-primary">
-                    {service.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-foreground/65">
-                    {service.desc}
-                  </p>
-                </div>
-              </article>
+        <div className="mx-auto mt-10 flex max-w-3xl flex-col gap-7 sm:gap-8">
+          {SERVICES.map((service, i) => (
+            <RevealScale key={service.key} delay={i * 0.06}>
+              <Link
+                href="/login"
+                className="group block overflow-hidden rounded-2xl shadow-lg shadow-primary/10 ring-1 ring-foreground/5 transition hover:-translate-y-0.5 hover:shadow-xl hover:ring-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:rounded-3xl"
+                aria-label={`${service.alt} — iniciar sesión para reservar`}
+              >
+                <Image
+                  src={serviceImages[service.key]}
+                  alt={service.alt}
+                  width={SERVICE_IMAGE.width}
+                  height={SERVICE_IMAGE.height}
+                  className="h-auto w-full transition duration-300 group-hover:brightness-[1.02]"
+                  sizes="(max-width: 768px) 100vw, 768px"
+                  priority={i === 0}
+                  unoptimized={serviceImages[service.key].startsWith(
+                    "/uploads/",
+                  )}
+                />
+              </Link>
             </RevealScale>
           ))}
         </div>
-
-        <Reveal direction="fade" delay={0.2}>
-          <div className="mt-10 text-center">
-            <Link
-              href="/register"
-              className="inline-block rounded-full border border-primary px-8 py-3 text-sm font-semibold uppercase tracking-wider text-primary transition hover:bg-primary hover:text-primary-foreground"
-            >
-              Reservá un turno
-            </Link>
-          </div>
-        </Reveal>
       </div>
     </section>
   );

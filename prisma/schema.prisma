@@ -3,7 +3,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -46,6 +45,7 @@ enum AppointmentFlow {
 
 enum PaymentStatus {
   PENDING
+  PARTIAL
   PAID
   REFUNDED
   FAILED
@@ -314,17 +314,26 @@ model TrainingFormSubmission {
 // ──────────────────────────────────────────────
 
 model Payment {
-  id            String        @id @default(cuid())
-  appointmentId String        @unique
-  appointment   Appointment   @relation(fields: [appointmentId], references: [id])
-  amount        Decimal       @db.Decimal(10, 2)
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
-  provider      String?       @default("manual")
-  providerRef   String?
-  adminNote     String?
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
+  id              String        @id @default(cuid())
+  appointmentId   String        @unique
+  appointment     Appointment   @relation(fields: [appointmentId], references: [id])
+  amount          Decimal       @db.Decimal(10, 2)
+  advanceAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  remainderAmount Decimal       @default(0) @db.Decimal(10, 2)
+  advancePercent  Int           @default(50)
+  currency        String        @default("ARS")
+  status          PaymentStatus @default(PENDING)
+  advanceStatus   PaymentStatus @default(PENDING)
+  remainderStatus PaymentStatus @default(PENDING)
+  provider        String?       @default("manual")
+  providerRef     String?
+  adminNote       String?
+  advanceNote     String?
+  remainderNote   String?
+  paidAt          DateTime?
+  advancePaidAt   DateTime?
+  remainderPaidAt DateTime?
+  createdAt       DateTime      @default(now())
 }
 
 // ──────────────────────────────────────────────

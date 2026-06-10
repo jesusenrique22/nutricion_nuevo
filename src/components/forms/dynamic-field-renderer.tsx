@@ -124,10 +124,16 @@ export function DynamicFieldRenderer({ field }: { field: FormFieldDefinition }) 
   return <input type={inputType} {...common} className={inputClass} />;
 }
 
-export function DynamicFieldBlock({ field }: { field: FormFieldDefinition }) {
+export function DynamicFieldBlock({
+  field,
+  className,
+}: {
+  field: FormFieldDefinition;
+  className?: string;
+}) {
   if (field.type === "checkbox") {
     return (
-      <div className={field.colSpan === 2 ? "sm:col-span-2" : undefined}>
+      <div className={className}>
         {field.helpText && (
           <p className="mb-2 text-sm text-foreground/65">{field.helpText}</p>
         )}
@@ -137,10 +143,7 @@ export function DynamicFieldBlock({ field }: { field: FormFieldDefinition }) {
   }
 
   return (
-    <Field
-      label={field.label}
-      className={field.colSpan === 2 ? "sm:col-span-2" : undefined}
-    >
+    <Field label={field.label} className={className}>
       {field.helpText && (
         <p className="mb-2 text-xs text-foreground/55">{field.helpText}</p>
       )}

@@ -48,6 +48,17 @@ export async function getSlotsForDay(
   return getAvailableSlots(type, dateStr);
 }
 
+import { toPaymentPhaseView } from "@/lib/payment-split";
+
+export interface PaymentPhaseDTO {
+  advanceAmount: string;
+  remainderAmount: string;
+  advancePercent: number;
+  advanceStatus: string;
+  remainderStatus: string;
+  overallStatus: string;
+}
+
 export interface AppointmentDTO {
   id: string;
   start: string;
@@ -62,6 +73,7 @@ export interface AppointmentDTO {
   consultationName?: string;
   price?: string;
   paymentStatus?: string | null;
+  paymentPhases?: PaymentPhaseDTO | null;
   notes?: string | null;
 }
 
@@ -88,6 +100,7 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
     consultationName: a.consultationType.name,
     price: a.consultationType.price.toString(),
     paymentStatus: a.payment?.status ?? null,
+    paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
     notes: a.notes,
   }));
 }
@@ -116,6 +129,7 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
     consultationName: a.consultationType.name,
     price: a.consultationType.price.toString(),
     paymentStatus: a.payment?.status ?? null,
+    paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
     notes: a.notes,
   }));
 }

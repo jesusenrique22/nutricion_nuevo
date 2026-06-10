@@ -58,9 +58,9 @@ export default async function DashboardLayout({
           initialUnreadChat={unreadChat}
           footer={signOutButton}
         />
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background px-4 py-4 sm:px-6 sm:py-6 md:p-8">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-background px-4 pt-4 pb-10 sm:px-6 sm:pt-6 sm:pb-12 md:px-8 md:pt-8 md:pb-14">
           <BackgroundCharacters />
-          <div className="relative z-10">{children}</div>
+          <div className="relative z-10 min-h-0 w-full flex-1">{children}</div>
         </main>
       </div>
     </SocketProvider>

@@ -5,12 +5,15 @@ import Link from "next/link";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 import { updateAppointmentStatus } from "@/server/actions/appointment-status.actions";
 import {
+  markAdvancePaid,
   markPaymentPaid,
   markPaymentRefunded,
+  markRemainderPaid,
 } from "@/server/actions/payment.actions";
 import {
   appointmentStatusLabels,
   modalityLabels,
+  paymentPhaseLabels,
   paymentStatusLabels,
 } from "@/lib/appointment-labels";
 import { RegisterMeasurementForm } from "@/components/measurements/register-measurement-form";
@@ -64,6 +67,28 @@ export function AppointmentAdminPanel({
     });
   }
 
+  function runMarkAdvance() {
+    setMessage(null);
+    startTransition(async () => {
+      const res = await markAdvancePaid({
+        appointmentId: appointment.id,
+        adminNote: paymentNote || undefined,
+      });
+      setMessage(res.ok ? "Adelanto registrado." : res.message);
+    });
+  }
+
+  function runMarkRemainder() {
+    setMessage(null);
+    startTransition(async () => {
+      const res = await markRemainderPaid({
+        appointmentId: appointment.id,
+        adminNote: paymentNote || undefined,
+      });
+      setMessage(res.ok ? "Saldo final registrado." : res.message);
+    });
+  }
+
   function runMarkPaid() {
     setMessage(null);
     startTransition(async () => {
@@ -82,6 +107,9 @@ export function AppointmentAdminPanel({
       setMessage(res.ok ? "Pago marcado como reembolsado." : res.message);
     });
   }
+
+  const phases = appointment.paymentPhases;
+  const overallStatus = phases?.overallStatus ?? appointment.paymentStatus;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-[2px]">
@@ -124,14 +152,38 @@ export function AppointmentAdminPanel({
           <span className="rounded-full bg-muted px-3 py-1">
             {modalityLabels[appointment.modality] ?? appointment.modality}
           </span>
-          {appointment.paymentStatus && (
+          {overallStatus && (
             <span className="rounded-full bg-accent/15 px-3 py-1 font-semibold text-accent">
-              {paymentStatusLabels[appointment.paymentStatus] ??
-                appointment.paymentStatus}
+              {paymentStatusLabels[overallStatus] ?? overallStatus}
               {appointment.price ? ` · $${appointment.price}` : ""}
             </span>
           )}
         </div>
+
+        {phases && (
+          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border border-foreground/10 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
+                Adelanto ({phases.advancePercent}%)
+              </p>
+              <p className="mt-1 font-semibold">${phases.advanceAmount}</p>
+              <p className="text-xs text-foreground/60">
+                {paymentPhaseLabels[phases.advanceStatus] ??
+                  phases.advanceStatus}
+              </p>
+            </div>
+            <div className="rounded-xl border border-foreground/10 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
+                Saldo final ({100 - phases.advancePercent}%)
+              </p>
+              <p className="mt-1 font-semibold">${phases.remainderAmount}</p>
+              <p className="text-xs text-foreground/60">
+                {paymentPhaseLabels[phases.remainderStatus] ??
+                  phases.remainderStatus}
+              </p>
+            </div>
+          </div>
+        )}
 
         {appointment.patientId && (
           <Link
@@ -160,30 +212,53 @@ export function AppointmentAdminPanel({
           </div>
         )}
 
-        {appointment.paymentStatus === "PENDING" && (
-          <div className="mt-6 rounded-xl border border-foreground/10 p-4">
-            <h3 className="text-sm font-bold">Registrar pago manual</h3>
-            <p className="mt-1 text-xs text-foreground/50">
-              Marca como pagado cuando el paciente pague en consulta o
-              transferencia.
+        {(overallStatus === "PENDING" ||
+          overallStatus === "PARTIAL" ||
+          appointment.paymentStatus === "PENDING") && (
+          <div className="mt-6 space-y-4 rounded-xl border border-foreground/10 p-4">
+            <h3 className="text-sm font-bold">Registrar pagos manuales</h3>
+            <p className="text-xs text-foreground/50">
+              Ejemplo: adelanto al agendar y saldo el día de la consulta. Al
+              registrar un pago, el chat del paciente puede habilitarse según la
+              política en Personalizar.
             </p>
             <input
               value={paymentNote}
               onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="Nota opcional (ej. efectivo, transferencia)"
-              className="mt-3 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+              placeholder="Nota opcional (ej. transferencia, efectivo)"
+              className="w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
             />
-            <button
-              disabled={isPending}
-              onClick={runMarkPaid}
-              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              Marcar como pagado
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {phases?.advanceStatus !== "PAID" && (
+                <button
+                  disabled={isPending}
+                  onClick={runMarkAdvance}
+                  className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-50"
+                >
+                  Registrar adelanto
+                </button>
+              )}
+              {phases?.remainderStatus !== "PAID" && (
+                <button
+                  disabled={isPending}
+                  onClick={runMarkRemainder}
+                  className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-50"
+                >
+                  Registrar saldo final
+                </button>
+              )}
+              <button
+                disabled={isPending}
+                onClick={runMarkPaid}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Pago completo
+              </button>
+            </div>
           </div>
         )}
 
-        {appointment.paymentStatus === "PAID" && (
+        {overallStatus === "PAID" && (
           <div className="mt-6">
             <button
               disabled={isPending}

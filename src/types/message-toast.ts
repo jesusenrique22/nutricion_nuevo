@@ -4,6 +4,7 @@ export interface IncomingMessageToast {
   preview: string;
   deepLink: string;
   conversationId: string;
+  consultationCode?: string;
 }
 
 export interface MessageIncomingPayload {
@@ -11,4 +12,5 @@ export interface MessageIncomingPayload {
   preview: string;
   deepLink: string;
   conversationId: string;
+  consultationCode?: string;
 }

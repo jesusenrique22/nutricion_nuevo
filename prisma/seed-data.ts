@@ -1,4 +1,7 @@
-/** Datos iniciales del seed (sin imports de @/ para evitar errores de TS en prisma/). */
+/** Datos iniciales del seed (imports relativos desde prisma/). */
+
+import { DEFAULT_NUTRICIONISTA_PAGE } from "../src/lib/nutricionista-cv-defaults";
+import { nutricionistaPageToRecord } from "../src/lib/nutricionista-cv-parse";
 
 export const DEFAULT_FORM_TEMPLATES: Record<
   string,
@@ -178,6 +181,20 @@ export const SITE_CONTENT_DEFAULTS: Record<
       philosophyImage: "/brand/presentation/recipe-success.png",
       brandSectionImage: "/brand/products.png",
       ctaBackground: "/brand/lifestyle/community.png",
+    },
+  },
+  nutricionista_page: {
+    title: "Conóceme más / CV",
+    data: nutricionistaPageToRecord(DEFAULT_NUTRICIONISTA_PAGE),
+  },
+  payment_chat_policy: {
+    title: "Pagos y acceso al chat",
+    data: {
+      advancePercent: 50,
+      remainderPercent: 50,
+      chatUnlockOnAppointment: true,
+      chatUnlockOnAdvancePaid: true,
+      chatUnlockOnRemainderPaid: true,
     },
   },
 };

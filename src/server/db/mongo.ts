@@ -42,9 +42,6 @@ async function ensureIndexes(db: Db): Promise<void> {
       .collection(Collections.conversations)
       .createIndex({ participants: 1, updatedAt: -1 }),
     db
-      .collection(Collections.conversations)
-      .createIndex({ patientId: 1 }, { unique: true }),
-    db
       .collection(Collections.messages)
       .createIndex({ conversationId: 1, createdAt: 1 }),
     db

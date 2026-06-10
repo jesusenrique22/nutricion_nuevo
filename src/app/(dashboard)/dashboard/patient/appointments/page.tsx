@@ -10,8 +10,10 @@ import { getPendingFormAppointments } from "@/server/actions/patient.queries";
 import {
   appointmentStatusLabels,
   modalityLabels,
+  paymentPhaseLabels,
   paymentStatusLabels,
 } from "@/lib/appointment-labels";
+import Link from "next/link";
 
 const statusStyles: Record<string, string> = {
   PENDING: "bg-accent/15 text-accent",
@@ -23,6 +25,7 @@ const statusStyles: Record<string, string> = {
 
 const paymentStyles: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700",
+  PARTIAL: "bg-sky-50 text-sky-700",
   PAID: "bg-green-50 text-green-700",
   REFUNDED: "bg-foreground/10 text-foreground/50",
   FAILED: "bg-red-50 text-red-600",
@@ -106,7 +109,11 @@ export default async function PatientAppointmentsPage() {
               Aún no tienes citas agendadas.
             </p>
           )}
-          {appointments.map((a) => (
+          {appointments.map((a) => {
+            const payStatus =
+              a.paymentPhases?.overallStatus ?? a.paymentStatus ?? "PENDING";
+
+            return (
             <div
               key={a.id}
               className="rounded-[24px] border border-foreground/10 bg-white p-4 shadow-sm"
@@ -127,24 +134,43 @@ export default async function PatientAppointmentsPage() {
                     >
                       {appointmentStatusLabels[a.status] ?? a.status}
                     </span>
-                    {a.paymentStatus && (
+                    {payStatus && (
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-bold ${
-                          paymentStyles[a.paymentStatus] ?? "bg-muted"
+                          paymentStyles[payStatus] ?? "bg-muted"
                         }`}
                       >
-                        {paymentStatusLabels[a.paymentStatus] ??
-                          a.paymentStatus}
+                        {paymentStatusLabels[payStatus] ?? payStatus}
                       </span>
                     )}
                   </div>
+                  {a.paymentPhases && (
+                    <p className="mt-2 text-xs text-foreground/50">
+                      Adelanto ${a.paymentPhases.advanceAmount} (
+                      {paymentPhaseLabels[a.paymentPhases.advanceStatus]}) ·
+                      Saldo ${a.paymentPhases.remainderAmount} (
+                      {paymentPhaseLabels[a.paymentPhases.remainderStatus]})
+                    </p>
+                  )}
+                  {a.consultationCode &&
+                    ["PENDING", "CONFIRMED", "COMPLETED"].includes(
+                      a.status,
+                    ) && (
+                      <Link
+                        href={`/dashboard/chat?type=${a.consultationCode}&appointment=${a.id}`}
+                        className="mt-3 inline-block text-xs font-semibold text-primary hover:underline"
+                      >
+                        Ir al chat de esta consulta →
+                      </Link>
+                    )}
                 </div>
                 {canCancel(a.status, a.start) && (
                   <CancelAppointmentButton appointmentId={a.id} />
                 )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       </div>
     </BrandFlowShell>

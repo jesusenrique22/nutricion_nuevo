@@ -2,4 +2,4 @@ export {
   ConsultationCode,
   Prisma,
   PrismaClient,
-} from "../node_modules/.prisma/client";
+} from "@prisma/client";

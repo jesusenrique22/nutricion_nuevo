@@ -9,6 +9,8 @@ import { createAppointmentSchema } from "@/lib/validators/appointment";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { syncPatientAndAdmins } from "@/server/realtime/sync";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
+import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
+import { buildPaymentCreateData } from "@/lib/payment-split";
 
 export type CreateAppointmentResult =
   | { ok: true; appointmentId: string; flow: "INTAKE" | "FOLLOW_UP" }
@@ -71,7 +73,9 @@ export async function createAppointment(
   });
   const flow = profile?.hasCompletedIntake ? "FOLLOW_UP" : "INTAKE";
 
-  // 6) Persistencia + registro de pago manual pendiente
+  // 6) Persistencia + registro de pago manual pendiente (adelanto + saldo)
+  const paymentPolicy = await getPaymentChatPolicy();
+
   const appointment = await prisma.$transaction(async (tx) => {
     const created = await tx.appointment.create({
       data: {
@@ -89,9 +93,10 @@ export async function createAppointment(
     await tx.payment.create({
       data: {
         appointmentId: created.id,
-        amount: consultationType.price,
-        status: "PENDING",
-        provider: "manual",
+        ...buildPaymentCreateData({
+          totalPrice: consultationType.price,
+          policy: paymentPolicy,
+        }),
       },
     });
 
@@ -109,6 +114,7 @@ export async function createAppointment(
   revalidatePath("/dashboard/patient/appointments");
   revalidatePath("/dashboard/admin/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/chat");
 
   await syncPatientAndAdmins(patientId, "appointments", {
     appointmentId: appointment.id,

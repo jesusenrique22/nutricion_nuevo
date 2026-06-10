@@ -60,7 +60,7 @@ export function PatientDashboardHome({
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10">
+    <div className="mx-auto max-w-5xl space-y-10 pb-2">
       <BrandDashboardHeader
         title={`Hola, ${firstName}`}
         description="Panel paciente · citas, estadísticas, planes y seguimiento en un solo lugar."
@@ -118,7 +118,7 @@ export function PatientDashboardHome({
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 pb-2 sm:grid-cols-2">
         {[
           {
             title: "Plan entrenamiento",

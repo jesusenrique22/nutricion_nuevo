@@ -39,10 +39,10 @@ export function Field({
 }
 
 export const inputClass =
-  "mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary";
+  "mt-1.5 w-full rounded-xl border border-foreground/15 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";
 
 export const selectClass =
-  "mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary bg-white";
+  "mt-1.5 w-full rounded-xl border border-foreground/15 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 bg-white";
 
 export const textareaClass =
-  "mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary min-h-[88px]";
+  "mt-1.5 h-[120px] w-full resize-none overflow-y-auto rounded-xl border border-foreground/15 px-4 py-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";

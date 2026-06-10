@@ -5,19 +5,25 @@ import { useState } from "react";
 import { ConsultationPricesEditor } from "@/components/cms/consultation-prices-editor";
 import { FormTemplateEditor } from "@/components/cms/form-template-editor";
 import { LandingImagesEditor } from "@/components/cms/landing-images-editor";
+import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
 import { SiteContentEditor } from "@/components/cms/site-content-editor";
+import { PaymentChatPolicyEditor } from "@/components/cms/payment-chat-policy-editor";
 import type {
   ConsultationAdminDTO,
   FormTemplateDTO,
   SiteContentDTO,
 } from "@/server/actions/cms.actions";
+import type { PaymentChatPolicy } from "@/types/payment-chat-policy";
 import type { LandingImagesData } from "@/types/landing-images";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
+import type { NutricionistaPageData } from "@/types/nutricionista-cv";
+import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 
 const tabs = [
   { id: "imagenes", label: "Imágenes" },
   { id: "precios", label: "Precios y consultas" },
   { id: "web", label: "Contenido web" },
+  { id: "conocerme", label: "Conóceme más" },
   { id: "formularios", label: "Formularios" },
   { id: "recursos", label: "Recursos" },
 ] as const;
@@ -30,15 +36,21 @@ export function PersonalizarTabs({
   formTemplates,
   resourceCount,
   landingImages,
+  nutricionistaPage,
+  paymentPolicy,
 }: {
   consultationTypes: ConsultationAdminDTO[];
   siteBlocks: SiteContentDTO[];
   formTemplates: FormTemplateDTO[];
   resourceCount: number;
   landingImages: LandingImagesData;
+  nutricionistaPage: NutricionistaPageData;
+  paymentPolicy: PaymentChatPolicy;
 }) {
   const [tab, setTab] = useState<TabId>("imagenes");
-  const textBlocks = siteBlocks.filter((b) => b.slug !== LANDING_IMAGES_SLUG);
+  const textBlocks = siteBlocks.filter(
+    (b) => b.slug !== LANDING_IMAGES_SLUG && b.slug !== NUTRICIONISTA_PAGE_SLUG,
+  );
 
   return (
     <div>
@@ -64,9 +76,15 @@ export function PersonalizarTabs({
           <LandingImagesEditor initial={landingImages} />
         )}
         {tab === "precios" && (
-          <ConsultationPricesEditor types={consultationTypes} />
+          <div className="space-y-6">
+            <PaymentChatPolicyEditor initial={paymentPolicy} />
+            <ConsultationPricesEditor types={consultationTypes} />
+          </div>
         )}
         {tab === "web" && <SiteContentEditor blocks={textBlocks} />}
+        {tab === "conocerme" && (
+          <NutricionistaCvEditor initial={nutricionistaPage} />
+        )}
         {tab === "formularios" && (
           <FormTemplateEditor templates={formTemplates} />
         )}

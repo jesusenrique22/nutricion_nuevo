@@ -1,6 +1,6 @@
 "use client";
 
-import { BrandFlowShell } from "@/components/brand/brand-flow-shell";
+import Link from "next/link";
 import { BrandLinkButton } from "@/components/brand/brand-link-button";
 
 export function PatientFormFlow({
@@ -19,36 +19,48 @@ export function PatientFormFlow({
   children: React.ReactNode;
 }) {
   return (
-    <BrandFlowShell
-      backHref="/dashboard/patient/appointments"
-      backLabel="← Volver a mis citas"
-      hub={{
-        greeting: subtitle,
-        compact: true,
-      }}
-    >
-      {pendingLinks.length > 1 && (
-        <div className="mx-auto mb-6 flex w-full max-w-[344px] flex-col gap-2">
-          {pendingLinks.map((p, i) => (
-            <BrandLinkButton
-              key={p.href}
-              href={p.href}
-              label={p.label}
-              subtitle={p.subtitle}
-              selected={i === activeSlot}
-              delay={i * 0.04}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="mx-auto w-full max-w-3xl rounded-[28px] bg-white p-5 shadow-md ring-1 ring-foreground/5 sm:p-8">
-        <h1 className="text-center text-xl font-bold sm:text-2xl">{title}</h1>
-        <p className="mt-3 rounded-2xl bg-accent/10 px-4 py-3 text-center text-sm text-foreground/80">
-          {description}
-        </p>
-        <div className="mt-8">{children}</div>
+    <div className="mx-auto flex h-full w-full max-w-6xl flex-col">
+      <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/dashboard/patient/appointments"
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          ← Volver a mis citas
+        </Link>
+        <p className="text-sm text-foreground/60">{subtitle}</p>
       </div>
-    </BrandFlowShell>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
+        {pendingLinks.length > 1 && (
+          <aside className="flex shrink-0 flex-col gap-2 lg:w-56">
+            {pendingLinks.map((p, i) => (
+              <BrandLinkButton
+                key={p.href}
+                href={p.href}
+                label={p.label}
+                subtitle={p.subtitle}
+                selected={i === activeSlot}
+                delay={i * 0.04}
+              />
+            ))}
+          </aside>
+        )}
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-white shadow-md ring-1 ring-foreground/5">
+          <header className="shrink-0 border-b border-foreground/5 px-5 py-4 sm:px-8 sm:py-5">
+            <h1 className="text-xl font-bold text-primary sm:text-2xl">
+              {title}
+            </h1>
+            <p className="mt-1.5 text-sm leading-relaxed text-foreground/65">
+              {description}
+            </p>
+          </header>
+
+          <div className="flex min-h-0 flex-1 flex-col px-5 py-4 sm:px-8 sm:py-5">
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

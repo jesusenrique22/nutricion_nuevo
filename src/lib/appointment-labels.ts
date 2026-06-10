@@ -8,9 +8,16 @@ export const appointmentStatusLabels: Record<string, string> = {
 
 export const paymentStatusLabels: Record<string, string> = {
   PENDING: "Pago pendiente",
+  PARTIAL: "Adelanto pagado",
   PAID: "Pagado",
   REFUNDED: "Reembolsado",
   FAILED: "Fallido",
+};
+
+export const paymentPhaseLabels: Record<string, string> = {
+  PENDING: "Pendiente",
+  PAID: "Pagado",
+  REFUNDED: "Reembolsado",
 };
 
 export const modalityLabels: Record<string, string> = {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand/logo";
 import { BrandSocialIcons } from "@/components/brand/brand-social-icons";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
-import { NUTRICIONISTA_CV } from "@/lib/nutricionista-cv-data";
+import type { NutricionistaCvData } from "@/types/nutricionista-cv";
 
 function CvSectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -28,8 +28,7 @@ function ContactRow({
   );
 }
 
-export function NutricionistaCvDocument() {
-  const cv = NUTRICIONISTA_CV;
+export function NutricionistaCvDocument({ cv }: { cv: NutricionistaCvData }) {
 
   return (
     <div className="mx-auto max-w-5xl">

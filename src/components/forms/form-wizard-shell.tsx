@@ -8,14 +8,14 @@ export function FormWizardProgress({
   total: number;
 }) {
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between text-sm font-semibold text-foreground/60">
+    <div className="mb-4">
+      <div className="flex items-center justify-between text-xs font-semibold text-foreground/55 sm:text-sm">
         <span>
           Página {step} de {total}
         </span>
         <span>{Math.round((step / total) * 100)}%</span>
       </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-primary transition-all"
           style={{ width: `${(step / total) * 100}%` }}
@@ -39,7 +39,7 @@ export function FormWizardNav({
   isPending?: boolean;
 }) {
   return (
-    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row">
       {step > 1 && (
         <button
           type="button"

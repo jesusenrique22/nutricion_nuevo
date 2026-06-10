@@ -44,9 +44,18 @@ export function MessageToast() {
     (payload: MessageIncomingPayload) => {
       const onChatPage = pathname.startsWith("/dashboard/chat");
       const activeConversation = searchParams.get("conversation");
+      const activeType = searchParams.get("type");
 
       if (onChatPage) {
-        if (!activeConversation || activeConversation === payload.conversationId) {
+        if (activeConversation) {
+          if (activeConversation === payload.conversationId) return;
+        } else if (
+          activeType &&
+          payload.consultationCode &&
+          activeType === payload.consultationCode
+        ) {
+          return;
+        } else if (!activeConversation && !activeType && !payload.consultationCode) {
           return;
         }
       }
