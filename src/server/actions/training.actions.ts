@@ -1,4 +1,5 @@
 "use server";
+import { revalidatePath } from "next/cache";
 
 import { ConsultationCode } from "@prisma/client";
 import { auth } from "@/lib/auth";
@@ -94,5 +95,6 @@ export async function submitTrainingForm(
   );
 
   if (!result.ok) return result;
+  revalidatePath("/dashboard/patient/appointments");
   return { ok: true };
 }

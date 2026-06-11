@@ -1,9 +1,7 @@
 import type { RealtimeScope } from "@/types/realtime";
 
-const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3001";
-const SOCKET_SECRET =
-  process.env.SOCKET_INTERNAL_SECRET ?? "dev-socket-secret";
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "";
+const SOCKET_SECRET = process.env.SOCKET_INTERNAL_SECRET ?? "";
 
 async function postSocketEmit(body: {
   event: string;
@@ -12,6 +10,7 @@ async function postSocketEmit(body: {
   roles?: Array<"ADMIN" | "PATIENT">;
 }): Promise<void> {
   if (!body.userIds?.length && !body.roles?.length) return;
+  if (!SOCKET_URL || !SOCKET_SECRET) return;
 
   try {
     const res = await fetch(`${SOCKET_URL}/internal/emit`, {

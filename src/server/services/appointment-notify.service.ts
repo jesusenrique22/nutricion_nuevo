@@ -29,7 +29,7 @@ export async function notifyAppointmentBooked(params: {
   appointmentId: string;
 }) {
   await safeNotify(async () => {
-    await createNotification({
+    await createNotification({ _serverOnly: true,
       recipientId: params.patientId,
       type: "SYSTEM",
       title: "Cita solicitada",
@@ -44,6 +44,7 @@ export async function notifyAppointmentBooked(params: {
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
+          _serverOnly: true,
           recipientId: id,
           type: "SYSTEM",
           title: "Nueva cita",
@@ -75,7 +76,7 @@ export async function notifyAppointmentStatusChange(params: {
   if (!title) return;
 
   await safeNotify(async () => {
-    await createNotification({
+    await createNotification({ _serverOnly: true,
       recipientId: params.patientId,
       type: params.status === "CONFIRMED" ? "APPOINTMENT_REMINDER" : "SYSTEM",
       title,
@@ -95,7 +96,7 @@ export async function notifyPaymentRegistered(params: {
   appointmentId: string;
 }) {
   await safeNotify(async () => {
-    await createNotification({
+    await createNotification({ _serverOnly: true,
       recipientId: params.patientId,
       type: "PAYMENT",
       title: "Pago registrado",
@@ -115,7 +116,7 @@ export async function notifyAppointmentReminder(params: {
   appointmentId: string;
 }) {
   await safeNotify(async () => {
-    await createNotification({
+    await createNotification({ _serverOnly: true,
       recipientId: params.patientId,
       type: "APPOINTMENT_REMINDER",
       title: "Recordatorio de cita",

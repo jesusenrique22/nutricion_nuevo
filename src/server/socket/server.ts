@@ -8,8 +8,13 @@ import { Server } from "socket.io";
  * - Actualizaciones del dashboard (salas por usuario y rol)
  */
 const PORT = Number(process.env.SOCKET_PORT ?? 3001);
-const SOCKET_SECRET =
-  process.env.SOCKET_INTERNAL_SECRET ?? "dev-socket-secret";
+const SOCKET_SECRET = process.env.SOCKET_INTERNAL_SECRET;
+if (!SOCKET_SECRET) {
+  console.error(
+    "[socket] SOCKET_INTERNAL_SECRET no configurado. Establece esta variable en producción.",
+  );
+  if (process.env.NODE_ENV === "production") process.exit(1);
+}
 
 const httpServer = createServer(handleHttpRequest);
 const io = new Server(httpServer, {

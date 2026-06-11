@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { isCloudinaryUrl, isMongoMediaUrl } from "@/lib/media-url";
 import {
   isDisplayableCoverUrl,
   isLocalCoverPath,
@@ -17,7 +18,7 @@ export function ResourceCoverImage({
 }) {
   if (!isDisplayableCoverUrl(src)) return null;
 
-  if (isLocalCoverPath(src)) {
+  if (isLocalCoverPath(src) || isCloudinaryUrl(src)) {
     return (
       <Image
         src={src}
@@ -25,12 +26,13 @@ export function ResourceCoverImage({
         fill
         className={className}
         sizes={sizes}
+        unoptimized={isMongoMediaUrl(src)}
       />
     );
   }
 
   return (
-    // Remote image URLs use <img> so admins are not blocked by next.config host allowlists.
+    // Other remote URLs use <img> to avoid next.config host allowlists.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}

@@ -11,6 +11,7 @@ import {
   type WeeklyPlanData,
 } from "@/types/weekly-plan";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { parseUploadResponse } from "@/lib/upload-response";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -49,7 +50,7 @@ export function AdminWeeklyPlanEditor({
         method: "POST",
         body: fd,
       });
-      const json = (await res.json()) as { url?: string; error?: string };
+      const json = await parseUploadResponse(res);
       if (!res.ok || !json.url) throw new Error(json.error ?? "Error al subir");
       setImageUrl(json.url);
     } catch (err) {

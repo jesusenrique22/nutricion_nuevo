@@ -1,3 +1,5 @@
+import { isCloudinaryUrl, isMongoMediaUrl } from "@/lib/media-url";
+
 const IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i;
 
 export function isLocalCoverPath(url: string): boolean {
@@ -8,6 +10,8 @@ export function isDisplayableCoverUrl(url: string | null | undefined): boolean {
   if (!url?.trim()) return false;
   const trimmed = url.trim();
   if (isLocalCoverPath(trimmed)) return true;
+  if (isMongoMediaUrl(trimmed)) return true;
+  if (isCloudinaryUrl(trimmed)) return true;
   try {
     const parsed = new URL(trimmed);
     return IMAGE_EXT.test(parsed.pathname);

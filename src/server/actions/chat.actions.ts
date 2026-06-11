@@ -475,7 +475,7 @@ export async function sendChatMessage(params: {
     consultationCode: conv.consultationCode,
   });
 
-  await createNotification({
+  await createNotification({ _serverOnly: true,
     recipientId,
     type: "NEW_MESSAGE",
     title: `Nuevo mensaje · ${consultationChatLabel(conv.consultationCode)}`,
@@ -604,7 +604,7 @@ export async function sendChatSticker(params: {
     consultationCode: conv.consultationCode,
   });
 
-  await createNotification({
+  await createNotification({ _serverOnly: true,
     recipientId,
     type: "NEW_MESSAGE",
     title: `Nuevo sticker · ${consultationChatLabel(conv.consultationCode)}`,

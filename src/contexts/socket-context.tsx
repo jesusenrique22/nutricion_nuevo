@@ -23,8 +23,19 @@ export function SocketProvider({
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
+    const configured = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
+    const isBrowser = typeof window !== "undefined";
+    const onProdHost =
+      isBrowser && !/localhost|127\.0\.0\.1/.test(window.location.hostname);
     const url =
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3001";
+      configured && !(onProdHost && /localhost|127\.0\.0\.1/.test(configured))
+        ? configured
+        : onProdHost
+          ? null
+          : (configured ?? "http://localhost:3001");
+
+    if (!url) return;
+
     const instance = io(url, {
       transports: ["websocket", "polling"],
       reconnection: true,

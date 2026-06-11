@@ -17,12 +17,18 @@ export interface NotificationDTO {
   createdAt: string;
 }
 
+/**
+ * Internal server-only function. NOT a Server Action callable from the client.
+ * Import only from server-side services/actions.
+ */
 export async function createNotification(params: {
   recipientId: string;
   type: NotificationType;
   title: string;
   body: string;
   payload?: Record<string, unknown>;
+  /** Must be true to confirm the call is from internal server code. */
+  _serverOnly?: true;
 }) {
   const db = await getMongoDb();
   await db.collection<NotificationDoc>(Collections.notifications).insertOne({

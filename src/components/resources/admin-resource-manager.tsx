@@ -10,6 +10,7 @@ import {
 } from "@/server/actions/resource.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { parseUploadResponse } from "@/lib/upload-response";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -92,8 +93,8 @@ export function AdminResourceManager({
         method: "POST",
         body: fd,
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Error al subir");
+      const json = await parseUploadResponse(res);
+      if (!res.ok || !json.url) throw new Error(json.error ?? "Error al subir");
 
       const nextForm = { ...form, [target]: json.url as string };
       setForm(nextForm);

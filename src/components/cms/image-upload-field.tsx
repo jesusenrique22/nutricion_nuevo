@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { parseUploadResponse } from "@/lib/upload-response";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -33,7 +35,7 @@ export function ImageUploadField({
         method: "POST",
         body: fd,
       });
-      const json = (await res.json()) as { url?: string; error?: string };
+      const json = await parseUploadResponse(res);
       if (!res.ok || !json.url) {
         throw new Error(json.error ?? "Error al subir");
       }
@@ -70,7 +72,7 @@ export function ImageUploadField({
             fill
             className="object-cover"
             sizes="320px"
-            unoptimized={value.startsWith("/uploads/")}
+            unoptimized={shouldUnoptimizeImage(value)}
           />
         </div>
       )}

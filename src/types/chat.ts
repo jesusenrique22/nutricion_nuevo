@@ -51,7 +51,7 @@ export interface FileDoc {
   ownerId: string;
   context: FileContext;
   relatedPatientId?: string;
-  provider: "cloudinary" | "s3";
+  provider: "mongodb" | "local" | "cloudinary" | "s3";
   publicId: string;
   url: string;
   secureUrl: string;

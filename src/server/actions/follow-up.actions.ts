@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import { followUpSchema } from "@/lib/validators/follow-up";
@@ -78,5 +79,6 @@ export async function submitFollowUpForm(
     }
   });
 
+  revalidatePath("/dashboard/patient/appointments");
   return { ok: true };
 }

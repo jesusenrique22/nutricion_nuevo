@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/lib/auth";
 import { getMongoDb, Collections } from "@/server/db/mongo";
 import { assertConversationAccess } from "@/server/services/chat-access";
+import { storePublicFile } from "@/server/services/file-storage";
 import type { FileDoc, MessageType } from "@/types/chat";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -54,98 +54,85 @@ function inferMessageType(mime: string): MessageType {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
 
-  const formData = await req.formData();
-  const file = formData.get("file");
-  const conversationId = formData.get("conversationId");
+    const formData = await req.formData();
+    const file = formData.get("file");
+    const conversationId = formData.get("conversationId");
 
-  if (!(file instanceof File) || typeof conversationId !== "string") {
-    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
-  }
+    if (!(file instanceof File) || typeof conversationId !== "string") {
+      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    }
 
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "El archivo es demasiado grande. Máximo 10 MB." },
-      { status: 400 },
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json(
+        { error: "El archivo es demasiado grande. Máximo 10 MB." },
+        { status: 400 },
+      );
+    }
+
+    const mimeType = resolveMimeType(file);
+    if (!ALLOWED_TYPES[mimeType]) {
+      return NextResponse.json(
+        {
+          error:
+            "Tipo de archivo no permitido. Podés enviar fotos (JPG, PNG, WEBP, HEIC), PDF o videos MP4.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const conv = await assertConversationAccess(
+      conversationId,
+      session.user.id,
+      session.user.role,
     );
+    if (!conv) {
+      return NextResponse.json(
+        { error: "Sin acceso a esta conversación" },
+        { status: 403 },
+      );
+    }
+
+    const stored = await storePublicFile(file, `chat/${conversationId}`, {
+      ownerId: session.user.id,
+    });
+
+    const db = await getMongoDb();
+    const fileDoc: FileDoc = {
+      ownerId: session.user.id,
+      context: "CHAT",
+      relatedPatientId: conv.patientId,
+      provider: stored.provider === "mongodb" ? "mongodb" : "local",
+      publicId: stored.fileId ?? stored.url,
+      url: stored.url,
+      secureUrl: stored.url,
+      mimeType,
+      fileName: file.name,
+      sizeBytes: file.size,
+      uploadedAt: new Date(),
+    };
+
+    const res = await db
+      .collection<FileDoc>(Collections.files)
+      .insertOne(fileDoc);
+
+    return NextResponse.json({
+      fileId: res.insertedId.toString(),
+      url: stored.url,
+      mimeType,
+      fileName: file.name,
+      sizeBytes: file.size,
+      messageType: inferMessageType(mimeType),
+    });
+  } catch (err) {
+    console.error("[chat/upload]", err);
+    const message =
+      err instanceof Error ? err.message : "Error al subir el archivo.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const mimeType = resolveMimeType(file);
-  if (!ALLOWED_TYPES[mimeType]) {
-    return NextResponse.json(
-      {
-        error:
-          "Tipo de archivo no permitido. Podés enviar fotos (JPG, PNG, WEBP, HEIC), PDF o videos MP4.",
-      },
-      { status: 400 },
-    );
-  }
-
-  const conv = await assertConversationAccess(
-    conversationId,
-    session.user.id,
-    session.user.role,
-  );
-
-  if (!conv) {
-    return NextResponse.json({ error: "Sin acceso a esta conversación" }, { status: 403 });
-  }
-
-  const db = await getMongoDb();
-
-  const ext = path.extname(file.name) || mimeToExt(mimeType);
-  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-  const relDir = path.join("uploads", "chat", conversationId);
-  const absDir = path.join(process.cwd(), "public", relDir);
-
-  await mkdir(absDir, { recursive: true });
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(absDir, safeName), buffer);
-
-  const publicUrl = `/${relDir.replace(/\\/g, "/")}/${safeName}`;
-
-  const fileDoc: FileDoc = {
-    ownerId: session.user.id,
-    context: "CHAT",
-    relatedPatientId: conv.patientId,
-    provider: "s3",
-    publicId: safeName,
-    url: publicUrl,
-    secureUrl: publicUrl,
-    mimeType,
-    fileName: file.name,
-    sizeBytes: file.size,
-    uploadedAt: new Date(),
-  };
-
-  const res = await db.collection<FileDoc>(Collections.files).insertOne(fileDoc);
-
-  return NextResponse.json({
-    fileId: res.insertedId.toString(),
-    url: publicUrl,
-    mimeType,
-    fileName: file.name,
-    sizeBytes: file.size,
-    messageType: inferMessageType(mimeType),
-  });
-}
-
-function mimeToExt(mime: string): string {
-  const map: Record<string, string> = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
-    "image/heic": ".heic",
-    "image/heif": ".heif",
-    "application/pdf": ".pdf",
-    "video/mp4": ".mp4",
-    "video/quicktime": ".mov",
-  };
-  return map[mime] ?? "";
 }
