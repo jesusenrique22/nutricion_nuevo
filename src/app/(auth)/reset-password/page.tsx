@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState, useTransition } from "react";
+import { PasswordInput } from "@/components/auth/password-input";
 import { resetPassword } from "@/server/actions/auth.actions";
 
 function ResetForm() {
@@ -46,16 +47,13 @@ function ResetForm() {
         });
       }}
     >
-      <label className="block text-sm">
-        <span className="font-semibold">Nueva contraseña</span>
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          className="mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary"
-        />
-      </label>
+      <PasswordInput
+        label="Nueva contraseña"
+        required
+        minLength={8}
+        autoComplete="new-password"
+        inputClassName="w-full rounded-xl border border-foreground/15 bg-background px-4 py-2.5 pr-12 outline-none transition focus:border-primary"
+      />
       <button
         type="submit"
         disabled={isPending}

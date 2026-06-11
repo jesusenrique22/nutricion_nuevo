@@ -9,6 +9,7 @@ import {
   AuthFormCard,
   AuthShell,
 } from "@/components/auth/auth-shell";
+import { PasswordInput } from "@/components/auth/password-input";
 
 function LoginForm() {
   const params = useSearchParams();
@@ -64,16 +65,11 @@ function LoginForm() {
             className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
           />
         </div>
-        <div>
-          <label className="text-sm font-semibold">Contraseña</label>
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
-          />
-        </div>
+        <PasswordInput
+          label="Contraseña"
+          required
+          autoComplete="current-password"
+        />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <a
             href="/forgot-password"

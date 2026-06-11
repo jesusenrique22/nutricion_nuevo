@@ -7,6 +7,7 @@ import {
   AuthFormCard,
   AuthShell,
 } from "@/components/auth/auth-shell";
+import { PasswordInput } from "@/components/auth/password-input";
 import { registerPatient } from "@/server/actions/auth.actions";
 
 export default function RegisterPage() {
@@ -69,17 +70,12 @@ export default function RegisterPage() {
               className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
             />
           </div>
-          <div>
-            <label className="text-sm font-semibold">Contraseña</label>
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
-            />
-          </div>
+          <PasswordInput
+            label="Contraseña"
+            required
+            minLength={8}
+            autoComplete="new-password"
+          />
           <p className="text-xs text-foreground/55">
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
           </p>
