@@ -1,35 +1,76 @@
-import { MongoClient, Db } from "mongodb";
+import { MongoClient, Db, ServerApiVersion } from "mongodb";
 
-const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB ?? "nutricion_chat";
 
-if (!uri) {
-  throw new Error("Falta la variable de entorno MONGODB_URI");
-}
-
 const globalForMongo = globalThis as unknown as {
+  _mongoClient: MongoClient | undefined;
   _mongoClientPromise: Promise<MongoClient> | undefined;
 };
 
-const clientOptions = {
-  serverSelectionTimeoutMS: 5_000,
-  connectTimeoutMS: 5_000,
-};
+/** Asegura parámetros recomendados para Atlas + serverless (Vercel). */
+function normalizeMongoUri(uri: string): string {
+  const trimmed = uri.trim();
+  if (!trimmed) return trimmed;
 
-const client = new MongoClient(uri, clientOptions);
+  const hasQuery = trimmed.includes("?");
+  const required = ["retryWrites=true", "w=majority"];
+  const missing = required.filter(
+    (p) => !trimmed.toLowerCase().includes(p.split("=")[0].toLowerCase()),
+  );
 
-// Reutiliza la conexión en desarrollo (evita agotar conexiones con HMR)
+  if (missing.length === 0) return trimmed;
+  return `${trimmed}${hasQuery ? "&" : "?"}${missing.join("&")}`;
+}
+
+function getClientOptions() {
+  return {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
+    // Evita fallos SSL/TLS en Vercel (IPv6 auto-select)
+    autoSelectFamily: false,
+    maxPoolSize: 10,
+    minPoolSize: 0,
+    maxIdleTimeMS: 10_000,
+    serverSelectionTimeoutMS: 15_000,
+    connectTimeoutMS: 15_000,
+    socketTimeoutMS: 45_000,
+  } as const;
+}
+
+function getMongoUri(): string {
+  const uri = process.env.MONGODB_URI?.trim();
+  if (!uri) {
+    throw new Error("Falta la variable de entorno MONGODB_URI");
+  }
+  return normalizeMongoUri(uri);
+}
+
+function getMongoClient(): MongoClient {
+  if (!globalForMongo._mongoClient) {
+    globalForMongo._mongoClient = new MongoClient(
+      getMongoUri(),
+      getClientOptions(),
+    );
+  }
+  return globalForMongo._mongoClient;
+}
+
+// Reutiliza la conexión entre invocaciones serverless (Vercel)
 function getClientPromise(): Promise<MongoClient> {
   if (!globalForMongo._mongoClientPromise) {
-    globalForMongo._mongoClientPromise = client.connect().catch((error) => {
-      globalForMongo._mongoClientPromise = undefined;
-      throw error;
-    });
+    globalForMongo._mongoClientPromise = getMongoClient()
+      .connect()
+      .catch((error) => {
+        globalForMongo._mongoClientPromise = undefined;
+        globalForMongo._mongoClient = undefined;
+        throw error;
+      });
   }
   return globalForMongo._mongoClientPromise;
 }
-
-const clientPromise = getClientPromise();
 
 let indexesEnsured = false;
 
@@ -42,17 +83,25 @@ async function ensureIndexes(db: Db): Promise<void> {
       .collection(Collections.conversations)
       .createIndex({ participants: 1, updatedAt: -1 }),
     db
+      .collection(Collections.conversations)
+      .createIndex(
+        { patientId: 1, consultationCode: 1 },
+        { unique: true },
+      ),
+    db
       .collection(Collections.messages)
       .createIndex({ conversationId: 1, createdAt: 1 }),
     db
       .collection(Collections.notifications)
       .createIndex({ recipientId: 1, isRead: 1, createdAt: -1 }),
-    db.collection(Collections.files).createIndex({ ownerId: 1, uploadedAt: -1 }),
+    db
+      .collection(Collections.files)
+      .createIndex({ ownerId: 1, uploadedAt: -1 }),
   ]);
 }
 
 export async function getMongoDb(): Promise<Db> {
-  const connectedClient = await clientPromise;
+  const connectedClient = await getClientPromise();
   const db = connectedClient.db(dbName);
   await ensureIndexes(db);
   return db;
@@ -66,4 +115,4 @@ export const Collections = {
   notifications: "notifications",
 } as const;
 
-export default clientPromise;
+export default getClientPromise;

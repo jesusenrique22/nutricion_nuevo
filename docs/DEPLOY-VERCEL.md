@@ -37,7 +37,13 @@ Project → **Settings** → **Environment Variables** (Production):
 
 Pacientes: registro en `/register`.
 
-## 5. Limitaciones en Vercel
+## 5. MongoDB Atlas — si chat/notificaciones fallan
+
+En **Atlas → Network Access**, agrega **`0.0.0.0/0`** (Allow access from anywhere) para que Vercel pueda conectar.
+
+Si ves `MongoServerSelectionError` o `SSL routines` en los logs, el código ya usa `autoSelectFamily: false`; redeploy tras el fix.
+
+## 6. Limitaciones en Vercel
 
 | Funcionalidad | Estado |
 |---------------|--------|
@@ -47,7 +53,7 @@ Pacientes: registro en `/register`.
 | Archivos del chat | ⚠️ Disco efímero — no persisten entre deploys |
 | Emails | ⚠️ Configurar SMTP en variables |
 
-## 6. Comandos locales útiles
+## 7. Comandos locales útiles
 
 ```bash
 pnpm run db:check        # Verificar Neon
@@ -56,7 +62,7 @@ pnpm run vercel-build    # Simular build de Vercel
 pnpm run db:seed         # Re-ejecutar datos iniciales
 ```
 
-## 7. CLI (opcional)
+## 8. CLI (opcional)
 
 ```bash
 npx vercel login

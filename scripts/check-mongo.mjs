@@ -19,7 +19,10 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 5_000 });
+  const client = new MongoClient(uri, {
+    serverSelectionTimeoutMS: 15_000,
+    autoSelectFamily: false,
+  });
 
   try {
     await client.connect();
@@ -46,9 +49,10 @@ Solución (desarrollo local):
    MONGODB_DB="nutricion_chat"
 
 Solución (MongoDB Atlas):
-1. Crea un cluster en https://cloud.mongodb.com
-2. Añade tu IP en Network Access
-3. Copia la connection string (SRV) y ponla en MONGODB_URI
+1. Network Access → Add IP Address → 0.0.0.0/0 (necesario para Vercel)
+2. Verifica que el cluster no esté pausado (Free tier)
+3. Database Access → usuario con contraseña correcta en MONGODB_URI
+4. Connection string SRV en MONGODB_URI (y MONGODB_DB=nutricion_chat)
 `);
     process.exit(1);
   } finally {
