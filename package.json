@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "build": "node scripts/vercel-build.mjs",
+    "build:local": "prisma generate && next build",
+    "build:skip-migrate": "SKIP_MIGRATE=1 node scripts/vercel-build.mjs",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "start": "next start",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate",

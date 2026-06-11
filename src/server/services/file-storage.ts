@@ -36,22 +36,28 @@ export async function storePublicFile(
   options?: { ownerId?: string },
 ): Promise<StoredFile> {
   if (hasMongoUri()) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const uploaded = await uploadToMongo(buffer, {
-      fileName: file.name,
-      mimeType: file.type,
-      folder,
-      ownerId: options?.ownerId,
-    });
-    return {
-      url: uploaded.url,
-      mimeType: file.type,
-      provider: "mongodb",
-      fileId: uploaded.fileId,
-    };
-  }
-
-  if (process.env.VERCEL === "1") {
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const uploaded = await uploadToMongo(buffer, {
+        fileName: file.name,
+        mimeType: file.type,
+        folder,
+        ownerId: options?.ownerId,
+      });
+      return {
+        url: uploaded.url,
+        mimeType: file.type,
+        provider: "mongodb",
+        fileId: uploaded.fileId,
+      };
+    } catch (err) {
+      if (process.env.VERCEL === "1") throw err;
+      console.warn(
+        "[storage] MongoDB no disponible, usando almacenamiento local:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  } else if (process.env.VERCEL === "1") {
     throw new Error(
       "MONGODB_URI no está configurado. Es necesario para subir archivos en producción.",
     );

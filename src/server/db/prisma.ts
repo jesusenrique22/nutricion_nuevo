@@ -1,13 +1,55 @@
+import { statSync } from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma?: PrismaClient;
+  prismaSchemaMtime?: number;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function schemaMtimeMs(): number {
+  try {
+    return statSync(path.join(process.cwd(), "prisma/schema.prisma")).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+function createPrismaClient(): PrismaClient {
+  return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function getPrismaClient(): PrismaClient {
+  const currentMtime = schemaMtimeMs();
+
+  if (process.env.NODE_ENV !== "production") {
+    const staleSchema =
+      globalForPrisma.prisma &&
+      (globalForPrisma.prismaSchemaMtime === undefined ||
+        globalForPrisma.prismaSchemaMtime !== currentMtime ||
+        !("mediaAsset" in globalForPrisma.prisma));
+
+    if (staleSchema) {
+      void globalForPrisma.prisma?.$disconnect();
+      globalForPrisma.prisma = undefined;
+    }
+  }
+
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaSchemaMtime = currentMtime;
+  }
+
+  return globalForPrisma.prisma;
+}
+
+/** Proxy evita usar un PrismaClient obsoleto tras `prisma generate` sin reiniciar el dev server. */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

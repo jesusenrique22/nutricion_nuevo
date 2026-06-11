@@ -1,4 +1,8 @@
-import { openMongoFileStream, mongoStreamToWebResponse } from "@/server/services/mongo-storage";
+import {
+  gridFileMimeType,
+  mongoStreamToWebResponse,
+  openMongoFileStream,
+} from "@/server/services/mongo-storage";
 
 export async function GET(
   _req: Request,
@@ -11,10 +15,9 @@ export async function GET(
       return new Response("No encontrado", { status: 404 });
     }
 
-    const mimeType =
-      (result.meta.metadata?.mimeType as string | undefined) ??
-      result.meta.contentType ??
-      "application/octet-stream";
+    const mimeType = gridFileMimeType(
+      result.meta.metadata as Record<string, unknown> | undefined,
+    );
 
     return mongoStreamToWebResponse(result.stream, mimeType);
   } catch (err) {

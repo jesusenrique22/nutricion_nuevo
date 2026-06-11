@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { storePublicFile } from "@/server/services/file-storage";
+import { registerMediaAsset } from "@/server/services/media-library.service";
 
 const MAX_BYTES = 25 * 1024 * 1024;
 
@@ -51,7 +52,26 @@ export async function POST(req: NextRequest) {
     const stored = await storePublicFile(file, safeFolder, {
       ownerId: session.user.id,
     });
-    return NextResponse.json({ url: stored.url, mimeType: stored.mimeType });
+
+    let assetId: string | undefined;
+    if (file.type.startsWith("image/")) {
+      try {
+        const asset = await registerMediaAsset(stored, {
+          folder: safeFolder,
+          fileName: file.name,
+          ownerId: session.user.id,
+        });
+        assetId = asset.id;
+      } catch (registerErr) {
+        console.warn("[resources/upload] No se pudo registrar en biblioteca:", registerErr);
+      }
+    }
+
+    return NextResponse.json({
+      url: stored.url,
+      mimeType: stored.mimeType,
+      id: assetId,
+    });
   } catch (err) {
     console.error("[resources/upload]", err);
     const message =

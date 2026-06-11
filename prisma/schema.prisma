@@ -373,6 +373,20 @@ model SiteContent {
   updatedAt DateTime @updatedAt
 }
 
+model MediaAsset {
+  id        String   @id @default(cuid())
+  url       String
+  fileId    String?
+  mimeType  String
+  fileName  String?
+  folder    String   @default("site")
+  provider  String
+  ownerId   String?
+  createdAt DateTime @default(now())
+
+  @@index([folder, createdAt(sort: Desc)])
+}
+
 model FormTemplate {
   id        String   @id @default(cuid())
   code      String   @unique

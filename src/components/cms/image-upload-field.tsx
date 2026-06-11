@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { MediaLibraryPanel } from "@/components/cms/media-library-panel";
 import { parseUploadResponse } from "@/lib/upload-response";
 
 const inputClass =
@@ -14,15 +15,18 @@ export function ImageUploadField({
   value,
   onChange,
   hint,
+  folder = "site",
 }: {
   label: string;
   value: string;
   onChange: (url: string) => void;
   hint?: string;
+  folder?: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [libraryRefresh, setLibraryRefresh] = useState(0);
 
   async function handleFile(file: File) {
     setUploading(true);
@@ -30,7 +34,7 @@ export function ImageUploadField({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("folder", "site");
+      fd.append("folder", folder);
       const res = await fetch("/api/resources/upload", {
         method: "POST",
         body: fd,
@@ -40,6 +44,7 @@ export function ImageUploadField({
         throw new Error(json.error ?? "Error al subir");
       }
       onChange(json.url);
+      setLibraryRefresh((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir");
     } finally {
@@ -110,6 +115,13 @@ export function ImageUploadField({
       />
 
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+      <MediaLibraryPanel
+        folder={folder}
+        selectedUrl={value}
+        onSelect={onChange}
+        refreshKey={libraryRefresh}
+      />
     </div>
   );
 }

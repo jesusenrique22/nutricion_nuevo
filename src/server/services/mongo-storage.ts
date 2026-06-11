@@ -22,7 +22,6 @@ export async function uploadToMongo(
 
   const fileId = await new Promise<ObjectId>((resolve, reject) => {
     const stream = bucket.openUploadStream(options.fileName, {
-      contentType: options.mimeType,
       metadata: {
         mimeType: options.mimeType,
         folder: options.folder,
@@ -57,6 +56,26 @@ export async function openMongoFileStream(fileId: string) {
   if (!meta) return null;
   const stream = bucket.openDownloadStream(new ObjectId(fileId));
   return { stream, meta };
+}
+
+export async function deleteFromMongo(fileId: string): Promise<boolean> {
+  if (!ObjectId.isValid(fileId)) return false;
+  const db = await getMongoDb();
+  const bucket = new GridFSBucket(db, { bucketName: BUCKET });
+  const files = await bucket
+    .find({ _id: new ObjectId(fileId) })
+    .limit(1)
+    .toArray();
+  if (!files[0]) return false;
+  await bucket.delete(new ObjectId(fileId));
+  return true;
+}
+
+export function gridFileMimeType(
+  metadata: Record<string, unknown> | undefined,
+): string {
+  const mime = metadata?.mimeType;
+  return typeof mime === "string" ? mime : "application/octet-stream";
 }
 
 export function mongoStreamToWebResponse(
