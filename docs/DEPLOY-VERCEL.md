@@ -22,12 +22,17 @@ Project → **Settings** → **Environment Variables** (Production):
 | `MONGODB_URI` | URI de MongoDB Atlas |
 | `MONGODB_DB` | `nutricion_chat` |
 | `AUTH_SECRET` | Secreto NextAuth (mismo que en `.env` local) |
-| `NEXTAUTH_URL` | `https://TU-PROYECTO.vercel.app` (tras el 1er deploy) |
+| `AUTH_URL` | `https://TU-PROYECTO.vercel.app` (URL exacta, sin `/` final) |
+| `NEXTAUTH_URL` | Mismo valor que `AUTH_URL` (compatibilidad emails) |
 | `CRON_SECRET` | Token para `/api/cron/reminders` |
 | `NEXT_PUBLIC_SOCKET_URL` | Opcional — URL del servidor Socket.io |
 | `SOCKET_INTERNAL_SECRET` | Opcional — mismo valor en servidor socket |
 
-**Importante:** Tras el primer deploy, actualiza `NEXTAUTH_URL` con la URL real y **redeploy**.
+**Importante:** Tras el primer deploy, actualiza `AUTH_URL` y `NEXTAUTH_URL` con la URL **real** del proyecto (ej. `https://nutricion-phi.vercel.app`) y **redeploy**.
+
+### URL correcta del proyecto
+
+Vercel puede asignar varios dominios (`nutricion.vercel.app`, `nutricion-phi.vercel.app`, etc.). Usá siempre el dominio del deploy activo que aparece en **Deployments → Visit**. Si entrás a un dominio viejo o de otro proyecto, verás **404** en `/dashboard` o `/login`.
 
 ## 4. Credenciales de demo
 
@@ -41,7 +46,23 @@ Pacientes: registro en `/register`.
 
 En **Atlas → Network Access**, agrega **`0.0.0.0/0`** (Allow access from anywhere) para que Vercel pueda conectar.
 
-Si ves `MongoServerSelectionError` o `SSL routines` en los logs, el código ya usa `autoSelectFamily: false`; redeploy tras el fix.
+Si ves `MongoServerSelectionError` o `SSL routines` en los logs:
+
+1. Atlas → **Network Access** → `0.0.0.0/0`
+2. Verificá que `MONGODB_URI` y `MONGODB_DB` estén en Vercel (Production)
+3. Si la contraseña del usuario Atlas tiene caracteres especiales, codificala en la URI (`@` → `%40`, etc.)
+4. Redeploy tras cambiar variables
+
+El código usa `autoSelectFamily: false` y `family: 4` para Vercel.
+
+## 5b. Login no funciona / 404 en `/dashboard`
+
+| Síntoma | Causa probable | Solución |
+|---------|----------------|----------|
+| 404 en `/dashboard` o `/login` | Dominio incorrecto | Usá la URL del deploy activo en Vercel |
+| Login con “Credenciales inválidas” | `DATABASE_URL` o seed | Verificá Neon y ejecutá seed en prod si hace falta |
+| Error 500 al iniciar sesión | Falta `AUTH_SECRET` | Agregá `AUTH_SECRET` en Vercel y redeploy |
+| Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio que usás en el navegador |
 
 ## 6. Limitaciones en Vercel
 

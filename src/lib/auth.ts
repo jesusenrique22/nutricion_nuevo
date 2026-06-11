@@ -13,6 +13,7 @@ const credentialsSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  trustHost: true,
   // Credentials provider requiere estrategia JWT
   session: { strategy: "jwt" },
   pages: {

@@ -26,11 +26,12 @@ function getClientOptions() {
   return {
     serverApi: {
       version: ServerApiVersion.v1,
-      strict: true,
+      strict: false,
       deprecationErrors: true,
     },
     // Evita fallos SSL/TLS en Vercel (IPv6 auto-select)
     autoSelectFamily: false,
+    family: 4,
     maxPoolSize: 10,
     minPoolSize: 0,
     maxIdleTimeMS: 10_000,
