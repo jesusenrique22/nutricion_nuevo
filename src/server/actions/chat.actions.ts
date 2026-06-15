@@ -21,7 +21,11 @@ import {
   getConsultationTypes,
   prepareChatStorage,
   resolveConsultationType,
+  syncConversationPatientProfile,
 } from "@/server/services/chat-conversation.service";
+import {
+  resolvePatientDisplay,
+} from "@/server/services/chat-patient-resolve";
 import {
   getCachedPatientChatEligibility,
   getPatientChatEligibility,
@@ -138,13 +142,14 @@ export interface ChatPageData {
 
 function serializeConversationListItem(
   conv: ConversationDoc,
-  nameMap: Record<string, string>,
+  patientId: string,
+  patientName: string,
   currentUserId: string,
 ): ConversationListItem {
   return {
     id: conv._id!.toString(),
-    patientId: conv.patientId,
-    patientName: nameMap[conv.patientId] ?? "Paciente",
+    patientId,
+    patientName,
     consultationCode: conv.consultationCode,
     consultationLabel: consultationChatLabel(conv.consultationCode),
     lastMessage: conv.lastMessage?.text ?? null,
@@ -180,16 +185,24 @@ export async function getAdminConversations(): Promise<ConversationListItem[]> {
 
   if (convs.length === 0) return [];
 
-  const patientIds = [...new Set(convs.map((c) => c.patientId))];
-  const patients = await prisma.user.findMany({
-    where: { id: { in: patientIds } },
-    select: { id: true, name: true },
-  });
-  const nameMap = Object.fromEntries(patients.map((p) => [p.id, p.name]));
+  const items: ConversationListItem[] = [];
 
-  return convs.map((c) =>
-    serializeConversationListItem(c, nameMap, session.user!.id),
-  );
+  for (const raw of convs) {
+    const conv = await syncConversationPatientProfile(db, raw);
+    const display = await resolvePatientDisplay(conv);
+    if (!display.patientId) continue;
+
+    items.push(
+      serializeConversationListItem(
+        conv,
+        display.patientId,
+        display.patientName,
+        session.user!.id,
+      ),
+    );
+  }
+
+  return items;
 }
 
 /** Resumen de los 3 chats del paciente (pestañas). */
@@ -306,11 +319,14 @@ export async function getChatPageData(options?: {
     }
   } else {
     if (!options?.selectedConversationId) return null;
-    conversation = await assertConversationAccess(
+    const raw = await assertConversationAccess(
       options.selectedConversationId,
       session.user.id,
       session.user.role,
     );
+    conversation = raw
+      ? await syncConversationPatientProfile(db, raw)
+      : null;
   }
 
   if (!conversation?._id && session.user.role !== "PATIENT") return null;
@@ -325,18 +341,35 @@ export async function getChatPageData(options?: {
   if (session.user.role === "PATIENT" && !resolvedType) return null;
 
   const convId = conversation?._id?.toString() ?? "";
-  const otherUserId =
-    conversation?.participants.find((id) => id !== session.user!.id) ??
-    (await getPrimaryAdminId());
-  if (!otherUserId) return null;
 
-  const [otherUser, patientTabs] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: otherUserId },
-      select: { name: true },
-    }),
-    session.user.role === "PATIENT" ? getPatientChatTabs() : Promise.resolve(undefined),
-  ]);
+  let otherUserId: string;
+  let otherUserName: string;
+  let patientTabs: PatientChatTab[] | undefined;
+
+  if (session.user.role === "ADMIN" && conversation) {
+    const display = await resolvePatientDisplay(conversation);
+    if (!display.patientId) return null;
+
+    otherUserId = display.patientId;
+    otherUserName = display.patientName;
+    patientTabs = undefined;
+  } else {
+    otherUserId =
+      conversation?.participants.find((id) => id !== session.user!.id) ??
+      (await getPrimaryAdminId()) ??
+      "";
+    if (!otherUserId) return null;
+
+    const [otherUser, tabs] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: otherUserId },
+        select: { name: true },
+      }),
+      getPatientChatTabs(),
+    ]);
+    otherUserName = otherUser?.name ?? "Nutricionista";
+    patientTabs = tabs;
+  }
 
   let rawMessages: (MessageDoc & { _id?: ObjectId })[] = [];
   if (conversation?._id && chatEnabled) {
@@ -361,7 +394,7 @@ export async function getChatPageData(options?: {
     messages: rawMessages
       .reverse()
       .map((m) => serializeMessage(m, session.user!.id)),
-    otherUserName: otherUser?.name ?? "Usuario",
+    otherUserName: otherUserName,
     otherUserId,
     currentUserId: session.user.id,
     role: session.user.role,

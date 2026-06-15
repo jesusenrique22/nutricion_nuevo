@@ -4,6 +4,10 @@ import { prisma } from "@/server/db/prisma";
 import { Collections } from "@/server/db/mongo";
 import type { ConsultationChatCode, ConversationDoc } from "@/types/chat";
 import { isConsultationChatCode } from "@/lib/consultation-chat";
+import {
+  resolvePatientDisplay,
+  fetchPatientProfile,
+} from "@/server/services/chat-patient-resolve";
 
 export type ConsultationTypeRef = {
   id: string;
@@ -95,10 +99,87 @@ async function migrateLegacyConversations(db: Db): Promise<void> {
   );
 }
 
+async function backfillConversationPatientIds(db: Db): Promise<void> {
+  const convs = await db
+    .collection<Partial<ConversationDoc>>(Collections.conversations)
+    .find({})
+    .toArray();
+
+  await Promise.all(
+    convs.map(async (doc) => {
+      if (!doc._id || !doc.participants?.length) return;
+
+      const resolved = await resolvePatientDisplay({
+        patientId: doc.patientId ?? "",
+        participants: doc.participants,
+        patientName: doc.patientName,
+        patientEmail: doc.patientEmail,
+        appointmentId: doc.appointmentId,
+      });
+
+      const updates: Partial<ConversationDoc> = {};
+
+      if (resolved.patientId && resolved.patientId !== doc.patientId) {
+        updates.patientId = resolved.patientId;
+      }
+      if (
+        resolved.patientName &&
+        resolved.patientName !== doc.patientName &&
+        !resolved.patientName.includes("(sin ficha)")
+      ) {
+        updates.patientName = resolved.patientName;
+      }
+      if (resolved.patientEmail && resolved.patientEmail !== doc.patientEmail) {
+        updates.patientEmail = resolved.patientEmail;
+      }
+
+      if (Object.keys(updates).length === 0) return;
+
+      return db
+        .collection(Collections.conversations)
+        .updateOne({ _id: doc._id }, { $set: updates });
+    }),
+  );
+}
+
+export async function syncConversationPatientProfile(
+  db: Db,
+  conv: ConversationDoc,
+): Promise<ConversationDoc> {
+  const resolved = await resolvePatientDisplay(conv);
+
+  const updates: Partial<ConversationDoc> = {};
+
+  if (resolved.patientId && resolved.patientId !== conv.patientId) {
+    updates.patientId = resolved.patientId;
+  }
+  if (
+    resolved.patientName &&
+    resolved.patientName !== conv.patientName &&
+    !resolved.patientName.includes("(sin ficha)")
+  ) {
+    updates.patientName = resolved.patientName;
+  }
+  if (resolved.patientEmail && resolved.patientEmail !== conv.patientEmail) {
+    updates.patientEmail = resolved.patientEmail;
+  }
+
+  if (Object.keys(updates).length === 0 || !conv._id) {
+    return { ...conv, ...updates };
+  }
+
+  await db
+    .collection<ConversationDoc>(Collections.conversations)
+    .updateOne({ _id: conv._id }, { $set: updates });
+
+  return { ...conv, ...updates };
+}
+
 /** Migración legacy (índices en mongo.ts → ensureIndexes). */
 export async function prepareChatStorage(db: Db): Promise<void> {
   if (preparedDbs.has(db)) return;
   await migrateLegacyConversations(db);
+  await backfillConversationPatientIds(db);
   preparedDbs.add(db);
 }
 
@@ -139,19 +220,33 @@ export async function ensureConversation(
     if (valid) appointmentId = params.appointmentId;
   }
 
+  const patient = await fetchPatientProfile(params.patientId);
+  const patientName = patient?.name?.trim() || undefined;
+  const patientEmail = patient?.email ?? undefined;
+
   const existing = await col.findOne({
     patientId: params.patientId,
     consultationTypeId: params.consultationTypeId,
   });
 
   if (existing) {
+    const profileUpdates: Partial<ConversationDoc> = {};
     if (appointmentId && existing.appointmentId !== appointmentId) {
-      await col.updateOne(
-        { _id: existing._id },
-        { $set: { appointmentId, updatedAt: new Date() } },
-      );
-      existing.appointmentId = appointmentId;
+      profileUpdates.appointmentId = appointmentId;
     }
+    if (patientName && existing.patientName !== patientName) {
+      profileUpdates.patientName = patientName;
+    }
+    if (patientEmail && existing.patientEmail !== patientEmail) {
+      profileUpdates.patientEmail = patientEmail;
+    }
+
+    if (Object.keys(profileUpdates).length > 0) {
+      profileUpdates.updatedAt = new Date();
+      await col.updateOne({ _id: existing._id }, { $set: profileUpdates });
+      Object.assign(existing, profileUpdates);
+    }
+
     return existing;
   }
 
@@ -159,6 +254,8 @@ export async function ensureConversation(
   const doc: ConversationDoc = {
     participants: [params.adminId, params.patientId],
     patientId: params.patientId,
+    patientName,
+    patientEmail,
     consultationTypeId: params.consultationTypeId,
     consultationCode: params.consultationCode,
     appointmentId,

@@ -14,6 +14,9 @@ export interface ConversationDoc {
   _id?: ObjectId;
   participants: string[]; // [adminId, patientId] — User.id de Postgres
   patientId: string;
+  /** Nombre denormalizado del paciente (sobrevive resets parciales de Postgres). */
+  patientName?: string;
+  patientEmail?: string;
   consultationTypeId: string; // ConsultationType.id de Postgres
   consultationCode: ConsultationChatCode;
   appointmentId?: string | null; // Appointment.id opcional (contexto de cita)

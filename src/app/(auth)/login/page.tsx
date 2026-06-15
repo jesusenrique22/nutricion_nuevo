@@ -8,6 +8,8 @@ import {
   AuthFooterLink,
   AuthFormCard,
   AuthShell,
+  authButtonClass,
+  authInputClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { safeRouterPush } from "@/lib/safe-router";
@@ -65,15 +67,16 @@ function LoginForm() {
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
+            className={authInputClass}
           />
         </div>
         <PasswordInput
           label="Contraseña"
           required
           autoComplete="current-password"
+          inputClassName={`${authInputClass} pr-12`}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-between">
           <a
             href="/forgot-password"
             className="text-sm font-semibold text-primary hover:underline"
@@ -103,7 +106,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center rounded-[28px] bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-md transition hover:scale-[1.02] disabled:opacity-50"
+          className={authButtonClass}
         >
           {loading ? "Ingresando…" : "Iniciar sesión"}
         </button>

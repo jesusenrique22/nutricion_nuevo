@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { ProfileEmojiBanner } from "@/components/brand/profile-emoji-banner";
 import { AdminWeeklyPlanEditor } from "@/components/weekly-plan/admin-weekly-plan-editor";
 import { getWeeklyPlanForPatientAdmin } from "@/server/actions/weekly-plan.actions";
-import { getPatientDetail } from "@/server/actions/patient.queries";
+import { getPatientDetail, getPatientFormHistory } from "@/server/actions/patient.queries";
 import { RegisterMeasurementForm } from "@/components/measurements/register-measurement-form";
+import { PatientFormHistory } from "@/components/forms/patient-form-history";
 import {
   ProgressLineChart,
   buildChartPoints,
@@ -56,9 +57,10 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [patient, weeklyPlan] = await Promise.all([
+  const [patient, weeklyPlan, formHistory] = await Promise.all([
     getPatientDetail(id),
     getWeeklyPlanForPatientAdmin(id),
+    getPatientFormHistory(id),
   ]);
   if (!patient) notFound();
 
@@ -99,14 +101,6 @@ export default async function PatientDetailPage({
             [patient.email, patient.phone].filter(Boolean).join(" · ") ||
             undefined
           }
-          hasCompletedIntake={patient.profile?.hasCompletedIntake ?? false}
-          appointmentCount={
-            patient.recentFollowUps.length +
-            patient.nutritionForms.length +
-            patient.trainingForms.length +
-            patient.anthropometryForms.length
-          }
-          measurementCount={patient.measurements.length}
           statusLabel={
             patient.profile?.hasCompletedIntake
               ? "Ingreso completado"
@@ -155,9 +149,29 @@ export default async function PatientDetailPage({
         </section>
       )}
 
+      {/* Historial de formularios */}
+      <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
+        <h2 className="text-lg font-bold">Formularios enviados</h2>
+        <p className="mt-1 text-sm text-foreground/50">
+          Todos los formularios completados por el paciente, con vista detallada
+          de cada respuesta.
+        </p>
+        <PatientFormHistory patientId={patient.id} items={formHistory} />
+      </section>
+
       {/* Anamnesis */}
       <section className="mt-6 rounded-2xl border border-foreground/10 bg-white p-6">
-        <h2 className="text-lg font-bold">Anamnesis (formulario de ingreso)</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-bold">Anamnesis (formulario de ingreso)</h2>
+          {patient.intakeForm && (
+            <Link
+              href={`/dashboard/admin/patients/${patient.id}/forms/intake`}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Ver formulario completo →
+            </Link>
+          )}
+        </div>
         {!patient.intakeForm ? (
           <p className="mt-3 text-sm text-foreground/50">
             {patient.profile?.hasCompletedIntake

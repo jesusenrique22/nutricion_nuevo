@@ -6,6 +6,8 @@ import {
   AuthFooterLink,
   AuthFormCard,
   AuthShell,
+  authButtonClass,
+  authInputClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { registerPatient } from "@/server/actions/auth.actions";
@@ -57,7 +59,7 @@ export default function RegisterPage() {
               name="name"
               required
               autoComplete="name"
-              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
+              className={authInputClass}
             />
           </div>
           <div>
@@ -67,7 +69,7 @@ export default function RegisterPage() {
               type="email"
               required
               autoComplete="email"
-              className="mt-1 w-full rounded-2xl border border-foreground/15 bg-background px-4 py-3 outline-none transition focus:border-primary"
+              className={authInputClass}
             />
           </div>
           <PasswordInput
@@ -75,6 +77,7 @@ export default function RegisterPage() {
             required
             minLength={8}
             autoComplete="new-password"
+            inputClassName={`${authInputClass} pr-12`}
           />
           <p className="text-xs text-foreground/55">
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
@@ -83,7 +86,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-[28px] bg-primary px-6 py-4 text-base font-semibold text-primary-foreground shadow-md transition hover:scale-[1.02] disabled:opacity-50"
+            className={authButtonClass}
           >
             {loading ? "Creando cuenta…" : "Registrarme"}
           </button>

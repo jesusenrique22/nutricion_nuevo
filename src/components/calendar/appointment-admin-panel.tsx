@@ -186,12 +186,20 @@ export function AppointmentAdminPanel({
         )}
 
         {appointment.patientId && (
-          <Link
-            href={`/dashboard/admin/patients/${appointment.patientId}`}
-            className="mt-4 inline-block text-sm font-semibold text-primary hover:underline"
-          >
-            Ver ficha del paciente →
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link
+              href={`/dashboard/admin/patients/${appointment.patientId}`}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Ver ficha del paciente →
+            </Link>
+            <Link
+              href={`/dashboard/admin/patients/${appointment.patientId}/forms/${appointment.id}`}
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              Ver formulario de la cita →
+            </Link>
+          </div>
         )}
 
         {actions.length > 0 && (

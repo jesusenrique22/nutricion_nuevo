@@ -14,6 +14,11 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatFilesPanel } from "@/components/chat/chat-files-panel";
 import { ChatNotice } from "@/components/ui/chat-notice";
+import {
+  AdminConsultationSwitcher,
+  type ConsultationChatLink,
+} from "@/components/chat/admin-consultation-switcher";
+import { CONSULTATION_CHAT_STYLES } from "@/lib/consultation-chat-styles";
 
 type ChatTab = "chat" | "files";
 
@@ -41,9 +46,11 @@ function messageToFile(
 export function ChatRoom({
   initialData,
   className = "",
+  adminConsultationLinks = [],
 }: {
   initialData: ChatPageData;
   className?: string;
+  adminConsultationLinks?: ConsultationChatLink[];
 }) {
   const [activeTab, setActiveTab] = useState<ChatTab>("chat");
   const [messages, setMessages] = useState<MessageDTO[]>(initialData.messages);
@@ -214,6 +221,9 @@ export function ChatRoom({
   }
 
   const fileCount = files.length;
+  const consultationStyle =
+    CONSULTATION_CHAT_STYLES[initialData.consultationCode]?.pill ??
+    CONSULTATION_CHAT_STYLES.NUT_01.pill;
 
   return (
     <div
@@ -222,10 +232,40 @@ export function ChatRoom({
       <ChatNotice message={notice} onClose={() => setNotice(null)} />
 
       <div className="shrink-0 border-b border-foreground/10 px-5 py-4">
-        <h2 className="font-bold">{initialData.otherUserName}</h2>
-        <p className="text-xs text-foreground/50">
-          {initialData.consultationLabel}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            {initialData.role === "ADMIN" ? (
+              <span
+                aria-hidden
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-bold text-primary"
+              >
+                {initialData.otherUserName.trim().charAt(0).toUpperCase() || "?"}
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-bold">
+                {initialData.otherUserName}
+              </h2>
+              <span
+                className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${consultationStyle}`}
+              >
+                Chat de {initialData.consultationLabel}
+              </span>
+            </div>
+          </div>
+          {initialData.role === "ADMIN" ? (
+            <p className="max-w-[12rem] text-right text-[10px] leading-snug text-foreground/45">
+              Mensajes solo de este tipo de consulta
+            </p>
+          ) : null}
+        </div>
+
+        {initialData.role === "ADMIN" ? (
+          <AdminConsultationSwitcher
+            links={adminConsultationLinks}
+            activeConversationId={initialData.conversationId}
+          />
+        ) : null}
 
         <div className="mt-3 flex gap-1 rounded-full bg-muted/60 p-1">
           <button
@@ -266,7 +306,7 @@ export function ChatRoom({
 
       {activeTab === "chat" ? (
         <>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+          <div className="scrollbar-stable min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
             {messages.length === 0 && (
               <p className="text-center text-sm text-foreground/50">
                 Aún no hay mensajes. ¡Envía el primero!

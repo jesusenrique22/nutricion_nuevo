@@ -38,7 +38,8 @@ export default async function ChatPage({
         <div>
           <h1 className="text-2xl font-bold sm:text-3xl">Chat</h1>
           <p className="mt-2 text-sm text-foreground/60 sm:text-base">
-            Conversaciones con tus pacientes por tipo de consulta.
+            Pacientes agrupados por carpeta — cada tipo de consulta tiene su
+            propio chat.
           </p>
 
           <div className="mt-6">
