@@ -153,8 +153,13 @@ export function FormTemplateEditor({
                   className={inputClass}
                 />
               </label>
-              <label className="block text-sm">
-                <span className="font-semibold">Nombre (campo)</span>
+              <label className="block text-sm sm:col-span-2">
+                <span className="font-semibold">
+                  Identificador interno
+                </span>
+                <span className="mt-0.5 block text-xs font-normal text-foreground/50">
+                  Solo lo usa el sistema. El paciente ve la etiqueta de arriba.
+                </span>
                 <input
                   value={f.name}
                   onChange={(e) =>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand/logo";
 import { BrandSocialIcons } from "@/components/brand/brand-social-icons";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { NutricionistaCvData } from "@/types/nutricionista-cv";
 
 function CvSectionTitle({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,8 @@ function ContactRow({
 }
 
 export function NutricionistaCvDocument({ cv }: { cv: NutricionistaCvData }) {
+  const photoSrc =
+    cv.photoUrl?.trim() || BRAND_PROFILE.professional;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -84,12 +87,13 @@ export function NutricionistaCvDocument({ cv }: { cv: NutricionistaCvData }) {
 
                 <div className="relative mx-auto my-8 h-36 w-36 overflow-hidden rounded-full ring-2 ring-primary/15 lg:mx-0">
                   <Image
-                    src={BRAND_PROFILE.professional}
+                    src={photoSrc}
                     alt={cv.name}
                     fill
                     className="object-cover"
                     sizes="144px"
                     priority
+                    unoptimized={shouldUnoptimizeImage(photoSrc)}
                   />
                 </div>
 

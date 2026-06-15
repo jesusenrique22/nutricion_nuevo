@@ -34,6 +34,7 @@ export const nutricionistaPageSchema = z.object({
     name: z.string().trim().min(1),
     title: z.string().trim().min(1),
     bio: z.string().trim().min(1),
+    photoUrl: z.string().trim().optional(),
     est: z.string().trim().min(1),
     city: z.string().trim().min(1),
     contact: z.object({

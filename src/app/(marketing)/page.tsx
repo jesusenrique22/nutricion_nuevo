@@ -9,7 +9,7 @@ import { LandingLobbyShell } from "@/components/marketing/landing-lobby-shell";
 import { Reveal, RevealScale } from "@/components/motion/reveal";
 import { getLandingImages } from "@/server/queries/landing.queries";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 const packagesMeta = [
   {

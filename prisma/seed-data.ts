@@ -110,7 +110,7 @@ export const SITE_CONTENT_DEFAULTS: Record<
   { title: string; data: Record<string, unknown> }
 > = {
   landing_hero: {
-    title: "Hero landing",
+    title: "Portada principal",
     data: {
       headline: "Tu bienestar, tu camino",
       subheadline:
@@ -136,7 +136,7 @@ export const SITE_CONTENT_DEFAULTS: Record<
     },
   },
   landing_images: {
-    title: "Imágenes landing",
+    title: "Imágenes del sitio",
     data: {
       heroSlides: [
         {
@@ -184,7 +184,7 @@ export const SITE_CONTENT_DEFAULTS: Record<
     },
   },
   nutricionista_page: {
-    title: "Conóceme más / CV",
+    title: "Conóceme más",
     data: nutricionistaPageToRecord(DEFAULT_NUTRICIONISTA_PAGE),
   },
   payment_chat_policy: {

@@ -21,6 +21,8 @@ export interface NutricionistaCvData {
   name: string;
   title: string;
   bio: string;
+  /** URL de la foto de perfil en el CV (subida o ruta en /public). */
+  photoUrl?: string;
   est: string;
   city: string;
   contact: NutricionistaCvContact;

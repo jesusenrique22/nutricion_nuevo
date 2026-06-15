@@ -1,4 +1,5 @@
 import { DEFAULT_NUTRICIONISTA_PAGE } from "@/lib/nutricionista-cv-defaults";
+import { BRAND_PROFILE } from "@/lib/brand-assets";
 import type {
   NutricionistaCvData,
   NutricionistaCvEducation,
@@ -59,6 +60,10 @@ function parseCv(raw: unknown): NutricionistaCvData {
     name: String(o.name ?? defaults.name).trim() || defaults.name,
     title: String(o.title ?? defaults.title).trim() || defaults.title,
     bio: String(o.bio ?? defaults.bio).trim() || defaults.bio,
+    photoUrl:
+      typeof o.photoUrl === "string" && o.photoUrl.trim()
+        ? o.photoUrl.trim()
+        : defaults.photoUrl ?? BRAND_PROFILE.professional,
     est: String(o.est ?? defaults.est).trim() || defaults.est,
     city: String(o.city ?? defaults.city).trim() || defaults.city,
     contact: {

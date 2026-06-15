@@ -9,7 +9,6 @@ export interface AnalyticsSummary {
   completedAppointments: number;
   cancelledAppointments: number;
   noShowCount: number;
-  totalRevenue: string;
   pendingPayments: number;
   byConsultation: { code: string; name: string; count: number }[];
   byStatus: { status: string; count: number }[];
@@ -32,7 +31,6 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
     completedAppointments,
     cancelledAppointments,
     noShowCount,
-    paidPayments,
     pendingPayments,
     byType,
     byStatus,
@@ -48,10 +46,6 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
     prisma.appointment.count({ where: { status: "COMPLETED" } }),
     prisma.appointment.count({ where: { status: "CANCELLED" } }),
     prisma.appointment.count({ where: { status: "NO_SHOW" } }),
-    prisma.payment.aggregate({
-      where: { status: "PAID" },
-      _sum: { amount: true },
-    }),
     prisma.payment.count({ where: { status: "PENDING" } }),
     prisma.appointment.groupBy({
       by: ["consultationTypeId"],
@@ -103,7 +97,6 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary | null> {
     completedAppointments,
     cancelledAppointments,
     noShowCount,
-    totalRevenue: (paidPayments._sum.amount ?? 0).toString(),
     pendingPayments,
     byConsultation,
     byStatus: byStatus.map((s) => ({

@@ -3,20 +3,21 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { LANDING_IMAGE_SECTION_LABELS } from "@/lib/cms-labels";
 import { landingImagesToRecord } from "@/lib/landing-images-parse";
 import { updateSiteContent } from "@/server/actions/cms.actions";
 import type { LandingImagesData } from "@/types/landing-images";
-import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
+import { LANDING_IMAGES_SLUG, MAX_HERO_SLIDES } from "@/types/landing-images";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
 
 const sections = [
-  { id: "hero", label: "Hero (carrusel)" },
-  { id: "gallery", label: "Galería" },
-  { id: "plans", label: "Paquetes" },
-  { id: "services", label: "Servicios" },
-  { id: "other", label: "Otras secciones" },
+  { id: "hero", label: LANDING_IMAGE_SECTION_LABELS.hero },
+  { id: "gallery", label: LANDING_IMAGE_SECTION_LABELS.gallery },
+  { id: "plans", label: LANDING_IMAGE_SECTION_LABELS.plans },
+  { id: "services", label: LANDING_IMAGE_SECTION_LABELS.services },
+  { id: "other", label: LANDING_IMAGE_SECTION_LABELS.other },
 ] as const;
 
 type SectionId = (typeof sections)[number]["id"];
@@ -37,7 +38,7 @@ export function LandingImagesEditor({
     startTransition(async () => {
       const res = await updateSiteContent({
         slug: LANDING_IMAGES_SLUG,
-        title: "Imágenes landing",
+        title: "Imágenes del sitio",
         data: landingImagesToRecord(data),
       });
       setMessage(res.ok ? "Imágenes guardadas." : res.message);
@@ -72,12 +73,32 @@ export function LandingImagesEditor({
       <div className="mt-4 space-y-4 rounded-2xl border border-foreground/10 bg-white p-4">
         {section === "hero" && (
           <div className="space-y-6">
+            <p className="text-xs text-foreground/55">
+              Máximo {MAX_HERO_SLIDES} diapositivas ({data.heroSlides.length}/
+              {MAX_HERO_SLIDES}).
+            </p>
             {data.heroSlides.map((slide, i) => (
               <div
                 key={i}
                 className="space-y-3 rounded-xl border border-foreground/10 p-4"
               >
-                <p className="text-sm font-bold">Slide {i + 1}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold">Diapositiva {i + 1}</p>
+                  {data.heroSlides.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = data.heroSlides.filter(
+                          (_, idx) => idx !== i,
+                        );
+                        setData({ ...data, heroSlides: next });
+                      }}
+                      className="text-xs font-semibold text-red-600"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
                 <ImageUploadField
                   label="Imagen de fondo"
                   value={slide.src}
@@ -125,6 +146,28 @@ export function LandingImagesEditor({
                 </label>
               </div>
             ))}
+            {data.heroSlides.length < MAX_HERO_SLIDES && (
+              <button
+                type="button"
+                onClick={() =>
+                  setData({
+                    ...data,
+                    heroSlides: [
+                      ...data.heroSlides,
+                      {
+                        src: "",
+                        alt: "Nueva diapositiva Anttova",
+                        line1: "Título principal",
+                        line2: "Subtítulo",
+                      },
+                    ],
+                  })
+                }
+                className="rounded-full border border-dashed border-foreground/25 px-4 py-2 text-sm font-semibold"
+              >
+                + Agregar diapositiva
+              </button>
+            )}
           </div>
         )}
 

@@ -29,3 +29,6 @@ export interface LandingImagesData {
 }
 
 export const LANDING_IMAGES_SLUG = "landing_images";
+
+/** Máximo de diapositivas en el carrusel hero del lobby. */
+export const MAX_HERO_SLIDES = 5;

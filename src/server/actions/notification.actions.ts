@@ -102,8 +102,11 @@ export async function markNotificationRead(
     );
 
   revalidatePath("/dashboard/notifications");
-  revalidatePath("/dashboard");
-  await syncUser(session.user.id, "notifications", { action: "read" });
+  revalidatePath("/dashboard", "layout");
+  await syncUser(session.user.id, "notifications", {
+    action: "read",
+    delta: -1,
+  });
   return { ok: res.modifiedCount > 0 };
 }
 
@@ -119,6 +122,6 @@ export async function markAllNotificationsRead(): Promise<void> {
       { $set: { isRead: true } },
     );
   revalidatePath("/dashboard/notifications");
-  revalidatePath("/dashboard");
-  await syncUser(session.user.id, "notifications", { action: "read" });
+  revalidatePath("/dashboard", "layout");
+  await syncUser(session.user.id, "notifications", { action: "read_all" });
 }

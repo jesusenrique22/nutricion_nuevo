@@ -1,4 +1,5 @@
 import type { NutricionistaPageData } from "@/types/nutricionista-cv";
+import { BRAND_PROFILE } from "@/lib/brand-assets";
 
 export const DEFAULT_NUTRICIONISTA_PAGE: NutricionistaPageData = {
   pageTitle: "Conoceme más",
@@ -8,6 +9,7 @@ export const DEFAULT_NUTRICIONISTA_PAGE: NutricionistaPageData = {
     name: "María Antonieta Lanza",
     title: "Personal trainer",
     bio: "Licenciada en Nutrición, antropometrista ISAK y entrenadora, con enfoque en nutrición deportiva y salud integral.",
+    photoUrl: BRAND_PROFILE.professional,
     contact: {
       phone: "11 3818 3675",
       email: "malanzahuerta@gmail.com",

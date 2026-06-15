@@ -15,6 +15,12 @@ function todayStr() {
 
 type Step = "service" | "details" | "confirm";
 
+function formatPrice(price: string) {
+  const n = Number(price);
+  if (Number.isNaN(n)) return price;
+  return n.toLocaleString("es-AR");
+}
+
 export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("service");
@@ -88,7 +94,7 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
                 key={t.id}
                 type="button"
                 label={t.name}
-                subtitle={`${t.code} · ${t.durationMinutes} min · $${t.price}`}
+                subtitle={`${t.durationMinutes} min · $${formatPrice(t.price)}`}
                 selected={typeId === t.id}
                 delay={i * 0.06}
                 onClick={() => {

@@ -119,7 +119,7 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
     id: a.id,
     start: a.startTime.toISOString(),
     end: a.endTime.toISOString(),
-    title: `${a.consultationType.code} · ${a.patient.name}`,
+    title: `${a.consultationType.name} · ${a.patient.name}`,
     status: a.status,
     modality: a.modality,
     flow: a.flow,

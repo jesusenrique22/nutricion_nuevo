@@ -4,6 +4,11 @@ import type {
   HeroSlide,
   LandingImagesData,
 } from "@/types/landing-images";
+import { MAX_HERO_SLIDES } from "@/types/landing-images";
+
+export function limitHeroSlides(slides: HeroSlide[]): HeroSlide[] {
+  return slides.slice(0, MAX_HERO_SLIDES);
+}
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
@@ -30,7 +35,7 @@ function parseHeroSlides(value: unknown): HeroSlide[] | null {
       line2: row.line2,
     });
   }
-  return slides.length > 0 ? slides : null;
+  return slides.length > 0 ? limitHeroSlides(slides) : null;
 }
 
 function parseGallery(value: unknown): GalleryItem[] | null {
@@ -78,7 +83,9 @@ export function mergeLandingImages(
   ]);
 
   return {
-    heroSlides: heroSlides ?? DEFAULT_LANDING_IMAGES.heroSlides,
+    heroSlides: limitHeroSlides(
+      heroSlides ?? DEFAULT_LANDING_IMAGES.heroSlides,
+    ),
     gallery: gallery ?? DEFAULT_LANDING_IMAGES.gallery,
     plans: plans ?? DEFAULT_LANDING_IMAGES.plans,
     services: services ?? DEFAULT_LANDING_IMAGES.services,
@@ -97,5 +104,8 @@ export function mergeLandingImages(
 export function landingImagesToRecord(
   data: LandingImagesData,
 ): Record<string, unknown> {
-  return { ...data };
+  return {
+    ...data,
+    heroSlides: limitHeroSlides(data.heroSlides),
+  };
 }

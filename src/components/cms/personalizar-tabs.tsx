@@ -6,8 +6,8 @@ import { ConsultationPricesEditor } from "@/components/cms/consultation-prices-e
 import { FormTemplateEditor } from "@/components/cms/form-template-editor";
 import { LandingImagesEditor } from "@/components/cms/landing-images-editor";
 import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
-import { SiteContentEditor } from "@/components/cms/site-content-editor";
 import { PaymentChatPolicyEditor } from "@/components/cms/payment-chat-policy-editor";
+import { SiteContentEditor } from "@/components/cms/site-content-editor";
 import type {
   ConsultationAdminDTO,
   FormTemplateDTO,
@@ -20,12 +20,36 @@ import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 
 const tabs = [
-  { id: "imagenes", label: "Imágenes" },
-  { id: "precios", label: "Precios y consultas" },
-  { id: "web", label: "Contenido web" },
-  { id: "conocerme", label: "Conóceme más" },
-  { id: "formularios", label: "Formularios" },
-  { id: "recursos", label: "Recursos" },
+  {
+    id: "imagenes",
+    label: "Imágenes",
+    hint: "Hero, galería, paquetes y secciones visuales de la landing.",
+  },
+  {
+    id: "precios",
+    label: "Precios y pagos",
+    hint: "Servicios, montos, adelantos y reglas del chat.",
+  },
+  {
+    id: "web",
+    label: "Textos web",
+    hint: "Títulos y párrafos editables del sitio público.",
+  },
+  {
+    id: "conocerme",
+    label: "Conóceme más",
+    hint: "CV y perfil profesional de la nutricionista.",
+  },
+  {
+    id: "formularios",
+    label: "Formularios",
+    hint: "Preguntas que completan los pacientes antes de cada cita.",
+  },
+  {
+    id: "recursos",
+    label: "Recursos",
+    hint: "E-books, videos y material descargable.",
+  },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -51,57 +75,69 @@ export function PersonalizarTabs({
   const textBlocks = siteBlocks.filter(
     (b) => b.slug !== LANDING_IMAGES_SLUG && b.slug !== NUTRICIONISTA_PAGE_SLUG,
   );
+  const activeTab = tabs.find((t) => t.id === tab)!;
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-2 border-b border-foreground/10 pb-4">
+    <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+      <nav className="flex gap-2 overflow-x-auto pb-1 lg:sticky lg:top-4 lg:flex-col lg:overflow-x-visible lg:pb-0">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+            className={`shrink-0 rounded-xl px-4 py-3 text-left text-sm font-semibold transition lg:w-full ${
               tab === t.id
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted hover:bg-muted/80"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-white text-foreground/70 ring-1 ring-foreground/10 hover:bg-muted/50"
             }`}
           >
             {t.label}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="mt-6">
+      <div className="min-w-0">
+        <header className="mb-5 rounded-2xl border border-foreground/8 bg-white px-5 py-4">
+          <h2 className="text-lg font-bold text-primary">{activeTab.label}</h2>
+          <p className="mt-1 text-sm text-foreground/60">{activeTab.hint}</p>
+        </header>
+
         {tab === "imagenes" && (
           <LandingImagesEditor initial={landingImages} />
         )}
+
         {tab === "precios" && (
           <div className="space-y-6">
             <PaymentChatPolicyEditor initial={paymentPolicy} />
             <ConsultationPricesEditor types={consultationTypes} />
           </div>
         )}
+
         {tab === "web" && <SiteContentEditor blocks={textBlocks} />}
+
         {tab === "conocerme" && (
           <NutricionistaCvEditor initial={nutricionistaPage} />
         )}
+
         {tab === "formularios" && (
           <FormTemplateEditor templates={formTemplates} />
         )}
+
         {tab === "recursos" && (
           <div className="rounded-2xl border border-foreground/10 bg-white p-6">
-            <p className="text-sm text-foreground/60">
-              Gestiona e-books, videos, portadas y enlaces desde el módulo de
-              recursos.
+            <h3 className="text-lg font-bold">Biblioteca digital</h3>
+            <p className="mt-2 text-sm text-foreground/60">
+              Subí portadas, archivos y enlaces desde el módulo de recursos. Los
+              pacientes los ven en su biblioteca.
             </p>
-            <p className="mt-2 text-sm">
-              <strong>{resourceCount}</strong> recurso(s) en catálogo.
+            <p className="mt-3 text-sm">
+              <strong>{resourceCount}</strong> recurso(s) publicados.
             </p>
             <Link
               href="/dashboard/admin/resources"
-              className="mt-4 inline-block rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+              className="mt-5 inline-block rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
             >
-              Ir a recursos →
+              Gestionar recursos →
             </Link>
           </div>
         )}

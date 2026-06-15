@@ -5,10 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
+import { limitHeroSlides } from "@/lib/landing-images-parse";
 import type { HeroSlide } from "@/types/landing-images";
 
 export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
-  const items = slides?.length ? slides : DEFAULT_LANDING_IMAGES.heroSlides;
+  const raw = slides?.length ? slides : DEFAULT_LANDING_IMAGES.heroSlides;
+  const items = limitHeroSlides(raw);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

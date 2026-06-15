@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUploadField } from "@/components/cms/image-upload-field";
 import { updateNutricionistaPage } from "@/server/actions/cms.actions";
 import type {
   NutricionistaCvEducation,
@@ -174,6 +175,13 @@ export function NutricionistaCvEditor({
 
         {section === "perfil" && (
           <SectionCard title="Datos principales del CV">
+            <ImageUploadField
+              label="Foto de perfil"
+              hint="Aparece en el CV circular. Recomendado: retrato cuadrado, buena luz."
+              value={data.cv.photoUrl ?? ""}
+              onChange={(photoUrl) => updateCv("photoUrl", photoUrl)}
+              folder="cv"
+            />
             <Field label="Nombre completo">
               <input
                 value={data.cv.name}

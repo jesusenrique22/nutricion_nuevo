@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { signIn } from "next-auth/react";
 import {
@@ -10,8 +10,10 @@ import {
   AuthShell,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { safeRouterPush } from "@/lib/safe-router";
 
 function LoginForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const resetOk = params.get("reset") === "1";
   const registered = params.get("registered") === "1";
@@ -39,7 +41,8 @@ function LoginForm() {
       setError("Credenciales inválidas.");
       return;
     }
-    window.location.assign("/dashboard");
+    router.refresh();
+    safeRouterPush(router, "/dashboard");
   }
 
   return (

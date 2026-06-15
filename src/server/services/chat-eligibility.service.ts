@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/server/db/prisma";
 import { consultationChatLabel } from "@/lib/consultation-chat";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
@@ -132,3 +133,6 @@ export async function isPatientChatEnabled(
   const map = await getPatientChatEligibility(patientId);
   return map[consultationCode];
 }
+
+/** Dedup por request (sidebar badges + chat en la misma navegación). */
+export const getCachedPatientChatEligibility = cache(getPatientChatEligibility);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
-import { useLiveCounter } from "@/hooks/use-live-counter";
+import { useDashboardBadges } from "@/hooks/use-dashboard-badges";
 
 interface NavLink {
   href: string;
@@ -80,23 +80,14 @@ function NavItems({
 export function DashboardSidebar({
   isAdmin,
   links,
-  initialUnreadNotifications,
-  initialUnreadChat,
   footer,
 }: {
   isAdmin: boolean;
   links: NavLink[];
-  initialUnreadNotifications: number;
-  initialUnreadChat: number;
   footer: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const unreadNotifications = useLiveCounter(initialUnreadNotifications, {
-    onNotificationCreated: true,
-  });
-  const unreadChat = useLiveCounter(initialUnreadChat, {
-    onMessageIncoming: true,
-  });
+  const { unreadNotifications, unreadChat } = useDashboardBadges();
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";

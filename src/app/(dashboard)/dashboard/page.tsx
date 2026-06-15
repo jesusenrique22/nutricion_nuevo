@@ -1,21 +1,23 @@
-import { auth } from "@/lib/auth";
 import { AdminDashboardCards } from "@/components/dashboard/admin-dashboard-cards";
 import { PatientDashboardHome } from "@/components/dashboard/patient-dashboard-home";
 import { getAdminTodayDashboard } from "@/server/actions/dashboard.queries";
-import { getUnreadNotificationCount } from "@/server/actions/notification.actions";
 import { getPendingFormAppointments } from "@/server/actions/patient.queries";
 import { getMyAppointments } from "@/server/actions/booking.queries";
+import {
+  getCachedUnreadNotificationCount,
+  getSession,
+} from "@/server/queries/cached-dashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardHome() {
-  const session = await auth();
+  const session = await getSession();
   const name = session?.user?.name ?? "";
   const isPatient = session?.user?.role === "PATIENT";
 
   const [unreadNotifs, pendingForms, appointments, adminToday] =
     await Promise.all([
-      getUnreadNotificationCount(),
+      getCachedUnreadNotificationCount(),
       isPatient ? getPendingFormAppointments() : Promise.resolve([]),
       isPatient ? getMyAppointments() : Promise.resolve([]),
       isPatient ? Promise.resolve(null) : getAdminTodayDashboard(),

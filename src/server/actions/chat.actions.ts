@@ -23,6 +23,7 @@ import {
   resolveConsultationType,
 } from "@/server/services/chat-conversation.service";
 import {
+  getCachedPatientChatEligibility,
   getPatientChatEligibility,
   isPatientChatEnabled,
 } from "@/server/services/chat-eligibility.service";
@@ -235,14 +236,16 @@ export async function getUnreadChatCount(): Promise<number> {
 
   try {
     const db = await getMongoDb();
-    await prepareChatStorage(db);
     const convs = await db
       .collection<ConversationDoc>(Collections.conversations)
-      .find({ participants: session.user.id })
+      .find(
+        { participants: session.user.id },
+        { projection: { consultationCode: 1, unreadCount: 1 } },
+      )
       .toArray();
 
     if (session.user.role === "PATIENT") {
-      const eligibility = await getPatientChatEligibility(session.user.id);
+      const eligibility = await getCachedPatientChatEligibility(session.user.id);
       return convs.reduce((sum, c) => {
         if (!eligibility[c.consultationCode]?.enabled) return sum;
         return sum + (c.unreadCount[session.user!.id] ?? 0);
