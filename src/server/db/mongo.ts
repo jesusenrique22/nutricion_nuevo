@@ -1,4 +1,12 @@
-import { MongoClient, Db, ServerApiVersion } from "mongodb";
+import {
+  type Collection,
+  type CreateIndexesOptions,
+  type Document,
+  type IndexSpecification,
+  MongoClient,
+  Db,
+  ServerApiVersion,
+} from "mongodb";
 
 const dbName = process.env.MONGODB_DB ?? "nutricion_chat";
 
@@ -75,30 +83,72 @@ function getClientPromise(): Promise<MongoClient> {
 
 let indexesEnsured = false;
 
+async function safeDropIndex(
+  collection: Collection<Document>,
+  name: string,
+): Promise<void> {
+  try {
+    await collection.dropIndex(name);
+  } catch {
+    // Índice ausente o ya eliminado
+  }
+}
+
+/** Crea un índice; si hay conflicto de spec (p. ej. unique distinto), lo reemplaza. */
+async function createIndexSafe(
+  collection: Collection<Document>,
+  spec: IndexSpecification,
+  options?: CreateIndexesOptions,
+): Promise<void> {
+  try {
+    await collection.createIndex(spec, options);
+  } catch (err) {
+    const code = (err as { code?: number }).code;
+    if (code !== 86) throw err;
+
+    const name =
+      options?.name ??
+      Object.entries(spec)
+        .map(([key, value]) => `${key}_${value}`)
+        .join("_");
+
+    await collection.dropIndex(name);
+    await collection.createIndex(spec, options);
+  }
+}
+
 async function ensureIndexes(db: Db): Promise<void> {
   if (indexesEnsured) return;
-  indexesEnsured = true;
+
+  const conversations = db.collection(Collections.conversations);
+
+  await safeDropIndex(conversations, "patientId_1");
 
   await Promise.all([
-    db
-      .collection(Collections.conversations)
-      .createIndex({ participants: 1, updatedAt: -1 }),
-    db
-      .collection(Collections.conversations)
-      .createIndex(
-        { patientId: 1, consultationCode: 1 },
-        { unique: true },
-      ),
-    db
-      .collection(Collections.messages)
-      .createIndex({ conversationId: 1, createdAt: 1 }),
-    db
-      .collection(Collections.notifications)
-      .createIndex({ recipientId: 1, isRead: 1, createdAt: -1 }),
-    db
-      .collection(Collections.files)
-      .createIndex({ ownerId: 1, uploadedAt: -1 }),
+    createIndexSafe(conversations, { participants: 1, updatedAt: -1 }),
+    createIndexSafe(
+      conversations,
+      { patientId: 1, consultationTypeId: 1 },
+      { unique: true },
+    ),
+    createIndexSafe(conversations, { patientId: 1, consultationCode: 1 }),
+    createIndexSafe(conversations, { consultationCode: 1, updatedAt: -1 }),
+    createIndexSafe(db.collection(Collections.messages), {
+      conversationId: 1,
+      createdAt: 1,
+    }),
+    createIndexSafe(db.collection(Collections.notifications), {
+      recipientId: 1,
+      isRead: 1,
+      createdAt: -1,
+    }),
+    createIndexSafe(db.collection(Collections.files), {
+      ownerId: 1,
+      uploadedAt: -1,
+    }),
   ]);
+
+  indexesEnsured = true;
 }
 
 export async function getMongoDb(): Promise<Db> {

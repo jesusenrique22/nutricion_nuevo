@@ -95,30 +95,10 @@ async function migrateLegacyConversations(db: Db): Promise<void> {
   );
 }
 
-async function ensureChatIndexes(db: Db): Promise<void> {
-  const col = db.collection(Collections.conversations);
-
-  try {
-    await col.dropIndex("patientId_1");
-  } catch {
-    // Índice legacy ausente o ya eliminado
-  }
-
-  await Promise.all([
-    col.createIndex(
-      { patientId: 1, consultationTypeId: 1 },
-      { unique: true },
-    ),
-    col.createIndex({ patientId: 1, consultationCode: 1 }),
-    col.createIndex({ consultationCode: 1, updatedAt: -1 }),
-  ]);
-}
-
-/** Migración legacy + índices compuestos (una sola vez por instancia de Db). */
+/** Migración legacy (índices en mongo.ts → ensureIndexes). */
 export async function prepareChatStorage(db: Db): Promise<void> {
   if (preparedDbs.has(db)) return;
   await migrateLegacyConversations(db);
-  await ensureChatIndexes(db);
   preparedDbs.add(db);
 }
 
