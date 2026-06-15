@@ -32,7 +32,7 @@ function NoteCard({
 }
 
 function LiveNotificationsCard({ initialCount }: { initialCount: number }) {
-  const count = useLiveCounter(initialCount, { onNotificationCreated: true });
+  const count = useLiveCounter(initialCount, { onNotificationEvents: true });
 
   return (
     <NoteCard title="Notificaciones" href="/dashboard/notifications">
