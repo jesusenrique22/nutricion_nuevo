@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { edgeAuth } from "@/lib/auth-edge";
 
-export default auth((req) => {
+export default edgeAuth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = Boolean(req.auth);
   const role = req.auth?.user?.role;
