@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/cms/image-upload-field";
 import { PdfListUploadField } from "@/components/cms/pdf-list-upload-field";
@@ -54,28 +54,54 @@ function Field({
 
 export function NutricionistaCvEditor({
   initial,
+  onLiveChange,
 }: {
   initial: NutricionistaPageData;
+  onLiveChange?: (data: NutricionistaPageData) => void;
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionId>("sobre-mi");
   const [data, setData] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [dirty, setDirty] = useState(false);
 
   function updateCv<K extends keyof NutricionistaPageData["cv"]>(
     key: K,
     value: NutricionistaPageData["cv"][K],
   ) {
-    setData((prev) => ({ ...prev, cv: { ...prev.cv, [key]: value } }));
+    setData((prev) => {
+      const next = { ...prev, cv: { ...prev.cv, [key]: value } };
+      onLiveChange?.(next);
+      return next;
+    });
+    setDirty(true);
+    setMessage(null);
   }
 
   function updateAbout<K extends keyof NutricionistaPageData["about"]>(
     key: K,
     value: NutricionistaPageData["about"][K],
   ) {
-    setData((prev) => ({ ...prev, about: { ...prev.about, [key]: value } }));
+    setData((prev) => {
+      const next = { ...prev, about: { ...prev.about, [key]: value } };
+      onLiveChange?.(next);
+      return next;
+    });
+    setDirty(true);
+    setMessage(null);
   }
+
+  // Auto-clear success banner
+  useEffect(() => {
+    if (message?.includes("correctamente")) {
+      const t = setTimeout(() => {
+        setMessage(null);
+        setDirty(false);
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [message]);
 
   function save() {
     setMessage(null);
@@ -108,7 +134,32 @@ export function NutricionistaCvEditor({
   }
 
   return (
-    <div>
+    <div className="space-y-4">
+      {(dirty || message) && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-sm ${
+            message
+              ? message.includes("correctamente")
+                ? "border border-green-200 bg-green-50 text-green-800"
+                : "border border-red-200 bg-red-50 text-red-700"
+              : "border border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          <span className="font-semibold">
+            {message ?? "Tenés cambios sin guardar."}
+          </span>
+          {dirty && !message && (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={save}
+              className="rounded-full bg-amber-700 px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+            >
+              {isPending ? "Guardando…" : "Guardar ahora"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/60">
           Editá la página &quot;Sobre mí&quot; y el CV de especialidad que ven
@@ -307,9 +358,15 @@ export function NutricionistaCvEditor({
                 label="CV en PDF"
                 hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 25 MB por archivo."
                 values={data.cvPdfUrls}
-                onChange={(cvPdfUrls) =>
-                  setData((prev) => ({ ...prev, cvPdfUrls }))
-                }
+                onChange={(cvPdfUrls) => {
+                  setData((prev) => {
+                    const next = { ...prev, cvPdfUrls };
+                    onLiveChange?.(next);
+                    return next;
+                  });
+                  setDirty(true);
+                  setMessage(null);
+                }}
                 folder="cv"
               />
             </SectionCard>
@@ -321,17 +378,13 @@ export function NutricionistaCvEditor({
         <button
           type="button"
           onClick={save}
-          disabled={isPending}
-          className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          disabled={isPending || !dirty}
+          className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-40"
         >
           {isPending ? "Guardando…" : "Guardar cambios"}
         </button>
-        {message && (
-          <p
-            className={`text-sm ${message.includes("correctamente") ? "text-green-700" : "text-red-600"}`}
-          >
-            {message}
-          </p>
+        {!dirty && !message && (
+          <span className="text-xs text-foreground/40">Sin cambios</span>
         )}
       </div>
     </div>

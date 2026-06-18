@@ -153,17 +153,33 @@
   }
 }
 
-.anttova-week__body {
+.anttova-week__scroll {
   flex: 1;
   min-height: min(20rem, calc(100dvh - 22rem));
-  max-height: none;
-  overflow-y: auto;
-  grid-auto-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
-  .anttova-week__body {
+  .anttova-week__scroll {
     min-height: 0;
+  }
+}
+
+.anttova-week__columns {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: stretch;
+  height: 100%;
+  width: 100%;
+  min-width: 100%;
+}
+
+@media (max-width: 639px) {
+  .anttova-week__scroll {
+    overflow-x: auto;
+  }
+
+  .anttova-week__columns {
+    min-width: 42rem;
   }
 }
 
@@ -175,14 +191,3 @@
   min-height: 0;
 }
 
-@media (max-width: 639px) {
-  .anttova-week {
-    overflow-x: auto;
-    max-width: 100%;
-  }
-
-  .anttova-week__body,
-  .anttova-week > .grid:first-child {
-    min-width: min(560px, 100%);
-  }
-}

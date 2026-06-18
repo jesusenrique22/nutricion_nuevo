@@ -10,11 +10,11 @@ import {
 } from "@/components/calendar/calendar-utils";
 import { statusLabel, statusUi } from "@/components/calendar/calendar-status";
 
-const STATUS_SHORT: Record<string, string> = {
-  PENDING: "Pend",
-  CONFIRMED: "Conf",
+const STATUS_WEEK: Record<string, string> = {
+  PENDING: "Pend.",
+  CONFIRMED: "Conf.",
   COMPLETED: "Ok",
-  CANCELLED: "Canc",
+  CANCELLED: "Canc.",
   NO_SHOW: "N/A",
 };
 
@@ -27,30 +27,31 @@ function WeekAppointmentChip({
 }) {
   const ui = statusUi(appointment.status);
   const time = formatTime(appointment.start);
-  const name =
-    appointment.patientName?.split(" ")[0] ??
-    appointment.title.split(" ")[0] ??
-    appointment.title;
+  const status =
+    STATUS_WEEK[appointment.status] ??
+    statusLabel(appointment.status).slice(0, 5);
+  const detail =
+    appointment.patientName ?? appointment.title;
 
   return (
     <button
       type="button"
+      title={`${time} · ${statusLabel(appointment.status)}${detail ? ` · ${detail}` : ""}`}
       onClick={() => onSelect?.(appointment)}
-      className={`w-full rounded-lg border px-2 py-1.5 text-left transition hover:shadow-sm ${ui.card}`}
+      className={`flex w-full min-w-0 flex-col items-center gap-0.5 overflow-hidden rounded-md border border-foreground/10 border-l-[3px] px-1 py-1.5 text-center transition hover:shadow-sm ${ui.card}`}
     >
-      <div className="flex items-center justify-between gap-1">
-        <span className="text-[11px] font-bold tabular-nums text-primary">
-          {time}
-        </span>
+      <span className="text-[10px] font-bold tabular-nums leading-none text-primary">
+        {time}
+      </span>
+      <span className="flex max-w-full items-center justify-center gap-0.5">
         <span
-          className={`shrink-0 rounded-full px-1.5 py-px text-[8px] font-bold uppercase ${ui.badge}`}
-        >
-          {STATUS_SHORT[appointment.status] ?? statusLabel(appointment.status).slice(0, 4)}
+          aria-hidden
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${ui.dot}`}
+        />
+        <span className="truncate text-[9px] font-semibold leading-none text-foreground/70">
+          {status}
         </span>
-      </div>
-      <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-foreground">
-        {name}
-      </p>
+      </span>
     </button>
   );
 }
@@ -71,77 +72,79 @@ export function CalendarWeekView({
   const days = getWeekDays(date);
 
   return (
-    <div className="anttova-week flex w-full min-w-0 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-      <div className="grid min-w-0 shrink-0 grid-cols-7 border-b border-foreground/8 bg-muted/25">
-        {days.map((day) => {
-          const today = isToday(day);
-          const isSelected = isSameDay(day, selected);
-          const count = appointmentsOnDay(appointments, day).length;
+    <div className="anttova-week flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+      <div className="anttova-week__scroll min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+        <div className="anttova-week__columns grid h-full min-h-0 w-full grid-cols-7">
+          {days.map((day) => {
+            const today = isToday(day);
+            const isSelected = isSameDay(day, selected);
+            const count = appointmentsOnDay(appointments, day).length;
+            const dayAppts = appointmentsOnDay(appointments, day);
 
-          return (
-            <button
-              key={`head-${day.toISOString()}`}
-              type="button"
-              onClick={() => onSelectDay?.(day)}
-              aria-pressed={isSelected}
-              className={`flex flex-col items-center gap-0.5 border-r border-foreground/6 px-1 py-2 last:border-r-0 transition ${
-                isSelected ? "bg-primary/10" : "hover:bg-muted/50"
-              }`}
-            >
-              <span className="text-[9px] font-bold uppercase tracking-wide text-foreground/45">
-                {format(day, "EEE", { locale: es })}
-              </span>
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : today
-                      ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                      : "text-foreground"
-                }`}
+            return (
+              <div
+                key={day.toISOString()}
+                className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-foreground/6 last:border-r-0"
               >
-                {format(day, "d")}
-              </span>
-              {count > 0 && (
-                <span className="text-[9px] font-semibold text-primary/70">
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectDay?.(day)}
+                  aria-pressed={isSelected}
+                  className={`flex w-full shrink-0 flex-col items-center gap-0.5 border-b border-foreground/6 px-0.5 py-2 transition ${
+                    isSelected
+                      ? "bg-primary/10"
+                      : "bg-muted/25 hover:bg-muted/50"
+                  }`}
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-foreground/45">
+                    {format(day, "EEE", { locale: es })}
+                  </span>
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : today
+                          ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                          : "text-foreground"
+                    }`}
+                  >
+                    {format(day, "d")}
+                  </span>
+                  <span
+                    className={`min-h-[12px] text-[9px] font-semibold leading-none ${
+                      count > 0 ? "text-primary/70" : "text-transparent"
+                    }`}
+                    aria-hidden={count === 0}
+                  >
+                    {count > 0 ? count : "0"}
+                  </span>
+                </button>
 
-      <div className="anttova-week__body grid min-h-0 min-w-0 flex-1 auto-rows-fr grid-cols-7 divide-x divide-foreground/6">
-        {days.map((day) => {
-          const dayAppts = appointmentsOnDay(appointments, day);
-          const isSelected = isSameDay(day, selected);
-
-          return (
-            <div
-              key={`body-${day.toISOString()}`}
-              className={`flex h-full min-h-[9rem] min-w-0 flex-col p-1.5 sm:min-h-[10rem] sm:p-2 lg:min-h-0 ${
-                isSelected ? "bg-primary/[0.04]" : ""
-              }`}
-            >
-              {dayAppts.length === 0 ? (
-                <p className="flex flex-1 items-center justify-center py-6 text-center text-[10px] text-foreground/25">
-                  —
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {dayAppts.map((appt) => (
-                    <WeekAppointmentChip
-                      key={appt.id}
-                      appointment={appt}
-                      onSelect={onSelect}
-                    />
-                  ))}
+                <div
+                  className={`min-h-0 flex-1 overflow-y-auto p-1 ${
+                    isSelected ? "bg-primary/[0.04]" : ""
+                  }`}
+                >
+                  {dayAppts.length === 0 ? (
+                    <p className="flex h-full min-h-[6rem] items-center justify-center text-center text-[10px] text-foreground/25">
+                      —
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {dayAppts.map((appt) => (
+                        <WeekAppointmentChip
+                          key={appt.id}
+                          appointment={appt}
+                          onSelect={onSelect}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

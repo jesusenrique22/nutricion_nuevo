@@ -10,18 +10,21 @@ import type { LandingImagesData } from "@/types/landing-images";
 const PILLARS = [
   {
     key: "nutrition" as const,
+    label: "01",
     title: "Nutrición consciente",
     teaser: "Plan de alimentación personalizado, sin dietas extremas.",
     imageAlt: "Consulta nutricional — qué incluye",
   },
   {
     key: "training" as const,
+    label: "02",
     title: "Entrenamiento a medida",
     teaser: "Rutinas pensadas para tu cuerpo, objetivos y estilo de vida.",
     imageAlt: "Plan de entrenamiento — qué incluye",
   },
   {
     key: "anthropometry" as const,
+    label: "03",
     title: "Mediciones precisas",
     teaser: "Antropometría ISAK y composición corporal con estrategia.",
     imageAlt: "Análisis antropométrico — qué incluye",
@@ -50,20 +53,17 @@ const panelMotion = {
 
 export function BrandPillarsShowcase({
   services,
-  plans,
 }: {
   services?: LandingImagesData["services"];
   plans?: LandingImagesData["plans"];
 }) {
   const serviceImages = services ?? DEFAULT_LANDING_IMAGES.services;
-  const planImages = plans ?? DEFAULT_LANDING_IMAGES.plans;
   const [active, setActive] = useState<(typeof PILLARS)[number]["key"]>(
     "nutrition",
   );
 
   const current = PILLARS.find((p) => p.key === active)!;
   const detailSrc = serviceImages[current.key];
-  const thumbSrc = planImages[current.key];
 
   return (
     <section className="relative overflow-hidden bg-muted/40 px-6 py-16 sm:py-20">
@@ -94,48 +94,45 @@ export function BrandPillarsShowcase({
           </p>
         </Reveal>
 
-        <div className="mt-10 flex flex-col gap-3 sm:mt-12 sm:flex-row sm:justify-center">
+        <div
+          role="tablist"
+          aria-label="Pilares de servicio"
+          className="mt-10 flex flex-col gap-2 sm:mt-12 sm:flex-row sm:justify-center sm:gap-3"
+        >
           {PILLARS.map((pillar) => {
             const selected = pillar.key === active;
             return (
               <button
                 key={pillar.key}
                 type="button"
+                role="tab"
+                aria-selected={selected}
                 onClick={() => setActive(pillar.key)}
-                className={`group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-left transition sm:max-w-[15rem] sm:flex-col sm:items-start sm:px-4 sm:py-4 ${
+                className={`flex min-w-0 flex-1 flex-col rounded-2xl border px-4 py-4 text-left transition sm:max-w-[16rem] ${
                   selected
-                    ? "border-primary/25 bg-primary text-primary-foreground shadow-lg shadow-primary/15"
-                    : "border-foreground/10 bg-surface/80 text-foreground hover:border-primary/20 hover:bg-surface"
+                    ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/15"
+                    : "border-foreground/10 bg-surface text-foreground hover:border-primary/20 hover:bg-surface/90"
                 }`}
               >
-                <div
-                  className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-xl sm:h-14 sm:w-full sm:rounded-2xl ${
-                    selected ? "ring-2 ring-primary-foreground/30" : ""
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
+                    selected ? "text-primary-foreground/70" : "text-primary/50"
                   }`}
                 >
-                  <Image
-                    src={planImages[pillar.key]}
-                    alt=""
-                    fill
-                    className="object-cover object-top transition duration-500 group-hover:scale-105"
-                    sizes="80px"
-                    unoptimized={planImages[pillar.key].startsWith("/uploads/")}
-                  />
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-sm font-bold leading-tight">
-                    {pillar.title}
-                  </span>
-                  <span
-                    className={`mt-1 hidden text-xs leading-snug sm:block ${
-                      selected
-                        ? "text-primary-foreground/80"
-                        : "text-foreground/55"
-                    }`}
-                  >
-                    {pillar.teaser}
-                  </span>
-                </div>
+                  {pillar.label}
+                </span>
+                <span className="mt-1 text-sm font-bold leading-tight">
+                  {pillar.title}
+                </span>
+                <span
+                  className={`mt-1.5 text-xs leading-snug ${
+                    selected
+                      ? "text-primary-foreground/80"
+                      : "text-foreground/55"
+                  }`}
+                >
+                  {pillar.teaser}
+                </span>
               </button>
             );
           })}
@@ -150,42 +147,6 @@ export function BrandPillarsShowcase({
           />
 
           <div className="relative overflow-hidden rounded-3xl bg-surface shadow-xl shadow-primary/10 ring-1 ring-foreground/8">
-            <div className="flex items-center justify-between gap-4 border-b border-foreground/8 bg-gradient-to-r from-accent-soft/25 via-surface to-muted/30 px-5 py-4 sm:px-6">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/55">
-                  ¿Qué incluye?
-                </p>
-                <AnimatePresence mode="wait">
-                  <motion.h3
-                    key={current.title}
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 12 }}
-                    transition={{ duration: 0.3 }}
-                    className="mt-1 text-lg font-bold text-primary sm:text-xl"
-                  >
-                    {current.title}
-                  </motion.h3>
-                </AnimatePresence>
-              </div>
-              <motion.div
-                key={thumbSrc}
-                initial={{ opacity: 0, rotate: -8, scale: 0.85 }}
-                animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                className="relative hidden h-16 w-16 overflow-hidden rounded-2xl ring-2 ring-accent-soft/50 sm:block"
-              >
-                <Image
-                  src={thumbSrc}
-                  alt=""
-                  fill
-                  className="object-cover object-top"
-                  sizes="64px"
-                  unoptimized={thumbSrc.startsWith("/uploads/")}
-                />
-              </motion.div>
-            </div>
-
             <AnimatePresence mode="wait">
               <motion.div
                 key={active}
