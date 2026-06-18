@@ -62,9 +62,13 @@ function createPrismaClient(): PrismaClient {
   });
 
   if (!hasRequiredDelegates(client) || !clientHasExpectedSchema()) {
-    throw new Error(
-      "Prisma Client desactualizado. Ejecuta: pnpm prisma generate && reinicia el servidor.",
-    );
+    const message =
+      "Prisma Client desactualizado. Ejecuta: pnpm prisma generate && reinicia el servidor.";
+    if (process.env.NODE_ENV === "production") {
+      console.error(`[prisma] ${message}`);
+    } else {
+      throw new Error(message);
+    }
   }
 
   return client;

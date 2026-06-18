@@ -61,6 +61,7 @@ El código usa `autoSelectFamily: false` y `family: 4` para Vercel.
 |---------|----------------|----------|
 | 404 en `/dashboard` o `/login` | Dominio incorrecto | Usá la URL del deploy activo en Vercel |
 | **500 en `/login` (Middleware)** | Proxy importa Prisma/`auth.ts` | Usá `@/lib/auth-edge` en `proxy.ts`; corré `pnpm run check:deploy` |
+| **500 en `/dashboard/admin/payments`** | Migraciones pendientes en Neon | Redeploy en Vercel; o `pnpm exec prisma migrate deploy` contra `DATABASE_URL` de prod |
 | Login con “Credenciales inválidas” | `DATABASE_URL` o seed | Verificá Neon y ejecutá seed en prod si hace falta |
 | Error 500 al iniciar sesión | Falta `AUTH_SECRET` | Agregá `AUTH_SECRET` en Vercel y redeploy |
 | Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio que usás en el navegador |

@@ -92,6 +92,7 @@ async function main() {
   run("node scripts/check-edge-boundaries.mjs");
   run("pnpm exec prisma generate");
   await migrateDeployWithRetry();
+  run("node scripts/check-db-schema.mjs");
   run("pnpm exec next build");
 }
 

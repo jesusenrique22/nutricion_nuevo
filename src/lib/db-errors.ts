@@ -24,6 +24,9 @@ export function getDbErrorMessage(error: unknown): string | null {
     if (error.code === "P2025") {
       return "El registro ya no existe.";
     }
+    if (error.code === "P2022") {
+      return "La base de datos en producción no está actualizada. Ejecutá las migraciones (pnpm run db:migrate en Neon o redeploy en Vercel con migrate deploy).";
+    }
   }
   if (error instanceof Prisma.PrismaClientValidationError) {
     return "Error interno de datos. Recargá la página e intentá de nuevo.";
@@ -50,6 +53,15 @@ export function formatActionError(
     }
     if (msg.includes("Unknown argument") || msg.includes("Invalid `prisma.")) {
       return "Error interno. Recargá la página e intentá de nuevo.";
+    }
+    if (
+      msg.includes("does not exist") &&
+      (msg.includes("column") || msg.includes("Column"))
+    ) {
+      return "Faltan migraciones en la base de datos. En Vercel, verificá que el build ejecute prisma migrate deploy; o corré pnpm exec prisma migrate deploy contra Neon.";
+    }
+    if (msg.includes("Prisma Client desactualizado")) {
+      return "El cliente Prisma no coincide con el schema. Redeploy en Vercel o ejecutá pnpm exec prisma generate.";
     }
     if (msg.length > 0 && msg.length <= 240) return msg;
   }

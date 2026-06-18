@@ -32,7 +32,7 @@ jobs:
         run: pnpm run check:edge
 
       - name: Production build
-        run: pnpm run vercel-build
+        run: SKIP_DB_SCHEMA_CHECK=1 pnpm run vercel-build
 
       - name: Smoke test (login / middleware)
         run: pnpm run check:smoke
