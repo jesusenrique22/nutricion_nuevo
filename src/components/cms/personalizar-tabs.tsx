@@ -2,22 +2,19 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ConsultationPricesEditor } from "@/components/cms/consultation-prices-editor";
-import { FormTemplateEditor } from "@/components/cms/form-template-editor";
+import { PaymentCheckoutPolicyEditor } from "@/components/cms/payment-checkout-policy-editor";
 import { LandingImagesEditor } from "@/components/cms/landing-images-editor";
 import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
-import { PaymentChatPolicyEditor } from "@/components/cms/payment-chat-policy-editor";
 import { SiteContentEditor } from "@/components/cms/site-content-editor";
-import type {
-  ConsultationAdminDTO,
-  FormTemplateDTO,
-  SiteContentDTO,
-} from "@/server/actions/cms.actions";
-import type { PaymentChatPolicy } from "@/types/payment-chat-policy";
+import type { SiteContentDTO } from "@/server/actions/cms.actions";
+import { CURRENCY_POLICY_SLUG } from "@/types/currency-policy";
 import type { LandingImagesData } from "@/types/landing-images";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
 import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
+import { PAYMENT_CHECKOUT_POLICY_SLUG } from "@/types/payment-checkout-policy";
+import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
+import { PAYMENT_CHAT_POLICY_SLUG } from "@/types/payment-chat-policy";
 
 const tabs = [
   {
@@ -26,24 +23,19 @@ const tabs = [
     hint: "Hero, galería, paquetes y secciones visuales de la landing.",
   },
   {
-    id: "precios",
-    label: "Precios y pagos",
-    hint: "Servicios, montos, adelantos y reglas del chat.",
-  },
-  {
     id: "web",
     label: "Textos web",
     hint: "Títulos y párrafos editables del sitio público.",
   },
   {
     id: "conocerme",
-    label: "Conóceme más",
-    hint: "CV y perfil profesional de la nutricionista.",
+    label: "Sobre mí",
+    hint: "Presentación de la nutricionista y CV en PDF.",
   },
   {
-    id: "formularios",
-    label: "Formularios",
-    hint: "Preguntas que completan los pacientes antes de cada cita.",
+    id: "pagos",
+    label: "Pagos checkout",
+    hint: "Contacto, métodos de pago, referencia y capturas del carrito.",
   },
   {
     id: "recursos",
@@ -55,25 +47,26 @@ const tabs = [
 type TabId = (typeof tabs)[number]["id"];
 
 export function PersonalizarTabs({
-  consultationTypes,
   siteBlocks,
-  formTemplates,
   resourceCount,
   landingImages,
   nutricionistaPage,
-  paymentPolicy,
+  paymentCheckoutPolicy,
 }: {
-  consultationTypes: ConsultationAdminDTO[];
   siteBlocks: SiteContentDTO[];
-  formTemplates: FormTemplateDTO[];
   resourceCount: number;
   landingImages: LandingImagesData;
   nutricionistaPage: NutricionistaPageData;
-  paymentPolicy: PaymentChatPolicy;
+  paymentCheckoutPolicy: PaymentCheckoutPolicy;
 }) {
   const [tab, setTab] = useState<TabId>("imagenes");
   const textBlocks = siteBlocks.filter(
-    (b) => b.slug !== LANDING_IMAGES_SLUG && b.slug !== NUTRICIONISTA_PAGE_SLUG,
+    (b) =>
+      b.slug !== LANDING_IMAGES_SLUG &&
+      b.slug !== NUTRICIONISTA_PAGE_SLUG &&
+      b.slug !== PAYMENT_CHAT_POLICY_SLUG &&
+      b.slug !== PAYMENT_CHECKOUT_POLICY_SLUG &&
+      b.slug !== CURRENCY_POLICY_SLUG,
   );
   const activeTab = tabs.find((t) => t.id === tab)!;
 
@@ -106,21 +99,14 @@ export function PersonalizarTabs({
           <LandingImagesEditor initial={landingImages} />
         )}
 
-        {tab === "precios" && (
-          <div className="space-y-6">
-            <PaymentChatPolicyEditor initial={paymentPolicy} />
-            <ConsultationPricesEditor types={consultationTypes} />
-          </div>
-        )}
-
         {tab === "web" && <SiteContentEditor blocks={textBlocks} />}
 
         {tab === "conocerme" && (
           <NutricionistaCvEditor initial={nutricionistaPage} />
         )}
 
-        {tab === "formularios" && (
-          <FormTemplateEditor templates={formTemplates} />
+        {tab === "pagos" && (
+          <PaymentCheckoutPolicyEditor initial={paymentCheckoutPolicy} />
         )}
 
         {tab === "recursos" && (
@@ -128,7 +114,9 @@ export function PersonalizarTabs({
             <h3 className="text-lg font-bold">Biblioteca digital</h3>
             <p className="mt-2 text-sm text-foreground/60">
               Subí portadas, archivos y enlaces desde el módulo de recursos. Los
-              pacientes los ven en su biblioteca.
+              pacientes los ven en su biblioteca. Los recursos tipo{" "}
+              <strong>Paquete</strong> publicados aparecen en{" "}
+              <strong>/resources</strong>.
             </p>
             <p className="mt-3 text-sm">
               <strong>{resourceCount}</strong> recurso(s) publicados.

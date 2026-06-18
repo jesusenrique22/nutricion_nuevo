@@ -62,12 +62,26 @@ html.landing-lobby {
   }
 }
 
+@keyframes brand-marquee-reverse {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 .brand-marquee {
   animation: brand-marquee 42s linear infinite;
 }
 
+.brand-marquee-reverse {
+  animation: brand-marquee-reverse 42s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .brand-marquee {
+  .brand-marquee,
+  .brand-marquee-reverse {
     animation: none;
   }
 
@@ -101,4 +115,9 @@ html.landing-lobby {
 
 .scrollbar-stable::-webkit-scrollbar-thumb:hover {
   background-color: rgb(116 30 49 / 0.38);
+}
+
+/* reCAPTCHA v3 badge — oculto si mostramos el aviso legal en el formulario */
+.grecaptcha-badge {
+  visibility: hidden !important;
 }

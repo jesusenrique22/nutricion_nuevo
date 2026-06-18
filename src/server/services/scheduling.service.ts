@@ -26,8 +26,9 @@ export async function validateAppointmentSlot(params: {
   consultationType: ConsultationType;
   startTime: Date;
   modality: ConsultationModality;
+  excludeAppointmentId?: string;
 }): Promise<ValidationResult> {
-  const { consultationType, startTime, modality } = params;
+  const { consultationType, startTime, modality, excludeAppointmentId } = params;
 
   if (Number.isNaN(startTime.getTime())) {
     return { ok: false, error: "INVALID_TIME", message: "Fecha inválida." };
@@ -72,6 +73,7 @@ export async function validateAppointmentSlot(params: {
   // 3) Validación estricta de cruce de horarios (overlap)
   const overlap = await prisma.appointment.findFirst({
     where: {
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
       status: { in: ["PENDING", "CONFIRMED"] },
       startTime: { lt: endTime },
       endTime: { gt: startTime },

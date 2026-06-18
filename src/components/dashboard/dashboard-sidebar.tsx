@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
+import { SidebarCurrencyBlock } from "@/components/currency/sidebar-currency-block";
 import { useDashboardBadges } from "@/hooks/use-dashboard-badges";
 
 interface NavLink {
@@ -22,13 +23,13 @@ function UnreadBadge({ count }: { count: number }) {
 
 function NavItems({
   links,
-  unreadChat,
   unreadNotifications,
+  cartCount,
   onNavigate,
 }: {
   links: NavLink[];
-  unreadChat: number;
   unreadNotifications: number;
+  cartCount: number;
   onNavigate?: () => void;
 }) {
   const linkClass =
@@ -43,28 +44,15 @@ function NavItems({
         <Link
           key={l.href}
           href={l.href}
-          className={linkClass}
+          className={`flex items-center justify-between ${linkClass}`}
           onClick={onNavigate}
         >
-          {l.label}
+          <span>{l.label}</span>
+          {l.href.includes("/cart") && cartCount > 0 && (
+            <UnreadBadge count={cartCount} />
+          )}
         </Link>
       ))}
-      <Link
-        href="/dashboard/chat"
-        className={`flex items-center justify-between ${linkClass}`}
-        onClick={onNavigate}
-      >
-        <span className="flex items-center gap-2.5">
-          Chat
-          {unreadChat > 0 && (
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-80" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white ring-2 ring-accent" />
-            </span>
-          )}
-        </span>
-        <UnreadBadge count={unreadChat} />
-      </Link>
       <Link
         href="/dashboard/notifications"
         className={`flex items-center justify-between ${linkClass}`}
@@ -81,13 +69,15 @@ export function DashboardSidebar({
   isAdmin,
   links,
   footer,
+  cartCount = 0,
 }: {
   isAdmin: boolean;
   links: NavLink[];
   footer: ReactNode;
+  cartCount?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { unreadNotifications, unreadChat } = useDashboardBadges();
+  const { unreadNotifications } = useDashboardBadges();
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -97,6 +87,7 @@ export function DashboardSidebar({
   }, [menuOpen]);
 
   const closeMenu = () => setMenuOpen(false);
+  const badgeTotal = unreadNotifications + cartCount;
 
   return (
     <>
@@ -119,11 +110,9 @@ export function DashboardSidebar({
           >
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
-          {(unreadChat > 0 || unreadNotifications > 0) && (
+          {badgeTotal > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-primary ring-2 ring-accent">
-              {unreadChat + unreadNotifications > 9
-                ? "9+"
-                : unreadChat + unreadNotifications}
+              {badgeTotal > 9 ? "9+" : badgeTotal}
             </span>
           )}
         </button>
@@ -138,12 +127,15 @@ export function DashboardSidebar({
         <nav className="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           <NavItems
             links={links}
-            unreadChat={unreadChat}
             unreadNotifications={unreadNotifications}
+            cartCount={cartCount}
           />
         </nav>
 
-        <div className="mt-4 shrink-0">{footer}</div>
+        <div className="mt-4 shrink-0 space-y-3">
+          <SidebarCurrencyBlock />
+          {footer}
+        </div>
       </aside>
 
       {menuOpen && (
@@ -175,13 +167,16 @@ export function DashboardSidebar({
             <nav className="mt-6 flex flex-1 flex-col gap-1 overflow-y-auto">
               <NavItems
                 links={links}
-                unreadChat={unreadChat}
                 unreadNotifications={unreadNotifications}
+                cartCount={cartCount}
                 onNavigate={closeMenu}
               />
             </nav>
 
-            <div onClick={closeMenu}>{footer}</div>
+            <div className="space-y-3">
+              <SidebarCurrencyBlock />
+              <div onClick={closeMenu}>{footer}</div>
+            </div>
           </aside>
         </>
       )}

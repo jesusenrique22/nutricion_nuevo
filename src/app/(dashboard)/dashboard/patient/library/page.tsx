@@ -1,59 +1,52 @@
-import { BrandDashboardHeader } from "@/components/brand/brand-dashboard-shell";
-import { LibraryResourceList } from "@/components/resources/resource-catalog";
-import { ResourceCatalog } from "@/components/resources/resource-catalog";
-import { PatientWeeklyPlanView } from "@/components/weekly-plan/patient-weekly-plan-view";
 import {
+  LibraryResourceList,
+  ResourceCatalog,
+} from "@/components/resources/resource-catalog";
+import { BrandDashboardHeader } from "@/components/brand/brand-dashboard-shell";
+import {
+  getAvailableResourcesForPatient,
   getMyLibraryResources,
-  getPublishedResources,
 } from "@/server/actions/resource.queries";
-import { getPublishedWeeklyPlanForPatient } from "@/server/actions/weekly-plan.actions";
-import { auth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function PatientLibraryPage() {
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  const [owned, catalog, weeklyPlan] = await Promise.all([
+  const [owned, available] = await Promise.all([
     getMyLibraryResources(),
-    getPublishedResources(),
-    userId ? getPublishedWeeklyPlanForPatient(userId) : Promise.resolve(null),
+    getAvailableResourcesForPatient(),
   ]);
-
-  const notOwned = catalog.filter(
-    (c) => !owned.some((o) => o.id === c.id),
-  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-10">
       <BrandDashboardHeader
-        eyebrow="Plan alimentación"
-        title="Recursos y guías"
-        description="Material digital de la Lic. Ma Antonieta Lanza."
+        eyebrow="Material digital"
+        title="Recursos"
+        description="Contenido publicado por la Lic. Ma Antonieta Lanza. Solo lectura en la plataforma."
       />
-
-      <PatientWeeklyPlanView plan={weeklyPlan} />
 
       <section>
         <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
-          Mi librería
+          Comprados
         </h2>
+        <p className="mt-1 text-sm text-foreground/55">
+          Recursos desbloqueados tras verificar tu pago.
+        </p>
         <div className="mt-4">
           <LibraryResourceList resources={owned} />
         </div>
       </section>
 
-      {notOwned.length > 0 && (
-        <section>
-          <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
-            Disponibles en tienda
-          </h2>
-          <div className="mt-4">
-            <ResourceCatalog resources={notOwned} />
-          </div>
-        </section>
-      )}
+      <section>
+        <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
+          Disponibles
+        </h2>
+        <p className="mt-1 text-sm text-foreground/55">
+          Agrega al carrito para solicitar acceso.
+        </p>
+        <div className="mt-4">
+          <ResourceCatalog resources={available} />
+        </div>
+      </section>
     </div>
   );
 }

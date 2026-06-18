@@ -19,6 +19,7 @@ export interface ResourceDTO {
   isPublished: boolean;
   sortOrder: number;
   owned?: boolean;
+  accessStatus?: "PENDING" | "GRANTED" | "REFUNDED" | null;
 }
 
 function mapResource(
@@ -38,7 +39,7 @@ function mapResource(
     isPublished: boolean;
     sortOrder: number;
   },
-  owned = false,
+  opts: { owned?: boolean; accessStatus?: "PENDING" | "GRANTED" | "REFUNDED" | null } = {},
 ): ResourceDTO {
   return {
     id: r.id,
@@ -55,16 +56,43 @@ function mapResource(
     category: r.category,
     isPublished: r.isPublished,
     sortOrder: r.sortOrder,
-    owned,
+    owned: opts.owned,
+    accessStatus: opts.accessStatus ?? null,
   };
 }
 
+export async function getPublishedResourcePackages(): Promise<ResourceDTO[]> {
+  const resources = await prisma.resource.findMany({
+    where: { isPublished: true, type: "PACKAGE" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+  });
+  return resources.map((r) => mapResource(r));
+}
+
 export async function getPublishedResources(): Promise<ResourceDTO[]> {
+  const session = await auth();
   const resources = await prisma.resource.findMany({
     where: { isPublished: true },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   });
-  return resources.map((r) => mapResource(r));
+
+  if (!session?.user?.id) {
+    return resources.map((r) => mapResource(r));
+  }
+
+  const purchases = await prisma.resourcePurchase.findMany({
+    where: { userId: session.user.id },
+    select: { resourceId: true, status: true },
+  });
+  const purchaseMap = new Map(purchases.map((p) => [p.resourceId, p.status]));
+
+  return resources.map((r) => {
+    const status = purchaseMap.get(r.id);
+    return mapResource(r, {
+      owned: status === "GRANTED",
+      accessStatus: status ?? null,
+    });
+  });
 }
 
 export async function getAllResourcesAdmin(): Promise<ResourceDTO[]> {
@@ -82,12 +110,40 @@ export async function getMyLibraryResources(): Promise<ResourceDTO[]> {
   if (!session?.user?.id) return [];
 
   const purchases = await prisma.resourcePurchase.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, status: "GRANTED" },
     include: { resource: true },
     orderBy: { createdAt: "desc" },
   });
 
-  return purchases.map((p) => mapResource(p.resource, true));
+  return purchases.map((p) =>
+    mapResource(p.resource, { owned: true, accessStatus: "GRANTED" }),
+  );
+}
+
+export async function getAvailableResourcesForPatient(): Promise<ResourceDTO[]> {
+  const session = await auth();
+  if (!session?.user?.id) return getPublishedResources();
+
+  const [catalog, purchases] = await Promise.all([
+    prisma.resource.findMany({
+      where: { isPublished: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
+    prisma.resourcePurchase.findMany({
+      where: { userId: session.user.id },
+      select: { resourceId: true, status: true },
+    }),
+  ]);
+
+  const blocked = new Set(
+    purchases
+      .filter((p) => p.status === "GRANTED" || p.status === "PENDING")
+      .map((p) => p.resourceId),
+  );
+
+  return catalog
+    .filter((r) => !blocked.has(r.id))
+    .map((r) => mapResource(r));
 }
 
 export async function getResourceById(
@@ -100,7 +156,7 @@ export async function getResourceById(
   const isAdmin = session?.user?.role === "ADMIN";
   if (!resource.isPublished && !isAdmin) return null;
 
-  let owned = false;
+  let accessStatus: "PENDING" | "GRANTED" | "REFUNDED" | null = null;
   if (session?.user?.id) {
     const purchase = await prisma.resourcePurchase.findUnique({
       where: {
@@ -110,8 +166,46 @@ export async function getResourceById(
         },
       },
     });
-    owned = Boolean(purchase);
+    accessStatus = purchase?.status ?? null;
   }
 
-  return mapResource(resource, owned);
+  const owned = isAdmin || accessStatus === "GRANTED";
+  if (!owned && !isAdmin) return null;
+
+  return mapResource(resource, { owned, accessStatus });
+}
+
+export interface PendingResourceRequestDTO {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  resourceId: string;
+  resourceTitle: string;
+  pricePaid: string;
+  createdAt: string;
+}
+
+export async function getPendingResourceRequests(): Promise<
+  PendingResourceRequestDTO[]
+> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return [];
+
+  const rows = await prisma.resourcePurchase.findMany({
+    where: { status: "PENDING" },
+    include: { user: true, resource: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    userName: r.user.name,
+    userEmail: r.user.email,
+    resourceId: r.resourceId,
+    resourceTitle: r.resource.title,
+    pricePaid: r.pricePaid.toString(),
+    createdAt: r.createdAt.toISOString(),
+  }));
 }

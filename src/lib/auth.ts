@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
+import { normalizeEmail } from "@/lib/normalize-email";
 import { prisma } from "@/server/db/prisma";
 
 const credentialsSchema = z.object({
@@ -29,12 +30,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = credentialsSchema.safeParse(raw);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
-        const user = await prisma.user.findUnique({ where: { email } });
+        const email = normalizeEmail(parsed.data.email);
+        const password = parsed.data.password;
+        const user = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: "insensitive" } },
+          include: {
+            patientProfile: { select: { hiddenFromAdminList: true } },
+          },
+        });
         if (!user?.passwordHash) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+
+        if (
+          user.role === "PATIENT" &&
+          user.patientProfile?.hiddenFromAdminList
+        ) {
+          throw new Error("ACCOUNT_DEACTIVATED");
+        }
 
         if (user.role === "PATIENT" && !user.emailVerified) {
           throw new Error("EMAIL_NOT_VERIFIED");

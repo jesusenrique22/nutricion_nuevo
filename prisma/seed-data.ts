@@ -2,108 +2,9 @@
 
 import { DEFAULT_NUTRICIONISTA_PAGE } from "../src/lib/nutricionista-cv-defaults";
 import { nutricionistaPageToRecord } from "../src/lib/nutricionista-cv-parse";
+import { DEFAULT_FORM_TEMPLATES } from "../src/lib/form-templates-catalog";
 
-export const DEFAULT_FORM_TEMPLATES: Record<
-  string,
-  { name: string; fields: Record<string, unknown>[] }
-> = {
-  follow_up: {
-    name: "Formulario de seguimiento",
-    fields: [
-      {
-        id: "currentWeight",
-        name: "currentWeight",
-        label: "Peso actual (kg)",
-        type: "number",
-        required: true,
-        step: 3,
-      },
-      {
-        id: "energyLevel",
-        name: "energyLevel",
-        label: "Nivel de energía",
-        type: "select",
-        required: true,
-        step: 3,
-        options: [
-          { value: "baja", label: "Baja" },
-          { value: "normal", label: "Normal" },
-          { value: "alta", label: "Alta" },
-        ],
-      },
-      {
-        id: "adherence",
-        name: "adherence",
-        label: "¿Cómo seguiste el plan?",
-        type: "select",
-        required: true,
-        step: 3,
-        options: [
-          { value: "muy_bien", label: "Muy bien" },
-          { value: "bien", label: "Bien" },
-          { value: "regular", label: "Regular" },
-          { value: "mal", label: "Mal" },
-        ],
-      },
-      {
-        id: "symptoms",
-        name: "symptoms",
-        label: "Síntomas o molestias",
-        type: "textarea",
-        required: true,
-        minLength: 3,
-        step: 3,
-      },
-      {
-        id: "notes",
-        name: "notes",
-        label: "Algo más que quieras comentar",
-        type: "textarea",
-        required: true,
-        minLength: 3,
-        step: 3,
-      },
-    ],
-  },
-  nutrition: {
-    name: "Primera consulta nutricional",
-    fields: [
-      {
-        id: "fullName",
-        name: "fullName",
-        label: "Nombre completo",
-        type: "text",
-        required: true,
-        step: 2,
-      },
-      {
-        id: "phone",
-        name: "phone",
-        label: "Teléfono",
-        type: "tel",
-        required: true,
-        step: 2,
-      },
-      {
-        id: "consultationReason",
-        name: "consultationReason",
-        label: "¿Qué te trae a consulta?",
-        type: "textarea",
-        required: true,
-        minLength: 5,
-        step: 3,
-      },
-      {
-        id: "dietDescription",
-        name: "dietDescription",
-        label: "¿Cómo describirías tu alimentación?",
-        type: "textarea",
-        required: true,
-        step: 3,
-      },
-    ],
-  },
-};
+export { DEFAULT_FORM_TEMPLATES };
 
 export const SITE_CONTENT_DEFAULTS: Record<
   string,
@@ -184,17 +85,80 @@ export const SITE_CONTENT_DEFAULTS: Record<
     },
   },
   nutricionista_page: {
-    title: "Conóceme más",
+    title: "Sobre mí",
     data: nutricionistaPageToRecord(DEFAULT_NUTRICIONISTA_PAGE),
   },
   payment_chat_policy: {
     title: "Pagos y acceso al chat",
     data: {
-      advancePercent: 50,
-      remainderPercent: 50,
+      consultationRules: [
+        {
+          consultationCode: "NUT_01",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+        {
+          consultationCode: "ENT_02",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+        {
+          consultationCode: "ANT_03",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+      ],
       chatUnlockOnAppointment: true,
       chatUnlockOnAdvancePaid: true,
       chatUnlockOnRemainderPaid: true,
+    },
+  },
+  currency_policy: {
+    title: "Cotización y monedas",
+    data: {
+      markupPercent: 5,
+      dollarType: "blue",
+    },
+  },
+  payment_checkout_policy: {
+    title: "Checkout y comprobantes de pago",
+    data: {
+      contact: {
+        phone: "+(54) 9 11 3819 2675",
+        phoneHref: "tel:+5491138192675",
+        instagram: "@anttova_fitness",
+        instagramHref: "https://instagram.com/anttova_fitness",
+        email: "ma.lanzahuerta@gmail.com",
+        emailHref: "mailto:ma.lanzahuerta@gmail.com",
+      },
+      methods: [
+        {
+          id: "zelle",
+          label: "Zelle",
+          detail: "Mariantolanza00@gmail.com",
+        },
+        {
+          id: "mercado_pago",
+          label: "Mercado Pago",
+          detail: "Anttova",
+        },
+      ],
+      referenceLabel: "Número de referencia / comprobante",
+      referencePlaceholder: "Ej. 1234567890 o ID de operación",
+      referenceRequired: true,
+      proofsLabel: "Capturas del pago",
+      proofsHint:
+        "Sube una o más capturas de pantalla del comprobante (JPG, PNG o WebP).",
+      maxProofFiles: 5,
+      showOptionalNote: true,
+      optionalNoteLabel: "Nota adicional (opcional)",
+      optionalNotePlaceholder: "Ej. titular de la cuenta, horario del pago",
     },
   },
 };

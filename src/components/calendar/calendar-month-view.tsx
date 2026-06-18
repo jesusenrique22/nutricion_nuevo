@@ -25,8 +25,8 @@ export function CalendarMonthView({
   const weeks = getMonthWeeks(month);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-foreground/8 bg-surface">
-      <div className="grid grid-cols-7 border-b border-foreground/8 bg-muted/30">
+    <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-foreground/8 bg-surface">
+      <div className="grid min-w-0 grid-cols-7 border-b border-foreground/8 bg-muted/30">
         {WEEKDAYS.map((d) => (
           <div
             key={d}
@@ -40,7 +40,7 @@ export function CalendarMonthView({
       {weeks.map((week, wi) => (
         <div
           key={wi}
-          className="grid grid-cols-7 border-b border-foreground/6 last:border-b-0"
+          className="grid min-w-0 grid-cols-7 border-b border-foreground/6 last:border-b-0"
         >
           {week.map((day) => {
             const inMonth = isSameMonth(day, month);
@@ -53,7 +53,7 @@ export function CalendarMonthView({
                 key={day.toISOString()}
                 type="button"
                 onClick={() => onSelectDay(day)}
-                className={`group relative min-h-[88px] border-r border-foreground/6 p-2 text-left transition last:border-r-0 sm:min-h-[110px] ${
+                className={`group relative min-h-[72px] min-w-0 border-r border-foreground/6 p-1.5 text-left transition last:border-r-0 sm:min-h-[88px] sm:p-2 lg:min-h-[96px] ${
                   selectedDay
                     ? "bg-primary/8 ring-1 ring-inset ring-primary/25"
                     : today

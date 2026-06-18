@@ -40,4 +40,5 @@ export const upsertResourceSchema = z.object({
 export const grantResourceSchema = z.object({
   resourceId: z.string().min(1),
   userId: z.string().min(1),
+  adminNote: z.string().max(300).optional(),
 });

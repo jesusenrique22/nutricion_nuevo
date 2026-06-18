@@ -57,11 +57,14 @@ export const SOCIAL_ICON_ORDER: SocialIconId[] = [
   "whatsapp",
 ];
 
-export function getPatientAppLinks(options: {
-  pendingForms: number;
-  upcomingAppointments: number;
-}): BrandLinkItem[] {
+export function getPatientAppLinks(): BrandLinkItem[] {
   return [
+    {
+      id: "progress",
+      label: "Mi progreso",
+      href: "/dashboard/patient/progress",
+      subtitle: "Compras, citas y mediciones",
+    },
     {
       id: "appointments",
       label: "Agendar cita",
@@ -69,31 +72,16 @@ export function getPatientAppLinks(options: {
       subtitle: "Nutrición, entrenamiento o antropometría",
     },
     {
-      id: "forms",
-      label:
-        options.pendingForms > 0
-          ? `Formularios (${options.pendingForms})`
-          : "Mis formularios",
-      href: "/dashboard/patient/appointments/form",
-      subtitle: "Completa tu ingreso o seguimiento",
-    },
-    {
-      id: "progress",
-      label: "Mi progreso",
-      href: "/dashboard/patient/progress",
-      subtitle: "Mediciones y evolución",
-    },
-    {
       id: "library",
-      label: "Mi librería",
+      label: "Recursos",
       href: "/dashboard/patient/library",
-      subtitle: "E-books y videos",
+      subtitle: "Material digital desbloqueado",
     },
     {
-      id: "chat",
-      label: "Chat con Anttova",
-      href: "/dashboard/chat",
-      subtitle: "Consultas en tiempo real",
+      id: "cart",
+      label: "Carrito",
+      href: "/dashboard/patient/cart",
+      subtitle: "Solicita recursos y citas",
     },
   ];
 }

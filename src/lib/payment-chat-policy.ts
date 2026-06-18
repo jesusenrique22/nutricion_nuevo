@@ -1,7 +1,14 @@
 import {
+  ALL_CONSULTATION_CODES,
+  defaultRuleForConsultation,
+  parseConsultationPaymentRule,
+} from "@/lib/payment-policy-resolve";
+import {
   DEFAULT_PAYMENT_CHAT_POLICY,
+  type ConsultationPaymentRule,
   type PaymentChatPolicy,
 } from "@/types/payment-chat-policy";
+import { withoutChatUnlock } from "@/lib/feature-flags";
 import { getSiteContentBySlug } from "@/server/actions/cms.actions";
 import { PAYMENT_CHAT_POLICY_SLUG } from "@/types/payment-chat-policy";
 
@@ -18,27 +25,50 @@ function parseBool(value: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
-export function parsePaymentChatPolicy(
-  data: Record<string, unknown> | null | undefined,
-): PaymentChatPolicy {
-  if (!data) return DEFAULT_PAYMENT_CHAT_POLICY;
-
-  const advancePercent = clampPercent(
+function parseConsultationRules(
+  data: Record<string, unknown>,
+  catalogCodes: string[],
+): ConsultationPaymentRule[] {
+  const legacyAdvance = clampPercent(
     data.advancePercent,
-    DEFAULT_PAYMENT_CHAT_POLICY.advancePercent,
-  );
-  let remainderPercent = clampPercent(
-    data.remainderPercent,
-    DEFAULT_PAYMENT_CHAT_POLICY.remainderPercent,
+    DEFAULT_PAYMENT_CHAT_POLICY.consultationRules[0]?.advancePercent ?? 50,
   );
 
-  if (advancePercent + remainderPercent !== 100) {
-    remainderPercent = 100 - advancePercent;
+  const rawRules = data.consultationRules;
+  if (!Array.isArray(rawRules)) {
+    return catalogCodes.map((code) =>
+      defaultRuleForConsultation(code, legacyAdvance),
+    );
   }
 
-  return {
-    advancePercent,
-    remainderPercent,
+  const parsed = rawRules
+    .map(parseConsultationPaymentRule)
+    .filter((r): r is ConsultationPaymentRule => r != null);
+
+  return catalogCodes.map((code) => {
+    const found = parsed.find((r) => r.consultationCode === code);
+    return found ?? defaultRuleForConsultation(code, legacyAdvance);
+  });
+}
+
+export function parsePaymentChatPolicy(
+  data: Record<string, unknown> | null | undefined,
+  catalogCodes: string[] = ALL_CONSULTATION_CODES,
+): PaymentChatPolicy {
+  if (!data) {
+    return withoutChatUnlock({
+      ...DEFAULT_PAYMENT_CHAT_POLICY,
+      consultationRules: catalogCodes.map((code) =>
+        defaultRuleForConsultation(
+          code,
+          DEFAULT_PAYMENT_CHAT_POLICY.consultationRules[0]?.advancePercent ?? 50,
+        ),
+      ),
+    });
+  }
+
+  return withoutChatUnlock({
+    consultationRules: parseConsultationRules(data, catalogCodes),
     chatUnlockOnAppointment: parseBool(
       data.chatUnlockOnAppointment,
       DEFAULT_PAYMENT_CHAT_POLICY.chatUnlockOnAppointment,
@@ -51,16 +81,32 @@ export function parsePaymentChatPolicy(
       data.chatUnlockOnRemainderPaid,
       DEFAULT_PAYMENT_CHAT_POLICY.chatUnlockOnRemainderPaid,
     ),
-  };
+  });
 }
 
 export async function getPaymentChatPolicy(): Promise<PaymentChatPolicy> {
-  const row = await getSiteContentBySlug(PAYMENT_CHAT_POLICY_SLUG);
-  return parsePaymentChatPolicy(row?.data);
+  const { prisma } = await import("@/server/db/prisma");
+  const [row, types] = await Promise.all([
+    getSiteContentBySlug(PAYMENT_CHAT_POLICY_SLUG),
+    prisma.consultationType.findMany({
+      where: { isPublished: true },
+      select: { code: true },
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+    }),
+  ]);
+  return parsePaymentChatPolicy(
+    row?.data as Record<string, unknown> | undefined,
+    types.map((t) => t.code),
+  );
 }
 
 export function paymentChatPolicyToRecord(
   policy: PaymentChatPolicy,
 ): Record<string, unknown> {
-  return { ...policy };
+  return {
+    consultationRules: policy.consultationRules,
+    chatUnlockOnAppointment: policy.chatUnlockOnAppointment,
+    chatUnlockOnAdvancePaid: policy.chatUnlockOnAdvancePaid,
+    chatUnlockOnRemainderPaid: policy.chatUnlockOnRemainderPaid,
+  };
 }

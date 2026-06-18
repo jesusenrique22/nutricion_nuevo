@@ -6,6 +6,23 @@ export const updateConsultationPriceSchema = z.object({
   description: z.string().trim().optional(),
   price: z.coerce.number().min(0),
   durationMinutes: z.coerce.number().int().min(15).max(240),
+  isPublished: z.coerce.boolean().optional(),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+  imageUrl: z.string().trim().optional(),
+  allowsOnline: z.coerce.boolean().optional(),
+  allowsPresencial: z.coerce.boolean().optional(),
+  morningOnly: z.coerce.boolean().optional(),
+});
+
+export const createConsultationTypeSchema = z.object({
+  name: z.string().trim().min(2),
+  description: z.string().trim().optional(),
+  price: z.coerce.number().min(0),
+  durationMinutes: z.coerce.number().int().min(15).max(240).default(60),
+  allowsOnline: z.coerce.boolean().optional().default(true),
+  allowsPresencial: z.coerce.boolean().optional().default(true),
+  morningOnly: z.coerce.boolean().optional().default(false),
+  imageUrl: z.string().trim().optional(),
 });
 
 export const updateSiteContentSchema = z.object({
@@ -30,6 +47,19 @@ const cvExperienceSchema = z.object({
 export const nutricionistaPageSchema = z.object({
   pageTitle: z.string().trim().min(1),
   pageDescription: z.string().trim().min(1),
+  about: z.object({
+    headline: z.string().trim().min(1),
+    intro: z.string().trim().min(1),
+    highlights: z.array(z.string().trim().min(1)),
+    approachHeadline: z.string().trim().min(1),
+    approachIntro: z.string().trim().min(1),
+    approachHighlights: z.array(z.string().trim().min(1)),
+    approachClosing: z.string().trim().min(1),
+    specialtyLinkLabel: z.string().trim().min(1),
+    specialtyPageTitle: z.string().trim().min(1),
+    specialtyPageDescription: z.string().trim().min(1),
+  }),
+  cvPdfUrls: z.array(z.string().trim().min(1)),
   cv: z.object({
     name: z.string().trim().min(1),
     title: z.string().trim().min(1),
@@ -111,14 +141,36 @@ export const upsertWeeklyPlanSchema = z.object({
   days: z.array(weeklyDaySchema).min(1),
 });
 
+const consultationPaymentRuleSchema = z.object({
+  consultationCode: z.string().min(1),
+  enabled: z.coerce.boolean(),
+  mode: z.enum(["single", "two_phase"]),
+  advancePercent: z.coerce.number().int().min(0).max(100),
+  singleTiming: z.enum(["on_booking", "on_completion"]),
+});
+
 export const paymentChatPolicySchema = z
   .object({
-    advancePercent: z.coerce.number().int().min(0).max(100),
-    remainderPercent: z.coerce.number().int().min(0).max(100),
+    consultationRules: z.array(consultationPaymentRuleSchema).min(1),
     chatUnlockOnAppointment: z.coerce.boolean(),
     chatUnlockOnAdvancePaid: z.coerce.boolean(),
     chatUnlockOnRemainderPaid: z.coerce.boolean(),
   })
-  .refine((d) => d.advancePercent + d.remainderPercent === 100, {
-    message: "Adelanto + saldo deben sumar 100%",
+  .superRefine((data, ctx) => {
+    for (const [index, rule] of data.consultationRules.entries()) {
+      if (rule.mode === "two_phase" && rule.advancePercent <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El adelanto debe ser mayor a 0% en pagos en dos etapas.",
+          path: ["consultationRules", index, "advancePercent"],
+        });
+      }
+      if (rule.mode === "two_phase" && rule.advancePercent >= 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "El adelanto debe ser menor a 100% en pagos en dos etapas.",
+          path: ["consultationRules", index, "advancePercent"],
+        });
+      }
+    }
   });

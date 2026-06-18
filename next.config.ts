@@ -11,8 +11,17 @@ const securityHeaders = [
   },
 ];
 
+const useRecaptchaEnterprise = Boolean(
+  process.env.RECAPTCHA_PROJECT_ID?.trim() &&
+    process.env.GOOGLE_CLOUD_API_KEY?.trim(),
+);
+
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@prisma/client", "prisma"],
+  env: {
+    NEXT_PUBLIC_RECAPTCHA_ENTERPRISE: useRecaptchaEnterprise ? "true" : "false",
+  },
+
+  serverExternalPackages: ["@prisma/client", "prisma", "pdfjs-dist", "@napi-rs/canvas"],
 
   images: {
     remotePatterns: [

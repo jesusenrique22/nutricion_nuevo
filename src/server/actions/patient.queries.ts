@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { areFormsEnabled } from "@/lib/feature-flags";
 import { prisma } from "@/server/db/prisma";
 import {
   type ConsultationFormType,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/form-submission-display";
 import { getFormTemplateByCode } from "@/server/actions/cms.actions";
 import type { FormDisplayRow } from "@/lib/form-submission-display";
+import { toPaymentPhaseView } from "@/lib/payment-split";
 
 export interface AppointmentFormContext {
   appointmentId: string;
@@ -32,6 +34,8 @@ export async function getPendingFormContext(
   slot = 0,
   preferLatest = false,
 ): Promise<AppointmentFormContext | null> {
+  if (!areFormsEnabled()) return null;
+
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -93,6 +97,8 @@ export interface PendingFormAppointment {
 export async function getPendingFormAppointments(): Promise<
   PendingFormAppointment[]
 > {
+  if (!areFormsEnabled()) return [];
+
   const session = await auth();
   if (!session?.user?.id) return [];
 
@@ -145,7 +151,13 @@ export async function getPatientsList(): Promise<PatientListItem[]> {
   if (session?.user?.role !== "ADMIN") return [];
 
   const patients = await prisma.user.findMany({
-    where: { role: "PATIENT" },
+    where: {
+      role: "PATIENT",
+      OR: [
+        { patientProfile: { is: null } },
+        { patientProfile: { hiddenFromAdminList: false } },
+      ],
+    },
     include: {
       patientProfile: true,
       _count: { select: { appointments: true } },
@@ -175,55 +187,39 @@ export interface PatientDetailDTO {
     emergencyPhone: string | null;
     hasCompletedIntake: boolean;
   } | null;
-  intakeForm: {
-    medicalHistory: unknown;
-    allergies: unknown;
-    dietaryHabits: unknown;
-    physicalActivity: unknown;
-    goals: string | null;
-    supplementsUse: unknown;
-    extendedPayload: unknown;
-    createdAt: string;
+}
+
+export interface PatientFichaAppointment {
+  id: string;
+  start: string;
+  end: string;
+  title: string;
+  status: string;
+  modality: string;
+  flow: string;
+  price: string;
+  paymentStatus: string | null;
+  cancelledBy: "PATIENT" | "ADMIN" | null;
+  cancelledAt: string | null;
+  paymentPhases: {
+    advanceAmount: string;
+    remainderAmount: string;
+    advancePercent: number;
+    advanceStatus: string;
+    remainderStatus: string;
+    overallStatus: string;
   } | null;
-  measurements: {
-    id: string;
-    measuredAt: string;
-    weight: number | null;
-    bodyFatPct: number | null;
-    muscleMass: number | null;
-    waist: number | null;
-    hip: number | null;
-  }[];
-  recentFollowUps: {
-    appointmentDate: string;
-    consultationName: string;
-    energyLevel: string | null;
-    adherence: string | null;
-    symptoms: string | null;
-    notes: string | null;
-    currentWeight: number | null;
-  }[];
-  anthropometryForms: {
-    appointmentDate: string;
-    fullName: string | null;
-    mainObjective: string | null;
-    evaluationFrequency: string | null;
-    reportAnalysisTypes: unknown;
-    procedureQuestions: string | null;
-  }[];
-  nutritionForms: {
-    appointmentDate: string;
-    consultationReason: string | null;
-    continuationPreference: string | null;
-  }[];
-  trainingForms: {
-    appointmentDate: string;
-    fullName: string | null;
-    mainObjective: string | null;
-    evaluationFrequency: string | null;
-    reportAnalysisTypes: unknown;
-    procedureQuestions: string | null;
-  }[];
+}
+
+export interface PatientFichaPurchase {
+  id: string;
+  resourceId: string;
+  title: string;
+  type: string;
+  pricePaid: string;
+  status: "PENDING" | "GRANTED" | "REFUNDED";
+  purchasedAt: string;
+  grantedAt: string | null;
 }
 
 /** Mediciones del paciente autenticado. */
@@ -249,7 +245,7 @@ export async function getMyMeasurements() {
   }));
 }
 
-/** Ficha completa de un paciente (solo ADMIN). */
+/** Ficha de un paciente — datos básicos (solo ADMIN). */
 export async function getPatientDetail(
   patientId: string,
 ): Promise<PatientDetailDTO | null> {
@@ -258,25 +254,7 @@ export async function getPatientDetail(
 
   const patient = await prisma.user.findFirst({
     where: { id: patientId, role: "PATIENT" },
-    include: {
-      patientProfile: {
-        include: {
-          intakeForm: true,
-          measurements: { orderBy: { measuredAt: "desc" }, take: 30 },
-        },
-      },
-      appointments: {
-        include: {
-          consultationType: true,
-          followUpSubmission: true,
-          anthropometryFormSubmission: true,
-          nutritionFormSubmission: true,
-          trainingFormSubmission: true,
-        },
-        orderBy: { startTime: "desc" },
-        take: 10,
-      },
-    },
+    include: { patientProfile: true },
   });
 
   if (!patient) return null;
@@ -298,74 +276,61 @@ export async function getPatientDetail(
           hasCompletedIntake: profile.hasCompletedIntake,
         }
       : null,
-    intakeForm: profile?.intakeForm
-      ? {
-          medicalHistory: profile.intakeForm.medicalHistory,
-          allergies: profile.intakeForm.allergies,
-          dietaryHabits: profile.intakeForm.dietaryHabits,
-          physicalActivity: profile.intakeForm.physicalActivity,
-          goals: profile.intakeForm.goals,
-          supplementsUse: profile.intakeForm.supplementsUse,
-          extendedPayload: profile.intakeForm.extendedPayload,
-          createdAt: profile.intakeForm.createdAt.toISOString(),
-        }
-      : null,
-    measurements: (profile?.measurements ?? []).map((m) => ({
-      id: m.id,
-      measuredAt: m.measuredAt.toISOString(),
-      weight: m.weight,
-      bodyFatPct: m.bodyFatPct,
-      muscleMass: m.muscleMass,
-      waist: m.waist,
-      hip: m.hip,
-    })),
-    recentFollowUps: patient.appointments
-      .filter((a) => a.followUpSubmission)
-      .map((a) => ({
-        appointmentDate: a.startTime.toISOString(),
-        consultationName: a.consultationType.name,
-        energyLevel: a.followUpSubmission!.energyLevel,
-        adherence: a.followUpSubmission!.adherence,
-        symptoms: a.followUpSubmission!.symptoms,
-        notes: a.followUpSubmission!.notes,
-        currentWeight: a.followUpSubmission!.currentWeight,
-      })),
-    anthropometryForms: patient.appointments
-      .filter((a) => a.anthropometryFormSubmission)
-      .map((a) => ({
-        appointmentDate: a.startTime.toISOString(),
-        fullName: a.anthropometryFormSubmission!.fullName,
-        mainObjective: a.anthropometryFormSubmission!.mainObjective,
-        evaluationFrequency:
-          a.anthropometryFormSubmission!.evaluationFrequency,
-        reportAnalysisTypes:
-          a.anthropometryFormSubmission!.reportAnalysisTypes,
-        procedureQuestions:
-          a.anthropometryFormSubmission!.procedureQuestions,
-      })),
-    nutritionForms: patient.appointments
-      .filter((a) => a.nutritionFormSubmission)
-      .map((a) => ({
-        appointmentDate: a.startTime.toISOString(),
-        consultationReason:
-          a.nutritionFormSubmission!.consultationReason,
-        continuationPreference:
-          a.nutritionFormSubmission!.continuationPreference,
-      })),
-    trainingForms: patient.appointments
-      .filter((a) => a.trainingFormSubmission)
-      .map((a) => ({
-        appointmentDate: a.startTime.toISOString(),
-        fullName: a.trainingFormSubmission!.fullName,
-        mainObjective: a.trainingFormSubmission!.mainObjective,
-        evaluationFrequency:
-          a.trainingFormSubmission!.evaluationFrequency,
-        reportAnalysisTypes:
-          a.trainingFormSubmission!.reportAnalysisTypes,
-        procedureQuestions:
-          a.trainingFormSubmission!.procedureQuestions,
-      })),
   };
+}
+
+/** Consultas del paciente (solo ADMIN). */
+export async function getPatientAppointmentsAdmin(
+  patientId: string,
+): Promise<PatientFichaAppointment[]> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return [];
+
+  const appts = await prisma.appointment.findMany({
+    where: { patientId },
+    include: { consultationType: true, payment: true },
+    orderBy: { startTime: "desc" },
+  });
+
+  return appts.map((a) => ({
+    id: a.id,
+    start: a.startTime.toISOString(),
+    end: a.endTime.toISOString(),
+    title: a.consultationType.name,
+    status: a.status,
+    modality: a.modality,
+    flow: a.flow,
+    price: a.consultationType.price.toString(),
+    paymentStatus: a.payment?.status ?? null,
+    cancelledBy: a.cancelledBy,
+    cancelledAt: a.cancelledAt?.toISOString() ?? null,
+    paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
+  }));
+}
+
+/** Recursos y paquetes adquiridos (solo ADMIN). */
+export async function getPatientPurchasesAdmin(
+  patientId: string,
+): Promise<PatientFichaPurchase[]> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return [];
+
+  const rows = await prisma.resourcePurchase.findMany({
+    where: { userId: patientId, status: "GRANTED" },
+    include: { resource: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    resourceId: row.resourceId,
+    title: row.resource.title,
+    type: row.resource.type,
+    pricePaid: row.pricePaid.toString(),
+    status: row.status,
+    purchasedAt: row.createdAt.toISOString(),
+    grantedAt: row.grantedAt?.toISOString() ?? null,
+  }));
 }
 
 export interface PatientFormHistoryItem {
@@ -426,6 +391,8 @@ function submissionMeta(
 export async function getPatientFormHistory(
   patientId: string,
 ): Promise<PatientFormHistoryItem[]> {
+  if (!areFormsEnabled()) return [];
+
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
 
@@ -514,6 +481,8 @@ export async function getAdminFormSubmissionDetail(
   patientId: string,
   formKey: string,
 ): Promise<AdminFormSubmissionDetail | null> {
+  if (!areFormsEnabled()) return null;
+
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return null;
 

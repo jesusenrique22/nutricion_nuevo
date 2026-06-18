@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
-import { modalityLabels } from "@/lib/appointment-labels";
+import { modalityLabels, cancelledByLabels } from "@/lib/appointment-labels";
 import {
   formatDuration,
   formatTime,
@@ -67,6 +67,9 @@ export function AppointmentEventCard({
             <p className="mt-2 text-xs text-foreground/45">
               {modalityLabels[appointment.modality] ?? appointment.modality}
               {appointment.paymentStatus === "PENDING" && " · Pago pendiente"}
+              {appointment.status === "CANCELLED" &&
+                appointment.cancelledBy &&
+                ` · ${cancelledByLabels[appointment.cancelledBy] ?? appointment.cancelledBy}`}
             </p>
           )}
         </div>

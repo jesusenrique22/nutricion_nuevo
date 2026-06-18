@@ -3,10 +3,21 @@ import { ObjectId } from "mongodb";
 export type MessageType = "TEXT" | "FILE" | "IMAGE" | "VIDEO" | "PDF" | "STICKER";
 export type FileContext = "CHAT" | "PROGRESS_PHOTO" | "DIET_PLAN" | "RESOURCE";
 export type NotificationType =
+  | "APPOINTMENT_CONFIRMED"
   | "APPOINTMENT_REMINDER"
-  | "NEW_MESSAGE"
-  | "PAYMENT"
-  | "SYSTEM";
+  | "APPOINTMENT_CANCELLED"
+  | "RESOURCE_UNLOCKED"
+  | "REFUND_REQUESTED"
+  | "REFUND_RESOLVED";
+
+export const VISIBLE_NOTIFICATION_TYPES: NotificationType[] = [
+  "APPOINTMENT_CONFIRMED",
+  "APPOINTMENT_REMINDER",
+  "APPOINTMENT_CANCELLED",
+  "RESOURCE_UNLOCKED",
+  "REFUND_REQUESTED",
+  "REFUND_RESOLVED",
+];
 
 export type ConsultationChatCode = "NUT_01" | "ENT_02" | "ANT_03";
 

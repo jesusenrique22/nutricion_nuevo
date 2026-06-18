@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { authLabelClass } from "@/components/auth/auth-shell";
 
 function EyeIcon({ className }: { className?: string }) {
   return (
@@ -69,11 +70,11 @@ export function PasswordInput({
   return (
     <div className={className}>
       {label && (
-        <label htmlFor={inputId} className="text-sm font-semibold">
+        <label htmlFor={inputId} className={authLabelClass}>
           {label}
         </label>
       )}
-      <div className={label ? "relative mt-1" : "relative"}>
+      <div className={label ? "relative mt-1.5" : "relative"}>
         <input
           id={inputId}
           name={name}

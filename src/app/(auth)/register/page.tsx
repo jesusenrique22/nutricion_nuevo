@@ -8,6 +8,7 @@ import {
   AuthShell,
   authButtonClass,
   authInputClass,
+  authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { registerPatient } from "@/server/actions/auth.actions";
@@ -49,12 +50,12 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Empezá hoy"
-      subtitle="Creá tu cuenta y accedé a consultas, formularios y seguimiento personalizado con Anttova."
+      subtitle="Creá tu cuenta y accedé a consultas, recursos y seguimiento personalizado con Anttova."
     >
       <AuthFormCard>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
           <div>
-            <label className="text-sm font-semibold">Nombre completo</label>
+            <label className={authLabelClass}>Nombre completo</label>
             <input
               name="name"
               required
@@ -63,7 +64,7 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label className="text-sm font-semibold">Email</label>
+            <label className={authLabelClass}>Email</label>
             <input
               name="email"
               type="email"
@@ -79,7 +80,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
             inputClassName={`${authInputClass} pr-12`}
           />
-          <p className="text-xs text-foreground/55">
+          <p className="text-xs text-foreground/55 sm:text-sm">
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}

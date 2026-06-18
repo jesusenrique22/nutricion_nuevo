@@ -15,8 +15,46 @@ export function getDbErrorMessage(error: unknown): string | null {
     if (error.code === "P1003") {
       return 'La base de datos "nutricion" no existe. Créala en pgAdmin y ejecuta: npm run db:migrate';
     }
+    if (error.code === "P2002") {
+      return "Ya existe un registro con esos datos.";
+    }
+    if (error.code === "P2003" || error.code === "P2014") {
+      return "No se puede completar la operación porque hay registros vinculados.";
+    }
+    if (error.code === "P2025") {
+      return "El registro ya no existe.";
+    }
+  }
+  if (error instanceof Prisma.PrismaClientValidationError) {
+    return "Error interno de datos. Recargá la página e intentá de nuevo.";
   }
   return null;
+}
+
+/** Mensaje legible para acciones de servidor (evita pantallas de error crudas). */
+export function formatActionError(
+  error: unknown,
+  fallback = "No se pudo completar la acción. Intentá de nuevo.",
+): string {
+  const dbMessage = getDbErrorMessage(error);
+  if (dbMessage) return dbMessage;
+
+  if (error instanceof Error) {
+    const msg = error.message;
+    if (
+      msg.includes("23001") ||
+      msg.includes("foreign key") ||
+      msg.includes("violates RESTRICT")
+    ) {
+      return "No se puede eliminar porque hay registros vinculados.";
+    }
+    if (msg.includes("Unknown argument") || msg.includes("Invalid `prisma.")) {
+      return "Error interno. Recargá la página e intentá de nuevo.";
+    }
+    if (msg.length > 0 && msg.length <= 240) return msg;
+  }
+
+  return fallback;
 }
 
 /** Ejecuta una operación Prisma y devuelve error amigable si falla la conexión. */
@@ -30,6 +68,9 @@ export async function withDb<T>(
   } catch (error) {
     const dbMessage = getDbErrorMessage(error);
     if (dbMessage) return { ok: false, message: dbMessage };
+    if (error instanceof Error && error.message.length <= 200) {
+      return { ok: false, message: error.message };
+    }
     console.error(error);
     return { ok: false, message: fallbackMessage };
   }

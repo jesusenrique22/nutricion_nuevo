@@ -7,6 +7,9 @@ import {
   grantResourceSchema,
   upsertResourceSchema,
 } from "@/lib/validators/resource";
+import { createNotification } from "@/server/actions/notification.actions";
+import { syncUser } from "@/server/realtime/sync";
+import { formatActionError } from "@/lib/db-errors";
 
 export type ResourceActionResult =
   | { ok: true; id?: string }
@@ -19,10 +22,13 @@ async function requireAdmin() {
 }
 
 function revalidateResourcePaths() {
+  revalidatePath("/");
   revalidatePath("/resources");
   revalidatePath("/dashboard/admin/resources");
+  revalidatePath("/dashboard/admin/payments");
   revalidatePath("/dashboard/patient/library");
   revalidatePath("/dashboard/admin/personalizar");
+  revalidatePath("/dashboard/notifications");
 }
 
 export async function upsertResource(
@@ -58,14 +64,30 @@ export async function upsertResource(
   };
 
   if (data.id) {
-    await prisma.resource.update({ where: { id: data.id }, data: payload });
-    revalidateResourcePaths();
-    return { ok: true, id: data.id };
+    try {
+      await prisma.resource.update({ where: { id: data.id }, data: payload });
+      revalidateResourcePaths();
+      return { ok: true, id: data.id };
+    } catch (err) {
+      console.error("[upsertResource]", err);
+      return {
+        ok: false,
+        message: formatActionError(err, "No se pudo guardar el recurso."),
+      };
+    }
   }
 
-  const created = await prisma.resource.create({ data: payload });
-  revalidateResourcePaths();
-  return { ok: true, id: created.id };
+  try {
+    const created = await prisma.resource.create({ data: payload });
+    revalidateResourcePaths();
+    return { ok: true, id: created.id };
+  } catch (err) {
+    console.error("[upsertResource]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo crear el recurso."),
+    };
+  }
 }
 
 export async function deleteResource(id: string): Promise<ResourceActionResult> {
@@ -73,9 +95,44 @@ export async function deleteResource(id: string): Promise<ResourceActionResult> 
     return { ok: false, message: "No autorizado." };
   }
 
-  await prisma.resource.delete({ where: { id } });
-  revalidateResourcePaths();
-  return { ok: true };
+  const resource = await prisma.resource.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      purchases: {
+        where: { status: "GRANTED" },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+  if (!resource) {
+    return { ok: false, message: "Recurso no encontrado." };
+  }
+
+  if (resource.purchases.length > 0) {
+    return {
+      ok: false,
+      message:
+        "No se puede eliminar: hay pacientes con acceso activo. Despublícalo para ocultarlo de la tienda.",
+    };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.cartItem.deleteMany({ where: { resourceId: id } }),
+      prisma.resourcePurchase.deleteMany({ where: { resourceId: id } }),
+      prisma.resource.delete({ where: { id } }),
+    ]);
+    revalidateResourcePaths();
+    return { ok: true };
+  } catch (err) {
+    console.error("[deleteResource]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo eliminar el recurso."),
+    };
+  }
 }
 
 export async function toggleResourcePublished(
@@ -86,12 +143,20 @@ export async function toggleResourcePublished(
     return { ok: false, message: "No autorizado." };
   }
 
-  await prisma.resource.update({ where: { id }, data: { isPublished } });
-  revalidateResourcePaths();
-  return { ok: true };
+  try {
+    await prisma.resource.update({ where: { id }, data: { isPublished } });
+    revalidateResourcePaths();
+    return { ok: true };
+  } catch (err) {
+    console.error("[toggleResourcePublished]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo cambiar la publicación."),
+    };
+  }
 }
 
-/** Admin otorga acceso manual (sin pasarela). */
+/** Admin desbloquea recurso tras verificar pago. */
 export async function grantResourceAccess(
   formData: unknown,
 ): Promise<ResourceActionResult> {
@@ -109,61 +174,63 @@ export async function grantResourceAccess(
   });
   if (!resource) return { ok: false, message: "Recurso no encontrado." };
 
-  await prisma.resourcePurchase.upsert({
-    where: {
-      userId_resourceId: {
-        userId: parsed.data.userId,
-        resourceId: parsed.data.resourceId,
-      },
-    },
-    create: {
-      userId: parsed.data.userId,
-      resourceId: parsed.data.resourceId,
-      pricePaid: resource.price,
-    },
-    update: {},
-  });
-
-  revalidateResourcePaths();
-  return { ok: true };
-}
-
-/** Paciente solicita acceso — queda pendiente de pago manual o grant admin. */
-export async function requestResourceAccess(
-  resourceId: string,
-): Promise<ResourceActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { ok: false, message: "Debes iniciar sesión." };
-  }
-
-  const resource = await prisma.resource.findFirst({
-    where: { id: resourceId, isPublished: true },
-  });
-  if (!resource) return { ok: false, message: "Recurso no disponible." };
-
-  if (resource.price.toNumber() === 0) {
+  try {
     await prisma.resourcePurchase.upsert({
       where: {
         userId_resourceId: {
-          userId: session.user.id,
-          resourceId,
+          userId: parsed.data.userId,
+          resourceId: parsed.data.resourceId,
         },
       },
       create: {
-        userId: session.user.id,
-        resourceId,
-        pricePaid: 0,
+        userId: parsed.data.userId,
+        resourceId: parsed.data.resourceId,
+        pricePaid: resource.price,
+        status: "GRANTED",
+        grantedAt: new Date(),
+        adminNote: parsed.data.adminNote ?? null,
+        inboxTrashedAt: null,
+        inboxDismissedAt: null,
       },
-      update: {},
+      update: {
+        status: "GRANTED",
+        grantedAt: new Date(),
+        adminNote: parsed.data.adminNote ?? null,
+        inboxTrashedAt: null,
+        inboxDismissedAt: null,
+      },
     });
+
+    await createNotification({
+      _serverOnly: true,
+      recipientId: parsed.data.userId,
+      type: "RESOURCE_UNLOCKED",
+      title: "Recurso desbloqueado",
+      body: `Tu acceso a «${resource.title}» ya está activo.`,
+      payload: {
+        resourceId: resource.id,
+        deepLink: `/dashboard/patient/library/${resource.id}`,
+      },
+    });
+
+    await syncUser(parsed.data.userId, "notifications", { action: "created" });
     revalidateResourcePaths();
     return { ok: true };
+  } catch (err) {
+    console.error("[grantResourceAccess]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo desbloquear el recurso."),
+    };
   }
+}
 
-  return {
-    ok: false,
-    message:
-      "Contacta a tu nutricionista para completar el pago y activar el acceso.",
-  };
+/** Paciente agrega recurso al carrito para solicitar acceso. */
+export async function requestResourceAccess(
+  resourceId: string,
+): Promise<ResourceActionResult> {
+  const { addResourceToCart } = await import("@/server/actions/cart.actions");
+  const res = await addResourceToCart(resourceId);
+  if (!res.ok) return res;
+  return { ok: true };
 }

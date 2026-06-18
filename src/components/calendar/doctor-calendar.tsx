@@ -76,9 +76,9 @@ export function DoctorCalendar({
     : format(selectedDate, "d MMM", { locale: es });
 
   return (
-    <div className="anttova-calendar">
-      <div className="grid items-start gap-3 lg:grid-cols-[228px_1fr] lg:gap-5">
-        <aside className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-3">
+    <div className="anttova-calendar flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col overflow-hidden">
+      <div className="grid w-full min-w-0 flex-1 items-stretch gap-3 lg:grid-cols-[minmax(0,228px)_minmax(0,1fr)] lg:gap-5">
+        <aside className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-3">
           <CalendarMiniMonth
             month={miniMonth}
             selected={selectedDate}
@@ -104,8 +104,8 @@ export function DoctorCalendar({
           />
         </aside>
 
-        <div className="anttova-calendar__main min-w-0">
-          <header className="anttova-calendar__header">
+        <div className="anttova-calendar__main flex h-full min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+          <header className="anttova-calendar__header min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-accent">
                 Agenda
@@ -160,33 +160,43 @@ export function DoctorCalendar({
             </div>
           </header>
 
-          <div className="anttova-calendar__body">
-            {view === "day" && (
-              <CalendarDayView
-                date={selectedDate}
-                appointments={appointments}
-                onSelect={onSelectAppointment}
-              />
-            )}
-            {view === "week" && (
-              <CalendarWeekView
-                date={selectedDate}
-                selected={selectedDate}
-                appointments={appointments}
-                onSelectDay={pickDay}
-                onSelect={onSelectAppointment}
-              />
-            )}
-            {view === "month" && (
-              <CalendarMonthView
-                month={selectedDate}
-                selected={selectedDate}
-                appointments={appointments}
-                onSelectDay={pickDay}
-              />
-            )}
+          <div
+            className={`anttova-calendar__body min-w-0 overflow-hidden ${
+              view === "day"
+                ? "anttova-calendar__body--day"
+                : view === "week"
+                  ? "anttova-calendar__body--week"
+                  : ""
+            }`}
+          >
+            <div className="min-h-0 flex-1">
+              {view === "day" && (
+                <CalendarDayView
+                  date={selectedDate}
+                  appointments={appointments}
+                  onSelect={onSelectAppointment}
+                />
+              )}
+              {view === "week" && (
+                <CalendarWeekView
+                  date={selectedDate}
+                  selected={selectedDate}
+                  appointments={appointments}
+                  onSelectDay={pickDay}
+                  onSelect={onSelectAppointment}
+                />
+              )}
+              {view === "month" && (
+                <CalendarMonthView
+                  month={selectedDate}
+                  selected={selectedDate}
+                  appointments={appointments}
+                  onSelectDay={pickDay}
+                />
+              )}
+            </div>
 
-            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-foreground/6 pt-3">
+            <div className="mt-3 flex shrink-0 flex-wrap gap-x-3 gap-y-1.5 border-t border-foreground/6 pt-3">
               {Object.entries(STATUS_UI).map(([key, ui]) => (
                 <span
                   key={key}

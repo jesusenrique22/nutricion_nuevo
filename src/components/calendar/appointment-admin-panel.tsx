@@ -12,11 +12,15 @@ import {
 } from "@/server/actions/payment.actions";
 import {
   appointmentStatusLabels,
+  cancelledByLabels,
   modalityLabels,
   paymentPhaseLabels,
   paymentStatusLabels,
 } from "@/lib/appointment-labels";
 import { RegisterMeasurementForm } from "@/components/measurements/register-measurement-form";
+import { DisplayPrice } from "@/components/currency/display-price";
+import { FEATURE_FLAGS } from "@/lib/feature-flags";
+import { isTwoPhaseSplit } from "@/lib/payment-policy-resolve";
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleString("es", {
@@ -155,33 +159,67 @@ export function AppointmentAdminPanel({
           {overallStatus && (
             <span className="rounded-full bg-accent/15 px-3 py-1 font-semibold text-accent">
               {paymentStatusLabels[overallStatus] ?? overallStatus}
-              {appointment.price ? ` · $${appointment.price}` : ""}
+              {appointment.price ? (
+                <>
+                  {" · "}
+                  <DisplayPrice amount={appointment.price} currency="ARS" />
+                </>
+              ) : null}
+            </span>
+          )}
+          {appointment.status === "CANCELLED" && appointment.cancelledBy && (
+            <span className="rounded-full bg-red-50 px-3 py-1 font-semibold text-red-700">
+              {cancelledByLabels[appointment.cancelledBy] ??
+                appointment.cancelledBy}
             </span>
           )}
         </div>
 
         {phases && (
-          <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-            <div className="rounded-xl border border-foreground/10 p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
-                Adelanto ({phases.advancePercent}%)
-              </p>
-              <p className="mt-1 font-semibold">${phases.advanceAmount}</p>
-              <p className="text-xs text-foreground/60">
-                {paymentPhaseLabels[phases.advanceStatus] ??
-                  phases.advanceStatus}
-              </p>
-            </div>
-            <div className="rounded-xl border border-foreground/10 p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
-                Saldo final ({100 - phases.advancePercent}%)
-              </p>
-              <p className="mt-1 font-semibold">${phases.remainderAmount}</p>
-              <p className="text-xs text-foreground/60">
-                {paymentPhaseLabels[phases.remainderStatus] ??
-                  phases.remainderStatus}
-              </p>
-            </div>
+          <div
+            className={`mt-4 grid gap-2 text-sm ${
+              isTwoPhaseSplit(phases.advancePercent)
+                ? "sm:grid-cols-2"
+                : "grid-cols-1"
+            }`}
+          >
+            {(phases.advancePercent > 0 ||
+              isTwoPhaseSplit(phases.advancePercent)) && (
+              <div className="rounded-xl border border-foreground/10 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
+                  {isTwoPhaseSplit(phases.advancePercent)
+                    ? `Adelanto (${phases.advancePercent}%)`
+                    : "Pago al agendar"}
+                </p>
+                <p className="mt-1 font-semibold">
+                  <DisplayPrice amount={phases.advanceAmount} currency="ARS" />
+                </p>
+                <p className="text-xs text-foreground/60">
+                  {paymentPhaseLabels[phases.advanceStatus] ??
+                    phases.advanceStatus}
+                </p>
+              </div>
+            )}
+            {(phases.advancePercent < 100 ||
+              isTwoPhaseSplit(phases.advancePercent)) && (
+              <div className="rounded-xl border border-foreground/10 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
+                  {isTwoPhaseSplit(phases.advancePercent)
+                    ? `Saldo final (${100 - phases.advancePercent}%)`
+                    : "Pago al finalizar"}
+                </p>
+                <p className="mt-1 font-semibold">
+                  <DisplayPrice
+                    amount={phases.remainderAmount}
+                    currency="ARS"
+                  />
+                </p>
+                <p className="text-xs text-foreground/60">
+                  {paymentPhaseLabels[phases.remainderStatus] ??
+                    phases.remainderStatus}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -193,12 +231,14 @@ export function AppointmentAdminPanel({
             >
               Ver ficha del paciente →
             </Link>
-            <Link
-              href={`/dashboard/admin/patients/${appointment.patientId}/forms/${appointment.id}`}
-              className="text-sm font-semibold text-primary hover:underline"
-            >
-              Ver formulario de la cita →
-            </Link>
+            {FEATURE_FLAGS.FORMS_ENABLED && (
+              <Link
+                href={`/dashboard/admin/patients/${appointment.patientId}/forms/${appointment.id}`}
+                className="text-sm font-semibold text-primary hover:underline"
+              >
+                Ver formulario de la cita →
+              </Link>
+            )}
           </div>
         )}
 
@@ -226,33 +266,43 @@ export function AppointmentAdminPanel({
           <div className="mt-6 space-y-4 rounded-xl border border-foreground/10 p-4">
             <h3 className="text-sm font-bold">Registrar pagos manuales</h3>
             <p className="text-xs text-foreground/50">
-              Ejemplo: adelanto al agendar y saldo el día de la consulta. Al
-              registrar un pago, el chat del paciente puede habilitarse según la
-              política en Personalizar.
+              {phases && isTwoPhaseSplit(phases.advancePercent)
+                ? "Adelanto al agendar y saldo el día de la consulta."
+                : phases && phases.advancePercent >= 100
+                  ? "Pago único al agendar la cita."
+                  : "Pago único al finalizar la consulta."}
             </p>
             <input
               value={paymentNote}
               onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="Nota opcional (ej. transferencia, efectivo)"
+              placeholder="Nota opcional (ej. Zelle, Mercado Pago)"
               className="w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <div className="flex flex-wrap gap-2">
-              {phases?.advanceStatus !== "PAID" && (
+              {phases &&
+                phases.advancePercent > 0 &&
+                phases.advanceStatus !== "PAID" && (
                 <button
                   disabled={isPending}
                   onClick={runMarkAdvance}
                   className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-50"
                 >
-                  Registrar adelanto
+                  {isTwoPhaseSplit(phases.advancePercent)
+                    ? "Registrar adelanto"
+                    : "Registrar pago al agendar"}
                 </button>
               )}
-              {phases?.remainderStatus !== "PAID" && (
+              {phases &&
+                phases.advancePercent < 100 &&
+                phases.remainderStatus !== "PAID" && (
                 <button
                   disabled={isPending}
                   onClick={runMarkRemainder}
                   className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-50"
                 >
-                  Registrar saldo final
+                  {isTwoPhaseSplit(phases.advancePercent)
+                    ? "Registrar saldo final"
+                    : "Registrar pago al finalizar"}
                 </button>
               )}
               <button

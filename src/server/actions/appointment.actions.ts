@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
+import { assertBookingRequestAllowed } from "@/lib/booking-guard";
 import { prisma } from "@/server/db/prisma";
-import { limitByKey } from "@/lib/ratelimit";
 import { createAppointmentSchema } from "@/lib/validators/appointment";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { syncPatientAndAdmins } from "@/server/realtime/sync";
@@ -26,27 +25,17 @@ export async function createAppointment(
   }
   const patientId = session.user.id;
 
-  // 2) Anti-spam: rate limit por IP y por cuenta (Módulo 2)
-  const hdrs = await headers();
-  const ip =
-    hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown-ip";
-
-  const [ipLimit, userLimit] = await Promise.all([
-    limitByKey(`ip:${ip}`),
-    limitByKey(`user:${patientId}`),
-  ]);
-  if (!ipLimit.success || !userLimit.success) {
-    return {
-      ok: false,
-      message: "Demasiadas solicitudes. Intenta de nuevo en un minuto.",
-    };
-  }
-
-  // 3) Validación de entrada
   const parsed = createAppointmentSchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: "Datos de la cita inválidos." };
   }
+
+  const guard = await assertBookingRequestAllowed(
+    patientId,
+    parsed.data.recaptchaToken,
+  );
+  if (!guard.ok) return guard;
+
   const { consultationTypeId, startTime, modality } = parsed.data;
 
   const consultationType = await prisma.consultationType.findUnique({
@@ -95,6 +84,7 @@ export async function createAppointment(
         appointmentId: created.id,
         ...buildPaymentCreateData({
           totalPrice: consultationType.price,
+          consultationCode: consultationType.code,
           policy: paymentPolicy,
         }),
       },
@@ -112,9 +102,6 @@ export async function createAppointment(
   });
 
   revalidatePath("/dashboard/patient/appointments");
-  revalidatePath("/dashboard/admin/calendar");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/chat");
 
   await syncPatientAndAdmins(patientId, "appointments", {
     appointmentId: appointment.id,

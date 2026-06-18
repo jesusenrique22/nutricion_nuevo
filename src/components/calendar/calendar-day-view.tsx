@@ -20,22 +20,25 @@ export function CalendarDayView({
 
   if (dayAppointments.length === 0) {
     return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-foreground/12 bg-surface/60 px-6 py-16 text-center">
-        <p className="text-4xl">{today ? "☀️" : "📅"}</p>
-        <p className="mt-4 text-lg font-semibold text-foreground">
-          {today ? "Sin citas para hoy" : "Día libre"}
-        </p>
-        <p className="mt-2 max-w-xs text-sm text-foreground/50">
-          {today
-            ? "Cuando un paciente agende, aparecerá aquí en orden cronológico."
-            : "No hay consultas programadas para esta fecha."}
-        </p>
+      <div className="anttova-day">
+        <div className="anttova-day__empty flex w-full flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-foreground/12 bg-surface/60 px-6 py-10 text-center sm:py-16">
+          <p className="text-4xl">{today ? "☀️" : "📅"}</p>
+          <p className="mt-4 text-lg font-semibold text-foreground">
+            {today ? "Sin citas para hoy" : "Día libre"}
+          </p>
+          <p className="mt-2 max-w-md text-sm text-foreground/50">
+            {today
+              ? "Cuando un paciente agende, aparecerá aquí en orden cronológico."
+              : "No hay consultas programadas para esta fecha."}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="relative space-y-3">
+    <div className="anttova-day">
+      <div className="anttova-day__list relative space-y-3">
       <div
         aria-hidden
         className="absolute bottom-4 left-[1.65rem] top-4 w-px bg-gradient-to-b from-primary/30 via-accent/40 to-transparent"
@@ -55,6 +58,7 @@ export function CalendarDayView({
           <AppointmentEventCard appointment={appt} onSelect={onSelect} />
         </motion.div>
       ))}
+      </div>
     </div>
   );
 }

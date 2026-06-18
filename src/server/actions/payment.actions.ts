@@ -23,11 +23,11 @@ async function requireAdmin() {
 
 async function revalidatePaymentPaths(patientId: string) {
   revalidatePath("/dashboard/admin/calendar");
+  revalidatePath("/dashboard/admin/payments");
   revalidatePath("/dashboard/patient/appointments");
+  revalidatePath("/dashboard/patient/progress");
   revalidatePath("/dashboard");
-  revalidatePath("/dashboard/chat");
   await syncPatientAndAdmins(patientId, "appointments");
-  await syncPatientAndAdmins(patientId, "chat");
 }
 
 async function applyPaymentPhase(

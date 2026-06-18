@@ -4,12 +4,9 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { PdfListUploadField } from "@/components/cms/pdf-list-upload-field";
 import { updateNutricionistaPage } from "@/server/actions/cms.actions";
-import type {
-  NutricionistaCvEducation,
-  NutricionistaCvExperience,
-  NutricionistaPageData,
-} from "@/types/nutricionista-cv";
+import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -17,12 +14,8 @@ const inputClass =
 const textareaClass = `${inputClass} min-h-[88px] resize-y`;
 
 const sections = [
-  { id: "pagina", label: "Página" },
-  { id: "perfil", label: "Perfil" },
-  { id: "contacto", label: "Contacto" },
-  { id: "habilidades", label: "Habilidades" },
-  { id: "formacion", label: "Formación" },
-  { id: "experiencia", label: "Experiencia" },
+  { id: "sobre-mi", label: "Sobre mí" },
+  { id: "pagina-cv", label: "CV (PDF)" },
 ] as const;
 
 type SectionId = (typeof sections)[number]["id"];
@@ -65,7 +58,7 @@ export function NutricionistaCvEditor({
   initial: NutricionistaPageData;
 }) {
   const router = useRouter();
-  const [section, setSection] = useState<SectionId>("pagina");
+  const [section, setSection] = useState<SectionId>("sobre-mi");
   const [data, setData] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -77,23 +70,25 @@ export function NutricionistaCvEditor({
     setData((prev) => ({ ...prev, cv: { ...prev.cv, [key]: value } }));
   }
 
-  function updateContact(
-    key: keyof NutricionistaPageData["cv"]["contact"],
-    value: string,
+  function updateAbout<K extends keyof NutricionistaPageData["about"]>(
+    key: K,
+    value: NutricionistaPageData["about"][K],
   ) {
-    setData((prev) => ({
-      ...prev,
-      cv: {
-        ...prev.cv,
-        contact: { ...prev.cv.contact, [key]: value },
-      },
-    }));
+    setData((prev) => ({ ...prev, about: { ...prev.about, [key]: value } }));
   }
 
   function save() {
     setMessage(null);
     const payload: NutricionistaPageData = {
       ...data,
+      cvPdfUrls: data.cvPdfUrls.map((url) => url.trim()).filter(Boolean),
+      about: {
+        ...data.about,
+        highlights: data.about.highlights.map((s) => s.trim()).filter(Boolean),
+        approachHighlights: data.about.approachHighlights
+          .map((s) => s.trim())
+          .filter(Boolean),
+      },
       cv: {
         ...data.cv,
         skills: data.cv.skills.map((s) => s.trim()).filter(Boolean),
@@ -107,7 +102,7 @@ export function NutricionistaCvEditor({
     };
     startTransition(async () => {
       const res = await updateNutricionistaPage(payload);
-      setMessage(res.ok ? "CV guardado correctamente." : res.message);
+      setMessage(res.ok ? "Contenido guardado correctamente." : res.message);
       if (res.ok) router.refresh();
     });
   }
@@ -116,20 +111,36 @@ export function NutricionistaCvEditor({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-foreground/60">
-          Editá la página &quot;Conóceme más&quot; y el CV que ven tus
-          pacientes en{" "}
+          Editá la página &quot;Sobre mí&quot; y el CV de especialidad que ven
+          tus pacientes en{" "}
           <Link href="/nutricionista" className="font-semibold text-primary">
             /nutricionista
+          </Link>{" "}
+          y{" "}
+          <Link
+            href="/nutricionista/especialidad"
+            className="font-semibold text-primary"
+          >
+            /nutricionista/especialidad
           </Link>
           .
         </p>
-        <Link
-          href="/nutricionista"
-          target="_blank"
-          className="rounded-full border border-primary/20 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted"
-        >
-          Vista previa ↗
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/nutricionista"
+            target="_blank"
+            className="rounded-full border border-primary/20 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted"
+          >
+            Vista Sobre mí ↗
+          </Link>
+          <Link
+            href="/nutricionista/especialidad"
+            target="_blank"
+            className="rounded-full border border-primary/20 px-4 py-1.5 text-xs font-semibold text-primary hover:bg-muted"
+          >
+            Vista CV ↗
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -150,208 +161,159 @@ export function NutricionistaCvEditor({
       </div>
 
       <div className="mt-4 space-y-4">
-        {section === "pagina" && (
-          <SectionCard title="Encabezado de la página">
-            <Field label="Título">
-              <input
-                value={data.pageTitle}
-                onChange={(e) =>
-                  setData((p) => ({ ...p, pageTitle: e.target.value }))
-                }
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Descripción breve">
-              <textarea
-                value={data.pageDescription}
-                onChange={(e) =>
-                  setData((p) => ({ ...p, pageDescription: e.target.value }))
-                }
-                className={textareaClass}
-              />
-            </Field>
-          </SectionCard>
-        )}
-
-        {section === "perfil" && (
-          <SectionCard title="Datos principales del CV">
-            <ImageUploadField
-              label="Foto de perfil"
-              hint="Aparece en el CV circular. Recomendado: retrato cuadrado, buena luz."
-              value={data.cv.photoUrl ?? ""}
-              onChange={(photoUrl) => updateCv("photoUrl", photoUrl)}
-              folder="cv"
-            />
-            <Field label="Nombre completo">
-              <input
-                value={data.cv.name}
-                onChange={(e) => updateCv("name", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Título profesional">
-              <input
-                value={data.cv.title}
-                onChange={(e) => updateCv("title", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Bio / presentación">
-              <textarea
-                value={data.cv.bio}
-                onChange={(e) => updateCv("bio", e.target.value)}
-                className={textareaClass}
-              />
-            </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Est. (año marca)">
+        {section === "sobre-mi" && (
+          <>
+            <SectionCard title="Encabezado — Sobre mí">
+              <Field label="Título de la página">
                 <input
-                  value={data.cv.est}
-                  onChange={(e) => updateCv("est", e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="Ciudad / pie de página">
-                <input
-                  value={data.cv.city}
-                  onChange={(e) => updateCv("city", e.target.value)}
-                  className={inputClass}
-                />
-              </Field>
-            </div>
-          </SectionCard>
-        )}
-
-        {section === "contacto" && (
-          <SectionCard title="Contacto">
-            <Field label="Teléfono">
-              <input
-                value={data.cv.contact.phone}
-                onChange={(e) => updateContact("phone", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Email">
-              <input
-                type="email"
-                value={data.cv.contact.email}
-                onChange={(e) => updateContact("email", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Ubicación">
-              <input
-                value={data.cv.contact.location}
-                onChange={(e) => updateContact("location", e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          </SectionCard>
-        )}
-
-        {section === "habilidades" && (
-          <SectionCard title="Habilidades">
-            {data.cv.skills.map((skill, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  value={skill}
-                  onChange={(e) => {
-                    const next = [...data.cv.skills];
-                    next[i] = e.target.value;
-                    updateCv("skills", next);
-                  }}
-                  className={inputClass}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateCv(
-                      "skills",
-                      data.cv.skills.filter((_, idx) => idx !== i),
-                    )
+                  value={data.pageTitle}
+                  onChange={(e) =>
+                    setData((p) => ({ ...p, pageTitle: e.target.value }))
                   }
-                  className="shrink-0 rounded-xl px-3 text-sm text-red-600 hover:bg-red-50"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => updateCv("skills", [...data.cv.skills, ""])}
-              className="rounded-full border border-dashed border-foreground/20 px-4 py-2 text-xs font-semibold text-foreground/60 hover:border-primary hover:text-primary"
-            >
-              + Agregar habilidad
-            </button>
-          </SectionCard>
-        )}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Descripción breve">
+                <textarea
+                  value={data.pageDescription}
+                  onChange={(e) =>
+                    setData((p) => ({
+                      ...p,
+                      pageDescription: e.target.value,
+                    }))
+                  }
+                  className={textareaClass}
+                />
+              </Field>
+            </SectionCard>
 
-        {section === "formacion" && (
-          <SectionCard title="Formación académica">
-            {data.cv.education.map((item, i) => (
-              <EducationRow
-                key={i}
-                item={item}
-                onChange={(next) => {
-                  const list = [...data.cv.education];
-                  list[i] = next;
-                  updateCv("education", list);
-                }}
-                onRemove={() =>
-                  updateCv(
-                    "education",
-                    data.cv.education.filter((_, idx) => idx !== i),
-                  )
+            <SectionCard title="¿Quién soy?">
+              <Field label="Título de sección">
+                <input
+                  value={data.about.headline}
+                  onChange={(e) => updateAbout("headline", e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Presentación">
+                <textarea
+                  value={data.about.intro}
+                  onChange={(e) => updateAbout("intro", e.target.value)}
+                  className={textareaClass}
+                />
+              </Field>
+              <StringListEditor
+                label="Puntos destacados"
+                items={data.about.highlights}
+                onChange={(highlights) => updateAbout("highlights", highlights)}
+              />
+            </SectionCard>
+
+            <SectionCard title="Enfoque / especialidad">
+              <Field label="Título de sección">
+                <input
+                  value={data.about.approachHeadline}
+                  onChange={(e) =>
+                    updateAbout("approachHeadline", e.target.value)
+                  }
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Introducción">
+                <textarea
+                  value={data.about.approachIntro}
+                  onChange={(e) => updateAbout("approachIntro", e.target.value)}
+                  className={textareaClass}
+                />
+              </Field>
+              <StringListEditor
+                label="Puntos del enfoque"
+                items={data.about.approachHighlights}
+                onChange={(approachHighlights) =>
+                  updateAbout("approachHighlights", approachHighlights)
                 }
               />
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                updateCv("education", [
-                  ...data.cv.education,
-                  { year: "", title: "", place: "" },
-                ])
-              }
-              className="rounded-full border border-dashed border-foreground/20 px-4 py-2 text-xs font-semibold text-foreground/60 hover:border-primary hover:text-primary"
-            >
-              + Agregar formación
-            </button>
-          </SectionCard>
+              <Field label="Cierre (negrita)">
+                <textarea
+                  value={data.about.approachClosing}
+                  onChange={(e) =>
+                    updateAbout("approachClosing", e.target.value)
+                  }
+                  className={textareaClass}
+                />
+              </Field>
+              <Field label="Texto del botón al CV">
+                <input
+                  value={data.about.specialtyLinkLabel}
+                  onChange={(e) =>
+                    updateAbout("specialtyLinkLabel", e.target.value)
+                  }
+                  className={inputClass}
+                />
+              </Field>
+            </SectionCard>
+
+            <SectionCard title="Foto y nombre">
+              <ImageUploadField
+                label="Foto de perfil"
+                hint="Aparece en la página Sobre mí. Recomendado: retrato vertical, buena luz."
+                value={data.cv.photoUrl ?? ""}
+                onChange={(photoUrl) => updateCv("photoUrl", photoUrl)}
+                folder="cv"
+              />
+              <Field label="Nombre completo">
+                <input
+                  value={data.cv.name}
+                  onChange={(e) => updateCv("name", e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Título profesional">
+                <input
+                  value={data.cv.title}
+                  onChange={(e) => updateCv("title", e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            </SectionCard>
+          </>
         )}
 
-        {section === "experiencia" && (
-          <SectionCard title="Experiencia laboral">
-            {data.cv.experience.map((item, i) => (
-              <ExperienceRow
-                key={i}
-                item={item}
-                onChange={(next) => {
-                  const list = [...data.cv.experience];
-                  list[i] = next;
-                  updateCv("experience", list);
-                }}
-                onRemove={() =>
-                  updateCv(
-                    "experience",
-                    data.cv.experience.filter((_, idx) => idx !== i),
-                  )
+        {section === "pagina-cv" && (
+          <>
+            <SectionCard title="Encabezado — CV / especialidad">
+              <Field label="Título de la página CV">
+                <input
+                  value={data.about.specialtyPageTitle}
+                  onChange={(e) =>
+                    updateAbout("specialtyPageTitle", e.target.value)
+                  }
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Descripción breve">
+                <textarea
+                  value={data.about.specialtyPageDescription}
+                  onChange={(e) =>
+                    updateAbout("specialtyPageDescription", e.target.value)
+                  }
+                  className={textareaClass}
+                />
+              </Field>
+            </SectionCard>
+
+            <SectionCard title="Archivos PDF del CV">
+              <PdfListUploadField
+                label="CV en PDF"
+                hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 25 MB por archivo."
+                values={data.cvPdfUrls}
+                onChange={(cvPdfUrls) =>
+                  setData((prev) => ({ ...prev, cvPdfUrls }))
                 }
+                folder="cv"
               />
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                updateCv("experience", [
-                  ...data.cv.experience,
-                  { year: "", role: "", company: "", bullets: [] },
-                ])
-              }
-              className="rounded-full border border-dashed border-foreground/20 px-4 py-2 text-xs font-semibold text-foreground/60 hover:border-primary hover:text-primary"
-            >
-              + Agregar experiencia
-            </button>
-          </SectionCard>
+            </SectionCard>
+          </>
         )}
       </div>
 
@@ -362,7 +324,7 @@ export function NutricionistaCvEditor({
           disabled={isPending}
           className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {isPending ? "Guardando…" : "Guardar CV"}
+          {isPending ? "Guardando…" : "Guardar cambios"}
         </button>
         {message && (
           <p
@@ -376,112 +338,47 @@ export function NutricionistaCvEditor({
   );
 }
 
-function EducationRow({
-  item,
+function StringListEditor({
+  label,
+  items,
   onChange,
-  onRemove,
 }: {
-  item: NutricionistaCvEducation;
-  onChange: (item: NutricionistaCvEducation) => void;
-  onRemove: () => void;
+  label: string;
+  items: string[];
+  onChange: (items: string[]) => void;
 }) {
   return (
-    <div className="rounded-xl border border-foreground/8 bg-muted/20 p-3">
-      <div className="mb-2 flex justify-end">
+    <div className="block text-sm">
+      <span className="font-semibold">{label}</span>
+      <div className="mt-2 space-y-2">
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2">
+            <input
+              value={item}
+              onChange={(e) => {
+                const next = [...items];
+                next[i] = e.target.value;
+                onChange(next);
+              }}
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, idx) => idx !== i))}
+              className="shrink-0 rounded-xl px-3 text-sm text-red-600 hover:bg-red-50"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
         <button
           type="button"
-          onClick={onRemove}
-          className="text-xs font-semibold text-red-600 hover:underline"
+          onClick={() => onChange([...items, ""])}
+          className="rounded-full border border-dashed border-foreground/20 px-4 py-2 text-xs font-semibold text-foreground/60 hover:border-primary hover:text-primary"
         >
-          Eliminar
+          + Agregar punto
         </button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Año">
-          <input
-            value={item.year}
-            onChange={(e) => onChange({ ...item, year: e.target.value })}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Título">
-          <input
-            value={item.title}
-            onChange={(e) => onChange({ ...item, title: e.target.value })}
-            className={`${inputClass} sm:col-span-2`}
-          />
-        </Field>
-      </div>
-      <Field label="Institución">
-        <input
-          value={item.place}
-          onChange={(e) => onChange({ ...item, place: e.target.value })}
-          className={inputClass}
-        />
-      </Field>
-    </div>
-  );
-}
-
-function ExperienceRow({
-  item,
-  onChange,
-  onRemove,
-}: {
-  item: NutricionistaCvExperience;
-  onChange: (item: NutricionistaCvExperience) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-foreground/8 bg-muted/20 p-3">
-      <div className="mb-2 flex justify-end">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-xs font-semibold text-red-600 hover:underline"
-        >
-          Eliminar
-        </button>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Período">
-          <input
-            value={item.year}
-            onChange={(e) => onChange({ ...item, year: e.target.value })}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Rol">
-          <input
-            value={item.role}
-            onChange={(e) => onChange({ ...item, role: e.target.value })}
-            className={inputClass}
-          />
-        </Field>
-      </div>
-      <Field label="Empresa / lugar">
-        <input
-          value={item.company}
-          onChange={(e) => onChange({ ...item, company: e.target.value })}
-          className={inputClass}
-        />
-      </Field>
-      <Field label="Detalle (una línea por ítem)">
-        <textarea
-          value={item.bullets.join("\n")}
-          onChange={(e) =>
-            onChange({
-              ...item,
-              bullets: e.target.value
-                .split("\n")
-                .map((l) => l.trim())
-                .filter(Boolean),
-            })
-          }
-          placeholder="Cada línea será un punto de la lista"
-          className={textareaClass}
-        />
-      </Field>
     </div>
   );
 }

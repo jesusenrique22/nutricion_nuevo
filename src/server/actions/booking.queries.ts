@@ -11,6 +11,7 @@ export interface ConsultationTypeDTO {
   description: string | null;
   durationMinutes: number;
   price: string;
+  imageUrl: string | null;
   allowsOnline: boolean;
   allowsPresencial: boolean;
   morningOnly: boolean;
@@ -20,7 +21,8 @@ export interface ConsultationTypeDTO {
 
 export async function getConsultationTypes(): Promise<ConsultationTypeDTO[]> {
   const types = await prisma.consultationType.findMany({
-    orderBy: { code: "asc" },
+    where: { isPublished: true },
+    orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
   });
   return types.map((t) => ({
     id: t.id,
@@ -29,6 +31,7 @@ export async function getConsultationTypes(): Promise<ConsultationTypeDTO[]> {
     description: t.description,
     durationMinutes: t.durationMinutes,
     price: t.price.toString(),
+    imageUrl: t.imageUrl,
     allowsOnline: t.allowsOnline,
     allowsPresencial: t.allowsPresencial,
     morningOnly: t.morningOnly,
@@ -75,6 +78,8 @@ export interface AppointmentDTO {
   paymentStatus?: string | null;
   paymentPhases?: PaymentPhaseDTO | null;
   notes?: string | null;
+  cancelledBy?: "PATIENT" | "ADMIN" | null;
+  cancelledAt?: string | null;
 }
 
 /** Citas del paciente autenticado. */
@@ -83,7 +88,10 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
   if (!session?.user?.id) return [];
 
   const appts = await prisma.appointment.findMany({
-    where: { patientId: session.user.id },
+    where: {
+      patientId: session.user.id,
+      status: { not: "CANCELLED" },
+    },
     include: { consultationType: true, payment: true },
     orderBy: { startTime: "desc" },
   });
@@ -131,5 +139,7 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
     paymentStatus: a.payment?.status ?? null,
     paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
     notes: a.notes,
+    cancelledBy: a.cancelledBy,
+    cancelledAt: a.cancelledAt?.toISOString() ?? null,
   }));
 }

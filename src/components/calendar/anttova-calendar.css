@@ -2,6 +2,24 @@
 
 .anttova-calendar {
   font-family: var(--font-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.anttova-calendar .grid > * {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .anttova-calendar > .grid {
+    min-height: calc(100dvh - 13.5rem);
+    align-items: stretch;
+  }
+
+  .anttova-calendar > .grid > .anttova-calendar__main {
+    min-height: 0;
+  }
 }
 
 .anttova-calendar__main {
@@ -13,6 +31,16 @@
   box-shadow:
     0 4px 24px -4px rgb(116 30 49 / 0.08),
     inset 0 1px 0 rgb(255 255 255 / 0.8);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .anttova-calendar__main {
+    flex: 1;
+  }
 }
 
 @media (min-width: 640px) {
@@ -22,12 +50,21 @@
   }
 }
 
+@media (min-width: 1024px) {
+  .anttova-calendar__main {
+    min-height: calc(100dvh - 13.5rem);
+  }
+}
+
 .anttova-calendar__header {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid rgb(116 30 49 / 0.06);
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 0;
 }
 
 @media (min-width: 640px) {
@@ -40,27 +77,112 @@
 
 .anttova-calendar__body {
   margin-top: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* Vista semana — altura acotada, scroll solo si hay muchas citas */
+@media (min-width: 1024px) {
+  .anttova-calendar__main .anttova-calendar__body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
+
+.anttova-calendar__body--day,
+.anttova-calendar__body--week {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: min(32rem, calc(100dvh - 16rem));
+}
+
+@media (min-width: 1024px) {
+  .anttova-calendar__body--day,
+  .anttova-calendar__body--week {
+    min-height: 0;
+    flex: 1;
+  }
+}
+
+/* Vista día */
+.anttova-day {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: min(28rem, calc(100dvh - 18rem));
+}
+
+@media (min-width: 1024px) {
+  .anttova-day {
+    min-height: 0;
+  }
+}
+
+.anttova-day__empty,
+.anttova-day__list {
+  flex: 1;
+  width: 100%;
+}
+
+.anttova-day__empty {
+  display: flex;
+  min-height: min(28rem, calc(100dvh - 18rem));
+}
+
+@media (min-width: 1024px) {
+  .anttova-day__empty {
+    min-height: 0;
+  }
+}
+
+/* Vista semana */
+.anttova-week {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-height: min(28rem, calc(100dvh - 18rem));
+}
+
+@media (min-width: 1024px) {
+  .anttova-week {
+    min-height: 0;
+  }
+}
+
 .anttova-week__body {
-  max-height: min(220px, calc(100dvh - 22rem));
+  flex: 1;
+  min-height: min(20rem, calc(100dvh - 22rem));
+  max-height: none;
   overflow-y: auto;
+  grid-auto-rows: minmax(0, 1fr);
 }
 
 @media (min-width: 1024px) {
   .anttova-week__body {
-    max-height: min(260px, calc(100dvh - 19rem));
+    min-height: 0;
   }
+}
+
+.anttova-calendar__body--day > .min-h-0,
+.anttova-calendar__body--week > .min-h-0 {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 @media (max-width: 639px) {
   .anttova-week {
     overflow-x: auto;
+    max-width: 100%;
   }
 
   .anttova-week__body,
   .anttova-week > .grid:first-child {
-    min-width: 560px;
+    min-width: min(560px, 100%);
   }
 }

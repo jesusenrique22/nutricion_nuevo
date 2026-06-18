@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { getMongoDb, Collections } from "@/server/db/mongo";
 import { syncUser } from "@/server/realtime/sync";
 import type { NotificationDoc, NotificationType } from "@/types/chat";
+import { VISIBLE_NOTIFICATION_TYPES } from "@/types/chat";
 
 export interface NotificationDTO {
   id: string;
@@ -54,7 +55,10 @@ export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
   const db = await getMongoDb();
   const docs = await db
     .collection<NotificationDoc>(Collections.notifications)
-    .find({ recipientId: session.user.id })
+    .find({
+      recipientId: session.user.id,
+      type: { $in: VISIBLE_NOTIFICATION_TYPES },
+    })
     .sort({ createdAt: -1 })
     .limit(limit)
     .toArray();
@@ -78,7 +82,11 @@ export async function getUnreadNotificationCount(): Promise<number> {
     const db = await getMongoDb();
     return await db
       .collection<NotificationDoc>(Collections.notifications)
-      .countDocuments({ recipientId: session.user.id, isRead: false });
+      .countDocuments({
+        recipientId: session.user.id,
+        isRead: false,
+        type: { $in: VISIBLE_NOTIFICATION_TYPES },
+      });
   } catch {
     return 0;
   }

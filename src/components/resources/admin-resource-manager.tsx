@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ResourceCoverImage } from "@/components/resources/resource-cover-image";
+import { DisplayPrice } from "@/components/currency/display-price";
 import {
   deleteResource,
   toggleResourcePublished,
@@ -18,7 +19,7 @@ const inputClass =
 const emptyForm = {
   title: "",
   description: "",
-  type: "EBOOK" as const,
+  type: "EBOOK" as "EBOOK" | "VIDEO" | "LINK" | "PACKAGE",
   coverUrl: "",
   contentUrl: "",
   videoUrl: "",
@@ -139,7 +140,8 @@ export function AdminResourceManager({
     <div className="space-y-6">
       <div className="flex justify-between gap-4">
         <p className="text-sm text-foreground/60">
-          Sube e-books, videos, enlaces y material para pacientes.
+          Sube e-books, videos, enlaces y material para pacientes. Los tipo{" "}
+          <strong>Paquete</strong> publicados se muestran en la landing.
         </p>
         <button
           type="button"
@@ -195,8 +197,13 @@ export function AdminResourceManager({
                 <option value="EBOOK">E-book / PDF</option>
                 <option value="VIDEO">Video</option>
                 <option value="LINK">Enlace externo</option>
-                <option value="PACKAGE">Paquete</option>
+                <option value="PACKAGE">Paquete (visible en landing)</option>
               </select>
+              {form.type === "PACKAGE" && (
+                <span className="mt-1 block text-xs text-foreground/55">
+                  Aparece en la página de recursos al publicarlo.
+                </span>
+              )}
             </label>
             <label className="block text-sm">
               <span className="font-semibold">Categoría</span>
@@ -409,7 +416,11 @@ export function AdminResourceManager({
               <div className="min-w-0">
               <div className="font-semibold">{r.title}</div>
               <div className="text-xs text-foreground/50">
-                {r.type} · ${r.price} {r.currency}
+                {r.type} ·{" "}
+                <DisplayPrice
+                  amount={r.price}
+                  currency={r.currency === "USD" ? "USD" : "ARS"}
+                />
                 {r.isPublished ? " · Publicado" : " · Borrador"}
               </div>
               </div>
@@ -441,7 +452,12 @@ export function AdminResourceManager({
                 onClick={() =>
                   startTransition(async () => {
                     if (!confirm("¿Eliminar recurso?")) return;
-                    await deleteResource(r.id);
+                    const res = await deleteResource(r.id);
+                    if (!res.ok) {
+                      setMessage(res.message);
+                      return;
+                    }
+                    setMessage(null);
                     router.refresh();
                   })
                 }

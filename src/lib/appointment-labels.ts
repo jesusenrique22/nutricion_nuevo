@@ -24,3 +24,8 @@ export const modalityLabels: Record<string, string> = {
   ONLINE: "Online",
   PRESENCIAL: "Presencial",
 };
+
+export const cancelledByLabels: Record<string, string> = {
+  PATIENT: "Cancelada por el paciente",
+  ADMIN: "Cancelada por Anttova",
+};

@@ -81,12 +81,23 @@ export function gridFileMimeType(
 export function mongoStreamToWebResponse(
   nodeStream: Readable,
   mimeType: string,
+  options?: {
+    cacheControl?: string;
+    disposition?: "inline" | "attachment";
+    fileName?: string;
+  },
 ): Response {
   const webStream = Readable.toWeb(nodeStream) as ReadableStream;
-  return new Response(webStream, {
-    headers: {
-      "Content-Type": mimeType,
-      "Cache-Control": "public, max-age=31536000, immutable",
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": mimeType,
+    "Cache-Control": options?.cacheControl ?? "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+  };
+  if (options?.disposition && options.fileName) {
+    const safe = options.fileName.replace(/[^\w.\-() ]/g, "_");
+    headers["Content-Disposition"] = `${options.disposition}; filename="${safe}"`;
+  } else if (options?.disposition === "inline") {
+    headers["Content-Disposition"] = "inline";
+  }
+  return new Response(webStream, { headers });
 }

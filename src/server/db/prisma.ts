@@ -1,6 +1,20 @@
+import { createRequire } from "node:module";
 import { statSync } from "node:fs";
 import path from "node:path";
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+
+const require = createRequire(path.join(process.cwd(), "package.json"));
+
+/** CJS evita client incompleto con Turbopack/ESM (delegates como cartItem ausentes). */
+const { PrismaClient: PrismaClientCtor, Prisma } = require("@prisma/client") as {
+  PrismaClient: new (options?: ConstructorParameters<typeof PrismaClient>[0]) => PrismaClient;
+  Prisma: {
+    ResourcePurchaseScalarFieldEnum?: Record<string, string>;
+    PaymentScalarFieldEnum?: Record<string, string>;
+  };
+};
+
+const REQUIRED_DELEGATES = ["user", "cartItem"] as const;
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -15,24 +29,59 @@ function schemaMtimeMs(): number {
   }
 }
 
+function hasRequiredDelegates(client: PrismaClient): boolean {
+  return REQUIRED_DELEGATES.every((key) => key in client);
+}
+
+/** Campos recientes del schema; si faltan, el bundle de Turbopack sigue con client viejo. */
+function clientHasExpectedSchema(): boolean {
+  const purchase = Prisma.ResourcePurchaseScalarFieldEnum;
+  const payment = Prisma.PaymentScalarFieldEnum;
+  const consultation = (
+    Prisma as { ConsultationTypeScalarFieldEnum?: Record<string, string> }
+  ).ConsultationTypeScalarFieldEnum;
+
+  if (consultation) {
+    const hasLobbyFields =
+      "isPublished" in consultation &&
+      "sortOrder" in consultation &&
+      "imageUrl" in consultation;
+    if (!hasLobbyFields) return false;
+  }
+
+  if (!purchase || !payment) return true;
+  return (
+    "inboxDismissedAt" in purchase &&
+    "advanceInboxTrashedAt" in payment
+  );
+}
+
 function createPrismaClient(): PrismaClient {
-  return new PrismaClient({
+  const client = new PrismaClientCtor({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
+
+  if (!hasRequiredDelegates(client) || !clientHasExpectedSchema()) {
+    throw new Error(
+      "Prisma Client desactualizado. Ejecuta: pnpm prisma generate && reinicia el servidor.",
+    );
+  }
+
+  return client;
 }
 
 function getPrismaClient(): PrismaClient {
   const currentMtime = schemaMtimeMs();
 
-  if (process.env.NODE_ENV !== "production") {
-    const staleSchema =
-      globalForPrisma.prisma &&
-      (globalForPrisma.prismaSchemaMtime === undefined ||
-        globalForPrisma.prismaSchemaMtime !== currentMtime ||
-        !("mediaAsset" in globalForPrisma.prisma));
+  if (process.env.NODE_ENV !== "production" && globalForPrisma.prisma) {
+    const stale =
+      globalForPrisma.prismaSchemaMtime === undefined ||
+      globalForPrisma.prismaSchemaMtime !== currentMtime ||
+      !hasRequiredDelegates(globalForPrisma.prisma) ||
+      !clientHasExpectedSchema();
 
-    if (staleSchema) {
-      void globalForPrisma.prisma?.$disconnect();
+    if (stale) {
+      void globalForPrisma.prisma.$disconnect();
       globalForPrisma.prisma = undefined;
     }
   }
@@ -45,7 +94,6 @@ function getPrismaClient(): PrismaClient {
   return globalForPrisma.prisma;
 }
 
-/** Proxy evita usar un PrismaClient obsoleto tras `prisma generate` sin reiniciar el dev server. */
 export const prisma = new Proxy({} as PrismaClient, {
   get(_target, prop, receiver) {
     const client = getPrismaClient();

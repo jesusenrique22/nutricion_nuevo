@@ -19,12 +19,6 @@ enum UserRole {
   PATIENT
 }
 
-enum ConsultationCode {
-  NUT_01 // Nutricional
-  ENT_02 // Entrenamiento
-  ANT_03 // Antropometría
-}
-
 enum ConsultationModality {
   ONLINE
   PRESENCIAL
@@ -38,9 +32,25 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum AppointmentCancelledBy {
+  PATIENT
+  ADMIN
+}
+
 enum AppointmentFlow {
   INTAKE // Primera cita -> Anamnesis completa
   FOLLOW_UP // Cita de seguimiento
+}
+
+enum ResourceAccessStatus {
+  PENDING
+  GRANTED
+  REFUNDED
+}
+
+enum CartItemType {
+  RESOURCE
+  APPOINTMENT
 }
 
 enum PaymentStatus {
@@ -49,6 +59,13 @@ enum PaymentStatus {
   PAID
   REFUNDED
   FAILED
+}
+
+enum RefundStatus {
+  NONE
+  REQUESTED
+  APPROVED
+  DENIED
 }
 
 // ──────────────────────────────────────────────
@@ -70,7 +87,8 @@ model User {
 
   patientProfile PatientProfile?
   appointments   Appointment[]      @relation("PatientAppointments")
-  purchases      ResourcePurchase[]
+  purchases ResourcePurchase[]
+  cartItems   CartItem[]
   weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
 
   accounts Account[]
@@ -92,6 +110,7 @@ model PatientProfile {
 
   // Flag clave para decidir Intake vs Follow-up (Módulo 1)
   hasCompletedIntake Boolean @default(false)
+  hiddenFromAdminList Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -105,21 +124,25 @@ model PatientProfile {
 // ──────────────────────────────────────────────
 
 model ConsultationType {
-  id              String           @id @default(cuid())
-  code            ConsultationCode @unique
+  id              String  @id @default(cuid())
+  code            String  @unique
   name            String
   description     String?
-  durationMinutes Int              @default(60)
-  price           Decimal          @db.Decimal(10, 2)
+  durationMinutes Int     @default(60)
+  price           Decimal @db.Decimal(10, 2)
 
-  // Reglas de negocio como datos:
   allowsOnline     Boolean @default(true)
   allowsPresencial Boolean @default(true)
-  morningOnly      Boolean @default(false) // ANT_03 = true
-  morningStart     String? // "08:00"
-  morningEnd       String? // "12:00"
+  morningOnly      Boolean @default(false)
+  morningStart     String?
+  morningEnd       String?
+
+  isPublished Boolean @default(true)
+  sortOrder   Int     @default(0)
+  imageUrl    String?
 
   appointments Appointment[]
+  cartItems    CartItem[]
 }
 
 // ──────────────────────────────────────────────
@@ -139,6 +162,8 @@ model Appointment {
   flow               AppointmentFlow
   notes              String?
   reminderSentAt     DateTime?
+  cancelledBy        AppointmentCancelledBy?
+  cancelledAt        DateTime?
 
   payment Payment?
 
@@ -330,9 +355,22 @@ model Payment {
   adminNote       String?
   advanceNote     String?
   remainderNote   String?
+  patientPaymentMethod    String?
+  patientPaymentReference String?
+  patientPaymentNote      String?
+  patientPaymentProofUrls Json?
   paidAt          DateTime?
   advancePaidAt   DateTime?
   remainderPaidAt DateTime?
+  refundStatus        RefundStatus @default(NONE)
+  refundRequestedAt   DateTime?
+  refundPatientNote   String?
+  refundAdminNote     String?
+  refundResolvedAt    DateTime?
+  advanceInboxTrashedAt    DateTime?
+  remainderInboxTrashedAt  DateTime?
+  advanceInboxDismissedAt  DateTime?
+  remainderInboxDismissedAt DateTime?
   createdAt       DateTime      @default(now())
 }
 
@@ -359,6 +397,7 @@ model Resource {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   purchases ResourcePurchase[]
+  cartItems   CartItem[]
 }
 
 // ──────────────────────────────────────────────
@@ -415,15 +454,47 @@ model PatientWeeklyPlan {
 }
 
 model ResourcePurchase {
-  id         String   @id @default(cuid())
+  id         String               @id @default(cuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User                 @relation(fields: [userId], references: [id])
   resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id])
-  pricePaid  Decimal  @db.Decimal(10, 2)
-  createdAt  DateTime @default(now())
+  resource   Resource             @relation(fields: [resourceId], references: [id])
+  pricePaid  Decimal              @db.Decimal(10, 2)
+  status     ResourceAccessStatus @default(PENDING)
+  adminNote  String?
+  patientPaymentMethod    String?
+  patientPaymentReference String?
+  patientPaymentNote      String?
+  patientPaymentProofUrls Json?
+  grantedAt  DateTime?
+  refundStatus        RefundStatus @default(NONE)
+  refundRequestedAt   DateTime?
+  refundPatientNote   String?
+  refundAdminNote     String?
+  refundResolvedAt    DateTime?
+  inboxTrashedAt      DateTime?
+  inboxDismissedAt    DateTime?
+  createdAt  DateTime             @default(now())
 
   @@unique([userId, resourceId])
+  @@index([status])
+}
+
+model CartItem {
+  id                 String                @id @default(cuid())
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type               CartItemType
+  resourceId         String?
+  resource           Resource?             @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  consultationTypeId String?
+  consultationType   ConsultationType?     @relation(fields: [consultationTypeId], references: [id])
+  appointmentStart   DateTime?
+  modality           ConsultationModality?
+  createdAt          DateTime              @default(now())
+
+  @@unique([userId, resourceId])
+  @@index([userId])
 }
 
 // ──────────────────────────────────────────────

@@ -3,10 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLinkButton } from "@/components/brand/brand-link-button";
+import { RecaptchaNotice } from "@/components/security/recaptcha-notice";
+import { useCurrency } from "@/contexts/currency-context";
 import { FlowStep, FlowStepDots } from "@/components/motion/flow-step";
+import { useRecaptcha } from "@/hooks/use-recaptcha";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import { getSlotsForDay } from "@/server/actions/booking.queries";
-import { createAppointment } from "@/server/actions/appointment.actions";
+import { addAppointmentToCart } from "@/server/actions/cart.actions";
 import type { Slot } from "@/server/services/availability.service";
 
 function todayStr() {
@@ -15,14 +18,9 @@ function todayStr() {
 
 type Step = "service" | "details" | "confirm";
 
-function formatPrice(price: string) {
-  const n = Number(price);
-  if (Number.isNaN(n)) return price;
-  return n.toLocaleString("es-AR");
-}
-
 export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   const router = useRouter();
+  const { formatPrice } = useCurrency();
   const [step, setStep] = useState<Step>("service");
   const [direction, setDirection] = useState<1 | -1>(1);
   const [typeId, setTypeId] = useState(types[0]?.id ?? "");
@@ -35,6 +33,8 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { enabled: recaptchaEnabled, ready: recaptchaReady, getToken } =
+    useRecaptcha(undefined, step === "confirm");
 
   const selectedType = types.find((t) => t.id === typeId);
   const stepIndex = step === "service" ? 0 : step === "details" ? 1 : 2;
@@ -62,20 +62,39 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
       .finally(() => setLoadingSlots(false));
   }, [typeId, date, step]);
 
-  function handleBook() {
+  function handleAddToCart() {
     if (!selectedSlot) return;
     setMessage(null);
     startTransition(async () => {
-      const res = await createAppointment({
+      let recaptchaToken: string | undefined;
+
+      if (recaptchaEnabled) {
+        if (!recaptchaReady) {
+          setMessage("Cargando verificación de seguridad… Intentá en unos segundos.");
+          return;
+        }
+        const token = await getToken();
+        if (!token) {
+          setMessage(
+            "No pudimos verificar la solicitud. Recargá la página e intentá de nuevo.",
+          );
+          return;
+        }
+        recaptchaToken = token;
+      }
+
+      const res = await addAppointmentToCart({
         consultationTypeId: typeId,
-        startTime: selectedSlot!,
+        startTime: selectedSlot,
         modality,
+        recaptchaToken,
       });
       if (!res.ok) {
         setMessage(res.message);
         return;
       }
-      router.push("/dashboard/patient/appointments/form?recien=1");
+      router.push("/dashboard/patient/cart?cita=agregada");
+      router.refresh();
     });
   }
 
@@ -94,7 +113,7 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
                 key={t.id}
                 type="button"
                 label={t.name}
-                subtitle={`${t.durationMinutes} min · $${formatPrice(t.price)}`}
+                subtitle={`${t.durationMinutes} min · ${formatPrice(t.price, "ARS")}`}
                 selected={typeId === t.id}
                 delay={i * 0.06}
                 onClick={() => {
@@ -182,6 +201,9 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
             <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-foreground/50">
               Horario disponible
             </p>
+            <p className="mt-2 text-center text-sm font-semibold text-primary">
+              {formatPrice(selectedType.price, "ARS")}
+            </p>
 
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {loadingSlots && (
@@ -218,10 +240,24 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
             <div className="mt-5 flex flex-col gap-2">
               <BrandLinkButton
                 type="button"
-                label={isPending ? "Agendando…" : "Confirmar cita"}
-                onClick={handleBook}
-                disabled={!selectedSlot || isPending}
+                label={isPending ? "Agregando…" : "Agregar al carrito"}
+                onClick={handleAddToCart}
+                disabled={
+                  !selectedSlot ||
+                  isPending ||
+                  (recaptchaEnabled && !recaptchaReady)
+                }
               />
+              <p className="text-center text-xs text-foreground/50">
+                Podés sumar recursos y pagar todo junto desde el carrito.
+              </p>
+              <RecaptchaNotice className="text-center" />
+              {recaptchaEnabled && (
+                <p className="text-center text-[10px] leading-snug text-foreground/45">
+                  La verificación es automática en segundo plano; no verás un
+                  checkbox.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => go("details")}

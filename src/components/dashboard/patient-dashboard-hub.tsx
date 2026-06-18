@@ -13,7 +13,7 @@ export function PatientDashboardHub({
   upcomingAppointments: number;
 }) {
   const firstName = userName.split(" ")[0] ?? userName;
-  const links = getPatientAppLinks({ pendingForms, upcomingAppointments });
+  const links = getPatientAppLinks();
 
   return (
     <BrandLinkHub

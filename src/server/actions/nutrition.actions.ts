@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 
-import { ConsultationCode } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { areFormsEnabled, FORMS_DISABLED_MESSAGE } from "@/lib/feature-flags";
 import { prisma } from "@/server/db/prisma";
 import { withDb } from "@/lib/db-errors";
 import { nutritionFormSchema } from "@/lib/validators/nutrition";
@@ -15,6 +15,10 @@ export async function submitNutritionForm(
   appointmentId: string,
   formData: unknown,
 ): Promise<SubmitNutritionResult> {
+  if (!areFormsEnabled()) {
+    return { ok: false, message: FORMS_DISABLED_MESSAGE };
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Debes iniciar sesión." };
@@ -25,7 +29,7 @@ export async function submitNutritionForm(
       id: appointmentId,
       patientId: session.user.id,
       status: { in: ["PENDING", "CONFIRMED"] },
-      consultationType: { code: ConsultationCode.NUT_01 },
+      consultationType: { code: "NUT_01" },
     },
     include: { nutritionFormSubmission: true, patient: true },
   });

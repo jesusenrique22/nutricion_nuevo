@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+.swc/
 
 # production
 /build
@@ -42,6 +43,7 @@ yarn-error.log*
 # caches
 .eslintcache
 .turbo
+node_modules/.cache/
 
 # misc
 .DS_Store
@@ -49,6 +51,8 @@ Thumbs.db
 *.pem
 *.tmp
 _tmp_*
+*.swp
+*~
 
 # IDE / editor
 .vscode/
@@ -57,11 +61,23 @@ _tmp_*
 
 # archivos locales de sesión / handoff
 HANDOFF-CONTEXTO-CHAT.txt
+*.handoff.txt
 
 # assets de diseño (fuentes pesadas; en web se usa public/brand/)
 Anttova-Diseños/
 Anttova _ Brandbook/
 
+# código archivado / backups locales (no forma parte del build)
+/_archived/
+/src/_archived/
+
+# generado en postinstall (scripts/copy-pdf-worker.mjs)
+/public/pdf/
+
 # uploads generados en runtime
 /public/uploads/
 /uploads/
+
+# prisma — bases locales de desarrollo
+*.db
+*.db-journal

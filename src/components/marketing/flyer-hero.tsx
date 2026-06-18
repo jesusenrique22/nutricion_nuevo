@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { limitHeroSlides } from "@/lib/landing-images-parse";
+import { scrollToLobbySection } from "@/lib/lobby-scroll";
 import type { HeroSlide } from "@/types/landing-images";
 
 export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
@@ -115,6 +116,17 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
               className="rounded-full border border-primary-foreground/35 bg-primary-foreground/10 px-8 py-3.5 text-sm font-semibold text-primary-foreground backdrop-blur-sm transition hover:bg-primary-foreground/20"
             >
               Ver paquetes
+            </Link>
+            <Link
+              href="#contacto"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToLobbySection("contacto");
+                window.history.replaceState(null, "", "#contacto");
+              }}
+              className="rounded-full border border-accent-soft/50 bg-accent-soft/15 px-8 py-3.5 text-sm font-semibold text-primary-foreground backdrop-blur-sm transition hover:bg-accent-soft/25"
+            >
+              Contáctame
             </Link>
           </div>
         </div>

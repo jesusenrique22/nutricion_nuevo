@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 
-import { ConsultationCode } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { areFormsEnabled, FORMS_DISABLED_MESSAGE } from "@/lib/feature-flags";
 import { prisma } from "@/server/db/prisma";
 import { withDb } from "@/lib/db-errors";
 import { trainingFormSchema } from "@/lib/validators/training";
@@ -15,6 +15,10 @@ export async function submitTrainingForm(
   appointmentId: string,
   formData: unknown,
 ): Promise<SubmitTrainingResult> {
+  if (!areFormsEnabled()) {
+    return { ok: false, message: FORMS_DISABLED_MESSAGE };
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Debes iniciar sesión." };
@@ -25,7 +29,7 @@ export async function submitTrainingForm(
       id: appointmentId,
       patientId: session.user.id,
       status: { in: ["PENDING", "CONFIRMED"] },
-      consultationType: { code: ConsultationCode.ENT_02 },
+      consultationType: { code: "ENT_02" },
     },
     include: { trainingFormSubmission: true },
   });

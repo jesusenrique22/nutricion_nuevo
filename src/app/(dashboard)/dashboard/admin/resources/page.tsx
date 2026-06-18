@@ -10,7 +10,7 @@ export default async function AdminResourcesPage() {
   return (
     <ContentLobbyShell
       title="Recursos"
-      description="E-books, videos y enlaces para tus pacientes."
+      description="Publica material digital para tus pacientes."
     >
       <AdminResourceManager resources={resources} />
     </ContentLobbyShell>

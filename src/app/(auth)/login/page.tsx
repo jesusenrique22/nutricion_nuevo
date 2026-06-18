@@ -10,6 +10,7 @@ import {
   AuthShell,
   authButtonClass,
   authInputClass,
+  authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { safeRouterPush } from "@/lib/safe-router";
@@ -19,6 +20,7 @@ function LoginForm() {
   const params = useSearchParams();
   const resetOk = params.get("reset") === "1";
   const registered = params.get("registered") === "1";
+  const deactivated = params.get("deactivated") === "1";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,14 +35,20 @@ function LoginForm() {
       redirect: false,
     });
     setLoading(false);
-    if (res?.error) {
-      if (res.error === "EMAIL_NOT_VERIFIED") {
-        setError(
-          "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
-        );
-        return;
-      }
-      setError("Credenciales inválidas.");
+      if (res?.error) {
+        if (res.error === "EMAIL_NOT_VERIFIED") {
+          setError(
+            "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
+          );
+          return;
+        }
+        if (res.error === "ACCOUNT_DEACTIVATED") {
+          setError(
+            "Esta cuenta fue desactivada. Contactá a Anttova si necesitás ayuda.",
+          );
+          return;
+        }
+        setError("Credenciales inválidas.");
       return;
     }
     router.refresh();
@@ -59,9 +67,15 @@ function LoginForm() {
           Cuenta creada. En desarrollo sin correo configurado ya podés ingresar.
         </p>
       )}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {deactivated && (
+        <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Esta cuenta fue desactivada. Si creés que es un error, contactá a
+          Anttova.
+        </p>
+      )}
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
         <div>
-          <label className="text-sm font-semibold">Email</label>
+          <label className={authLabelClass}>Email</label>
           <input
             name="email"
             type="email"
@@ -79,13 +93,13 @@ function LoginForm() {
         <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:items-center sm:justify-between">
           <a
             href="/forgot-password"
-            className="text-sm font-semibold text-primary hover:underline"
+            className="text-sm font-semibold text-primary hover:underline sm:text-base"
           >
             ¿Olvidaste tu contraseña?
           </a>
           <a
             href="/check-email"
-            className="text-sm font-semibold text-foreground/55 hover:text-primary hover:underline"
+            className="text-sm font-semibold text-foreground/55 hover:text-primary hover:underline sm:text-base"
           >
             Reenviar verificación
           </a>

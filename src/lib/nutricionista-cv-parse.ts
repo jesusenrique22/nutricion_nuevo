@@ -1,11 +1,71 @@
 import { DEFAULT_NUTRICIONISTA_PAGE } from "@/lib/nutricionista-cv-defaults";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
 import type {
+  NutricionistaAboutData,
   NutricionistaCvData,
   NutricionistaCvEducation,
   NutricionistaCvExperience,
   NutricionistaPageData,
 } from "@/types/nutricionista-cv";
+
+function parseStringList(raw: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(raw)) return fallback;
+  const list = raw.map((s) => String(s).trim()).filter(Boolean);
+  return list.length > 0 ? list : fallback;
+}
+
+function parseAbout(raw: unknown): NutricionistaAboutData {
+  const defaults = DEFAULT_NUTRICIONISTA_PAGE.about;
+  if (!raw || typeof raw !== "object") return defaults;
+
+  const o = raw as Record<string, unknown>;
+
+  return {
+    headline:
+      String(o.headline ?? defaults.headline).trim() || defaults.headline,
+    intro: String(o.intro ?? defaults.intro).trim() || defaults.intro,
+    highlights: parseStringList(o.highlights, defaults.highlights),
+    approachHeadline:
+      String(o.approachHeadline ?? defaults.approachHeadline).trim() ||
+      defaults.approachHeadline,
+    approachIntro:
+      String(o.approachIntro ?? defaults.approachIntro).trim() ||
+      defaults.approachIntro,
+    approachHighlights: parseStringList(
+      o.approachHighlights,
+      defaults.approachHighlights,
+    ),
+    approachClosing:
+      String(o.approachClosing ?? defaults.approachClosing).trim() ||
+      defaults.approachClosing,
+    specialtyLinkLabel:
+      String(o.specialtyLinkLabel ?? defaults.specialtyLinkLabel).trim() ||
+      defaults.specialtyLinkLabel,
+    specialtyPageTitle:
+      String(o.specialtyPageTitle ?? defaults.specialtyPageTitle).trim() ||
+      defaults.specialtyPageTitle,
+    specialtyPageDescription:
+      String(
+        o.specialtyPageDescription ?? defaults.specialtyPageDescription,
+      ).trim() || defaults.specialtyPageDescription,
+  };
+}
+
+function parseCvPdfUrls(
+  raw: unknown,
+  legacySingle?: unknown,
+): string[] {
+  if (Array.isArray(raw)) {
+    const list = raw.map((s) => String(s).trim()).filter(Boolean);
+    if (list.length > 0) return list;
+  }
+
+  if (typeof legacySingle === "string" && legacySingle.trim()) {
+    return [legacySingle.trim()];
+  }
+
+  return DEFAULT_NUTRICIONISTA_PAGE.cvPdfUrls;
+}
 
 function parseEducation(raw: unknown): NutricionistaCvEducation[] {
   if (!Array.isArray(raw)) return DEFAULT_NUTRICIONISTA_PAGE.cv.education;
@@ -102,6 +162,8 @@ export function parseNutricionistaPage(raw: unknown): NutricionistaPageData {
     pageDescription:
       String(o.pageDescription ?? defaults.pageDescription).trim() ||
       defaults.pageDescription,
+    about: parseAbout(o.about),
+    cvPdfUrls: parseCvPdfUrls(o.cvPdfUrls, o.cvPdfUrl),
     cv: parseCv(cvRaw),
   };
 }
@@ -112,6 +174,8 @@ export function nutricionistaPageToRecord(
   return {
     pageTitle: data.pageTitle,
     pageDescription: data.pageDescription,
+    about: data.about,
+    cvPdfUrls: data.cvPdfUrls,
     cv: data.cv,
   };
 }

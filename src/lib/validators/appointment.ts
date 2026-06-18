@@ -5,6 +5,7 @@ export const createAppointmentSchema = z.object({
   // ISO datetime string del inicio de la cita
   startTime: z.string().datetime(),
   modality: z.enum(["ONLINE", "PRESENCIAL"]),
+  recaptchaToken: z.string().min(1).optional(),
 });
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;

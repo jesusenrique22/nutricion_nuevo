@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
+import type { ConsultationCode } from "@/lib/consultation-codes";
 import type { PaymentChatPolicy } from "@/types/payment-chat-policy";
+import { resolvePaymentSplit } from "@/lib/payment-policy-resolve";
 
 export function splitPaymentAmount(
   total: Prisma.Decimal | number | string,
@@ -32,18 +34,20 @@ export function syncOverallPaymentStatus(
 
 export function buildPaymentCreateData(params: {
   totalPrice: Prisma.Decimal;
+  consultationCode: ConsultationCode;
   policy: PaymentChatPolicy;
 }) {
+  const split = resolvePaymentSplit(params.policy, params.consultationCode);
   const { advanceAmount, remainderAmount } = splitPaymentAmount(
     params.totalPrice,
-    params.policy.advancePercent,
+    split.advancePercent,
   );
 
   return {
     amount: params.totalPrice,
     advanceAmount,
     remainderAmount,
-    advancePercent: params.policy.advancePercent,
+    advancePercent: split.advancePercent,
     status: "PENDING" as const,
     advanceStatus: "PENDING" as const,
     remainderStatus: "PENDING" as const,

@@ -11,13 +11,11 @@ function fmtDate(iso: Date | string) {
   });
 }
 
-async function safeNotify(
-  fn: () => Promise<void>,
-): Promise<void> {
+async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
   } catch {
-    // MongoDB opcional: no bloquear flujo de citas
+    // MongoDB opcional: no bloquear flujo principal
   }
 }
 
@@ -29,25 +27,14 @@ export async function notifyAppointmentBooked(params: {
   appointmentId: string;
 }) {
   await safeNotify(async () => {
-    await createNotification({ _serverOnly: true,
-      recipientId: params.patientId,
-      type: "SYSTEM",
-      title: "Cita solicitada",
-      body: `Tu cita de ${params.consultationName} el ${fmtDate(params.startTime)} está pendiente de confirmación.`,
-      payload: {
-        deepLink: "/dashboard/patient/appointments",
-        appointmentId: params.appointmentId,
-      },
-    });
-
     const adminIds = await getAdminUserIds();
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
           _serverOnly: true,
           recipientId: id,
-          type: "SYSTEM",
-          title: "Nueva cita",
+          type: "APPOINTMENT_REMINDER",
+          title: "Nueva cita solicitada",
           body: `${params.patientName} agendó ${params.consultationName} para el ${fmtDate(params.startTime)}.`,
           payload: {
             deepLink: "/dashboard/admin/calendar",
@@ -66,20 +53,14 @@ export async function notifyAppointmentStatusChange(params: {
   status: string;
   appointmentId: string;
 }) {
-  const titles: Record<string, string> = {
-    CONFIRMED: "Cita confirmada",
-    CANCELLED: "Cita cancelada",
-    COMPLETED: "Cita completada",
-    NO_SHOW: "Cita marcada como no asistió",
-  };
-  const title = titles[params.status];
-  if (!title) return;
+  if (params.status !== "CONFIRMED") return;
 
   await safeNotify(async () => {
-    await createNotification({ _serverOnly: true,
+    await createNotification({
+      _serverOnly: true,
       recipientId: params.patientId,
-      type: params.status === "CONFIRMED" ? "APPOINTMENT_REMINDER" : "SYSTEM",
-      title,
+      type: "APPOINTMENT_CONFIRMED",
+      title: "Cita confirmada",
       body: `${params.consultationName} · ${fmtDate(params.startTime)}`,
       payload: {
         deepLink: "/dashboard/patient/appointments",
@@ -89,24 +70,58 @@ export async function notifyAppointmentStatusChange(params: {
   });
 }
 
-export async function notifyPaymentRegistered(params: {
-  patientId: string;
-  amount: string;
-  consultationName: string;
+export async function notifyAppointmentCancelled(params: {
   appointmentId: string;
+  patientId: string;
+  patientName: string;
+  consultationName: string;
+  startTime: Date;
+  cancelledBy: "PATIENT" | "ADMIN";
 }) {
   await safeNotify(async () => {
-    await createNotification({ _serverOnly: true,
+    const when = fmtDate(params.startTime);
+
+    if (params.cancelledBy === "PATIENT") {
+      const adminIds = await getAdminUserIds();
+      await Promise.all(
+        adminIds.map((id) =>
+          createNotification({
+            _serverOnly: true,
+            recipientId: id,
+            type: "APPOINTMENT_CANCELLED",
+            title: "Cita cancelada por paciente",
+            body: `${params.patientName} canceló ${params.consultationName} (${when}).`,
+            payload: {
+              deepLink: `/dashboard/admin/patients/${params.patientId}`,
+              appointmentId: params.appointmentId,
+            },
+          }),
+        ),
+      );
+      return;
+    }
+
+    await createNotification({
+      _serverOnly: true,
       recipientId: params.patientId,
-      type: "PAYMENT",
-      title: "Pago registrado",
-      body: `Se registró el pago de $${params.amount} por ${params.consultationName}.`,
+      type: "APPOINTMENT_CANCELLED",
+      title: "Cita cancelada",
+      body: `Tu cita de ${params.consultationName} del ${when} fue cancelada por Anttova.`,
       payload: {
         deepLink: "/dashboard/patient/appointments",
         appointmentId: params.appointmentId,
       },
     });
   });
+}
+
+export async function notifyPaymentRegistered(_params: {
+  patientId: string;
+  amount: string;
+  consultationName: string;
+  appointmentId: string;
+}) {
+  // Pagos ya no generan notificación al paciente
 }
 
 export async function notifyAppointmentReminder(params: {
@@ -116,7 +131,8 @@ export async function notifyAppointmentReminder(params: {
   appointmentId: string;
 }) {
   await safeNotify(async () => {
-    await createNotification({ _serverOnly: true,
+    await createNotification({
+      _serverOnly: true,
       recipientId: params.patientId,
       type: "APPOINTMENT_REMINDER",
       title: "Recordatorio de cita",

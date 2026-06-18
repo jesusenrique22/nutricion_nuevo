@@ -42,17 +42,38 @@ export const SITE_CONTENT_DEFAULTS: Record<
     data: landingImagesToRecord(DEFAULT_LANDING_IMAGES),
   },
   nutricionista_page: {
-    title: "Conóceme más",
+    title: "Sobre mí",
     data: nutricionistaPageToRecord(DEFAULT_NUTRICIONISTA_PAGE),
   },
   payment_chat_policy: {
-    title: "Pagos y acceso al chat",
+    title: "Política de pagos",
     data: {
-      advancePercent: 50,
-      remainderPercent: 50,
-      chatUnlockOnAppointment: true,
-      chatUnlockOnAdvancePaid: true,
-      chatUnlockOnRemainderPaid: true,
+      consultationRules: [
+        {
+          consultationCode: "NUT_01",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+        {
+          consultationCode: "ENT_02",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+        {
+          consultationCode: "ANT_03",
+          enabled: true,
+          mode: "two_phase",
+          advancePercent: 50,
+          singleTiming: "on_booking",
+        },
+      ],
+      chatUnlockOnAppointment: false,
+      chatUnlockOnAdvancePaid: false,
+      chatUnlockOnRemainderPaid: false,
     },
   },
 };

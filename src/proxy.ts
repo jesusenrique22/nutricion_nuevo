@@ -26,9 +26,21 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
+  // CV solo visible embebido en /nutricionista/especialidad (admin puede abrir el archivo)
+  if (nextUrl.pathname.startsWith("/uploads/cv/")) {
+    if (role !== "ADMIN") {
+      return new NextResponse("No encontrado", { status: 404 });
+    }
+  }
+
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: [
+    "/dashboard/:path*",
+    "/login",
+    "/register",
+    "/uploads/cv/:path*",
+  ],
 };

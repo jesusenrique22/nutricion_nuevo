@@ -31,9 +31,25 @@ export interface NutricionistaCvData {
   experience: NutricionistaCvExperience[];
 }
 
+export interface NutricionistaAboutData {
+  headline: string;
+  intro: string;
+  highlights: string[];
+  approachHeadline: string;
+  approachIntro: string;
+  approachHighlights: string[];
+  approachClosing: string;
+  specialtyLinkLabel: string;
+  specialtyPageTitle: string;
+  specialtyPageDescription: string;
+}
+
 export interface NutricionistaPageData {
   pageTitle: string;
   pageDescription: string;
+  about: NutricionistaAboutData;
+  /** PDFs del CV mostrados en /nutricionista/especialidad (en orden) */
+  cvPdfUrls: string[];
   cv: NutricionistaCvData;
 }
 

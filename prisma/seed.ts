@@ -1,60 +1,110 @@
-import { PrismaClient, ConsultationCode, Prisma } from "./client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { DEFAULT_FORM_TEMPLATES } from "../src/lib/form-templates-catalog";
-import { SITE_CONTENT_DEFAULTS } from "./seed-data";
+import { DEFAULT_FORM_TEMPLATES, SITE_CONTENT_DEFAULTS } from "./seed-data";
 
-const prisma: PrismaClient = new PrismaClient();
+const prisma = new PrismaClient();
+
+type ConsultationSeed = {
+  code: string;
+  name: string;
+  description: string;
+  durationMinutes: number;
+  price: number;
+  allowsOnline: boolean;
+  allowsPresencial: boolean;
+  morningOnly: boolean;
+  morningStart?: string;
+  morningEnd?: string;
+  sortOrder: number;
+  isPublished: boolean;
+};
+
+const CONSULTATION_TYPES: ConsultationSeed[] = [
+  {
+    code: "NUT_01",
+    name: "Consulta Nutricional",
+    description: "Evaluación y plan nutricional personalizado.",
+    durationMinutes: 60,
+    price: 35000,
+    allowsOnline: true,
+    allowsPresencial: true,
+    morningOnly: false,
+    sortOrder: 1,
+    isPublished: true,
+  },
+  {
+    code: "ENT_02",
+    name: "Entrenamiento",
+    description: "Asesoría y planificación de entrenamiento.",
+    durationMinutes: 60,
+    price: 40000,
+    allowsOnline: true,
+    allowsPresencial: true,
+    morningOnly: false,
+    sortOrder: 2,
+    isPublished: true,
+  },
+  {
+    code: "ANT_03",
+    name: "Antropometría",
+    description: "Mediciones corporales. Solo presencial y matutino.",
+    durationMinutes: 45,
+    price: 25000,
+    allowsOnline: false,
+    allowsPresencial: true,
+    morningOnly: true,
+    morningStart: "08:00",
+    morningEnd: "12:00",
+    sortOrder: 3,
+    isPublished: true,
+  },
+];
+
+function consultationCreateInput(row: ConsultationSeed) {
+  return {
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    durationMinutes: row.durationMinutes,
+    price: new Prisma.Decimal(row.price),
+    allowsOnline: row.allowsOnline,
+    allowsPresencial: row.allowsPresencial,
+    morningOnly: row.morningOnly,
+    morningStart: row.morningStart ?? null,
+    morningEnd: row.morningEnd ?? null,
+    sortOrder: row.sortOrder,
+    isPublished: row.isPublished,
+  };
+}
+
+function consultationUpdateInput(row: ConsultationSeed) {
+  return {
+    name: row.name,
+    description: row.description,
+    durationMinutes: row.durationMinutes,
+    price: new Prisma.Decimal(row.price),
+    allowsOnline: row.allowsOnline,
+    allowsPresencial: row.allowsPresencial,
+    morningOnly: row.morningOnly,
+    morningStart: row.morningStart ?? null,
+    morningEnd: row.morningEnd ?? null,
+    sortOrder: row.sortOrder,
+    isPublished: row.isPublished,
+  };
+}
+
+async function seedConsultationTypes() {
+  for (const row of CONSULTATION_TYPES) {
+    await prisma.consultationType.upsert({
+      where: { code: row.code } as Prisma.ConsultationTypeWhereUniqueInput,
+      update: consultationUpdateInput(row) as Prisma.ConsultationTypeUpdateInput,
+      create: consultationCreateInput(row) as Prisma.ConsultationTypeUncheckedCreateInput,
+    });
+  }
+}
 
 async function main() {
-  await prisma.consultationType.upsert({
-    where: { code: ConsultationCode.NUT_01 },
-    update: {
-      price: new Prisma.Decimal(35000),
-      name: "Consulta Nutricional",
-    },
-    create: {
-      code: ConsultationCode.NUT_01,
-      name: "Consulta Nutricional",
-      description: "Evaluación y plan nutricional personalizado.",
-      durationMinutes: 60,
-      price: new Prisma.Decimal(35000),
-      allowsOnline: true,
-      allowsPresencial: true,
-      morningOnly: false,
-    },
-  });
-
-  await prisma.consultationType.upsert({
-    where: { code: ConsultationCode.ENT_02 },
-    update: { price: new Prisma.Decimal(40000) },
-    create: {
-      code: ConsultationCode.ENT_02,
-      name: "Entrenamiento",
-      description: "Asesoría y planificación de entrenamiento.",
-      durationMinutes: 60,
-      price: new Prisma.Decimal(40000),
-      allowsOnline: true,
-      allowsPresencial: true,
-      morningOnly: false,
-    },
-  });
-
-  await prisma.consultationType.upsert({
-    where: { code: ConsultationCode.ANT_03 },
-    update: { price: new Prisma.Decimal(25000) },
-    create: {
-      code: ConsultationCode.ANT_03,
-      name: "Antropometría",
-      description: "Mediciones corporales. Solo presencial y matutino.",
-      durationMinutes: 45,
-      price: new Prisma.Decimal(25000),
-      allowsOnline: false,
-      allowsPresencial: true,
-      morningOnly: true,
-      morningStart: "08:00",
-      morningEnd: "12:00",
-    },
-  });
+  await seedConsultationTypes();
 
   const adminEmail = "admin@gmail.com";
   const passwordHash = await bcrypt.hash("Admin123", 10);

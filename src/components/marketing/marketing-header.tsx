@@ -4,8 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
+import { CurrencySelector } from "@/components/currency/currency-selector";
+import { showsPublicCurrencySelector } from "@/lib/currency/visibility";
+import {
+  isLobbySectionId,
+  scrollToLobbySection,
+  type LobbySectionId,
+} from "@/lib/lobby-scroll";
 
-export type LobbySectionId = "inicio" | "paquetes";
+export type { LobbySectionId };
 
 const NAV: {
   id: LobbySectionId | null;
@@ -17,7 +24,7 @@ const NAV: {
   {
     id: null,
     href: "/nutricionista",
-    label: "Conoceme más",
+    label: "Sobre mí",
     matchPath: "/nutricionista",
   },
   { id: "paquetes", href: "/#paquetes", label: "Paquetes" },
@@ -27,13 +34,8 @@ const NAV: {
     label: "Recursos",
     matchPath: "/resources",
   },
+  { id: "contacto", href: "/#contacto", label: "Contáctame" },
 ];
-
-function scrollToLobbySection(id: string) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
-}
 
 function navLinkClass(active: boolean) {
   return `rounded-full px-4 py-2 transition ${
@@ -46,13 +48,14 @@ function navLinkClass(active: boolean) {
 export function MarketingHeader() {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const showCurrency = showsPublicCurrencySelector(pathname);
 
   useEffect(() => {
     if (!isHome || typeof window === "undefined") return;
 
     const scrollFromHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (!hash || !["inicio", "paquetes"].includes(hash)) return;
+      if (!hash || !isLobbySectionId(hash)) return;
       requestAnimationFrame(() => scrollToLobbySection(hash));
     };
 
@@ -79,7 +82,9 @@ export function MarketingHeader() {
         <div className="hidden items-center gap-1 text-sm font-semibold md:flex">
           {NAV.map((item) => {
             const active = item.matchPath
-              ? pathname === item.matchPath
+              ? item.matchPath === "/nutricionista"
+                ? pathname === "/nutricionista"
+                : pathname === item.matchPath
               : false;
 
             if (item.id) {
@@ -105,6 +110,7 @@ export function MarketingHeader() {
               </Link>
             );
           })}
+          {showCurrency && <CurrencySelector className="ml-1" />}
           <Link
             href="/login"
             className="ml-2 rounded-full bg-primary px-5 py-2 text-primary-foreground transition hover:bg-foreground/90"
@@ -113,7 +119,12 @@ export function MarketingHeader() {
           </Link>
         </div>
 
-        <MobileNav isHome={isHome} pathname={pathname} onSectionNav={handleSectionNav} />
+        <MobileNav
+          isHome={isHome}
+          pathname={pathname}
+          showCurrency={showCurrency}
+          onSectionNav={handleSectionNav}
+        />
       </nav>
     </header>
   );
@@ -122,10 +133,12 @@ export function MarketingHeader() {
 function MobileNav({
   isHome,
   pathname,
+  showCurrency,
   onSectionNav,
 }: {
   isHome: boolean;
   pathname: string;
+  showCurrency: boolean;
   onSectionNav: (e: React.MouseEvent, id: LobbySectionId) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -172,7 +185,9 @@ function MobileNav({
             <div className="mt-6 flex flex-col gap-2 text-sm font-semibold">
               {NAV.map((item) => {
                 const active = item.matchPath
-                  ? pathname === item.matchPath
+                  ? item.matchPath === "/nutricionista"
+                    ? pathname === "/nutricionista"
+                    : pathname === item.matchPath
                   : false;
 
                 if (item.id) {
@@ -202,6 +217,11 @@ function MobileNav({
                   </Link>
                 );
               })}
+              {showCurrency && (
+                <div className="px-3 py-2">
+                  <CurrencySelector />
+                </div>
+              )}
               <Link href="/login" onClick={close} className="mt-2 rounded-full bg-primary px-5 py-2.5 text-center text-primary-foreground">
                 Iniciar sesión
               </Link>

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { withDb } from "@/lib/db-errors";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { normalizeEmail } from "@/lib/normalize-email";
 import {
   passwordResetEmail,
   resetIdentifier,
@@ -109,10 +110,13 @@ export async function registerPatient(
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
   }
-  const { name, email, password } = parsed.data;
+  const { name, password } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
 
   const existingResult = await withDb(() =>
-    prisma.user.findUnique({ where: { email } }),
+    prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+    }),
   );
   if (!existingResult.ok) return existingResult;
   if (existingResult.data) {
@@ -196,8 +200,9 @@ export async function resendVerificationEmail(
     return { ok: false, message: parsed.error.issues[0].message };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
+  const email = normalizeEmail(parsed.data.email);
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
   });
 
   if (!user || user.role !== "PATIENT" || user.emailVerified) {
@@ -226,8 +231,9 @@ export async function requestPasswordReset(
     return { ok: false, message: parsed.error.issues[0].message };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email },
+  const email = normalizeEmail(parsed.data.email);
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
   });
 
   if (!user?.passwordHash) {

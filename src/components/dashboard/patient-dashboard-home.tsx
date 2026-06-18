@@ -1,25 +1,17 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import {
-  BrandDashboardHeader,
-  BrandQuickLinks,
-  BrandRecipePanel,
-  BrandStatGrid,
-} from "@/components/brand/brand-dashboard-shell";
-import { BRAND_PLANS } from "@/lib/brand-assets";
 
 export function PatientDashboardHome({
   userName,
-  pendingForms,
   upcomingAppointments,
   unreadNotifications,
+  cartCount,
 }: {
   userName: string;
-  pendingForms: number;
   upcomingAppointments: number;
   unreadNotifications: number;
+  cartCount: number;
 }) {
   const firstName = userName.split(" ")[0] ?? userName;
 
@@ -32,125 +24,73 @@ export function PatientDashboardHome({
     },
     {
       index: "02",
-      href: "/dashboard/patient/progress",
-      title: "Estadísticas",
-      desc: "Peso, grasa corporal y evolución ISAK",
+      href: "/dashboard/patient/library",
+      title: "Recursos",
+      desc: "Material digital desbloqueado por tu nutricionista",
     },
     {
       index: "03",
-      href: "/dashboard/patient/library",
-      title: "Plan alimentación",
-      desc: "Guía semanal y recursos nutricionales",
-    },
-    {
-      index: "04",
-      href: "/dashboard/patient/appointments/form",
-      title:
-        pendingForms > 0
-          ? `Formularios pendientes (${pendingForms})`
-          : "Mis formularios",
-      desc: "Ingreso y seguimiento clínico",
-    },
-    {
-      index: "05",
-      href: "/nutricionista",
-      title: "Conoce a Anttova",
-      desc: "Lic. Ma Antonieta Lanza",
+      href: "/dashboard/patient/cart",
+      title: cartCount > 0 ? `Carrito (${cartCount})` : "Carrito",
+      desc: "Solicita recursos y revisa tu pedido",
     },
   ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 pb-2">
-      <BrandDashboardHeader
-        title={`Hola, ${firstName}`}
-        description="Panel paciente · citas, estadísticas, planes y seguimiento en un solo lugar."
-        action={
-          unreadNotifications > 0
-            ? {
-                href: "/dashboard/notifications",
-                label: `${unreadNotifications} notificaciones`,
-              }
-            : undefined
-        }
-      />
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/50">
+          Anttova — tu proceso empieza aquí
+        </p>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Hola, {firstName}</h1>
+        <p className="mt-2 text-foreground/60">
+          Panel paciente · citas, recursos y notificaciones en un solo lugar.
+        </p>
+        {unreadNotifications > 0 && (
+          <Link
+            href="/dashboard/notifications"
+            className="mt-4 inline-block text-sm font-semibold text-accent"
+          >
+            {unreadNotifications} notificaciones sin leer →
+          </Link>
+        )}
+      </div>
 
-      <BrandStatGrid
-        items={[
-          { label: "Próximas citas", value: upcomingAppointments },
-          { label: "Formularios pendientes", value: pendingForms },
-          { label: "Notificaciones", value: unreadNotifications },
-        ]}
-      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-foreground/10 bg-white p-5">
+          <p className="text-xs font-bold uppercase tracking-wider text-foreground/45">
+            Próximas citas
+          </p>
+          <p className="mt-2 text-3xl font-bold text-primary">{upcomingAppointments}</p>
+        </div>
+        <div className="rounded-2xl border border-foreground/10 bg-white p-5">
+          <p className="text-xs font-bold uppercase tracking-wider text-foreground/45">
+            Carrito
+          </p>
+          <p className="mt-2 text-3xl font-bold text-primary">{cartCount}</p>
+        </div>
+      </div>
 
-      <BrandRecipePanel />
-
-      <BrandQuickLinks items={quickLinks} />
-
-      <section className="overflow-hidden rounded-3xl ring-1 ring-primary/10">
-        <div className="grid md:grid-cols-2">
-          <div className="flex flex-col justify-center bg-gradient-to-br from-accent-soft/35 to-muted/20 p-6 sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/50">
-              Plan alimentación
-            </p>
-            <h2 className="mt-2 text-2xl font-extralight uppercase text-primary">
-              Tu guía semanal
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/65">
-              Tras tu consulta nutricional verás recomendaciones, recetas y
-              ajustes personalizados.
-            </p>
+      <section>
+        <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
+          Accesos
+        </h2>
+        <div className="mt-4 space-y-3">
+          {quickLinks.map((link) => (
             <Link
-              href="/dashboard/patient/library"
-              className="mt-5 inline-flex w-fit rounded-full border border-primary px-6 py-2.5 text-sm font-semibold uppercase tracking-wider text-primary transition hover:bg-primary hover:text-primary-foreground"
+              key={link.href}
+              href={link.href}
+              className="flex items-start gap-4 rounded-2xl border border-foreground/10 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              Empecemos
+              <span className="text-lg font-light text-accent">{link.index}</span>
+              <div>
+                <p className="font-semibold">{link.title}</p>
+                <p className="text-sm text-foreground/55">{link.desc}</p>
+              </div>
             </Link>
-          </div>
-          <div className="relative min-h-[220px] bg-primary/5">
-            <Image
-              src={BRAND_PLANS.nutrition}
-              alt="Plan de alimentación"
-              fill
-              className="object-cover object-top"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          </div>
+          ))}
         </div>
       </section>
-
-      <div className="grid gap-4 pb-2 sm:grid-cols-2">
-        {[
-          {
-            title: "Plan entrenamiento",
-            image: BRAND_PLANS.training,
-            href: "/dashboard/patient/progress",
-          },
-          {
-            title: "Análisis antropométrico",
-            image: BRAND_PLANS.anthropometry,
-            href: "/dashboard/patient/progress",
-          },
-        ].map((item) => (
-          <Link
-            key={item.title}
-            href={item.href}
-            className="group overflow-hidden rounded-3xl ring-1 ring-primary/10 transition hover:-translate-y-0.5 hover:shadow-lg"
-          >
-            <div className="relative aspect-[2/1] bg-muted/20">
-              <Image
-                src={item.image}
-                alt={item.title}
-                fill
-                className="object-cover object-top transition duration-500 group-hover:scale-[1.02]"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
-            </div>
-            <p className="bg-surface px-5 py-4 text-sm font-bold uppercase tracking-wide text-primary">
-              {item.title}
-            </p>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

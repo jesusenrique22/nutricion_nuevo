@@ -5,8 +5,8 @@ const SITE_BLOCK_LABELS: Record<string, string> = {
   landing_packages: "Paquetes y precios",
   landing_about: "Sobre la nutricionista",
   landing_images: "Imágenes del sitio",
-  nutricionista_page: "Conóceme más",
-  payment_chat_policy: "Pagos y chat",
+  nutricionista_page: "Sobre mí",
+  payment_chat_policy: "Política de pagos",
 };
 
 /** Por bloque (slug) y clave del campo. */

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { FormSubmissionView } from "@/components/forms/form-submission-view";
+import { areFormsEnabled } from "@/lib/feature-flags";
 import { getAdminFormSubmissionDetail } from "@/server/actions/patient.queries";
 
 function fmt(iso: string | null) {
@@ -25,6 +26,11 @@ export default async function AdminPatientFormPage({
 }: {
   params: Promise<{ id: string; formKey: string }>;
 }) {
+  if (!areFormsEnabled()) {
+    const { id } = await params;
+    redirect(`/dashboard/admin/patients/${id}`);
+  }
+
   const { id, formKey } = await params;
   const form = await getAdminFormSubmissionDetail(id, formKey);
   if (!form) notFound();

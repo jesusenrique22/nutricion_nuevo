@@ -71,8 +71,8 @@ export function CalendarWeekView({
   const days = getWeekDays(date);
 
   return (
-    <div className="anttova-week overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-      <div className="grid grid-cols-7 border-b border-foreground/8 bg-muted/25">
+    <div className="anttova-week flex w-full min-w-0 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+      <div className="grid min-w-0 shrink-0 grid-cols-7 border-b border-foreground/8 bg-muted/25">
         {days.map((day) => {
           const today = isToday(day);
           const isSelected = isSameDay(day, selected);
@@ -112,7 +112,7 @@ export function CalendarWeekView({
         })}
       </div>
 
-      <div className="anttova-week__body grid grid-cols-7 divide-x divide-foreground/6">
+      <div className="anttova-week__body grid min-h-0 min-w-0 flex-1 auto-rows-fr grid-cols-7 divide-x divide-foreground/6">
         {days.map((day) => {
           const dayAppts = appointmentsOnDay(appointments, day);
           const isSelected = isSameDay(day, selected);
@@ -120,12 +120,12 @@ export function CalendarWeekView({
           return (
             <div
               key={`body-${day.toISOString()}`}
-              className={`min-h-[4.5rem] p-1.5 sm:p-2 ${
+              className={`flex h-full min-h-[9rem] min-w-0 flex-col p-1.5 sm:min-h-[10rem] sm:p-2 lg:min-h-0 ${
                 isSelected ? "bg-primary/[0.04]" : ""
               }`}
             >
               {dayAppts.length === 0 ? (
-                <p className="py-3 text-center text-[10px] text-foreground/25">
+                <p className="flex flex-1 items-center justify-center py-6 text-center text-[10px] text-foreground/25">
                   —
                 </p>
               ) : (

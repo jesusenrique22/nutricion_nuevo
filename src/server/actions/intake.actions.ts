@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { areFormsEnabled, FORMS_DISABLED_MESSAGE } from "@/lib/feature-flags";
 import { prisma } from "@/server/db/prisma";
 import { intakeFormSchema } from "@/lib/validators/intake";
 
@@ -14,6 +15,10 @@ export async function submitIntakeForm(
   appointmentId: string,
   formData: unknown,
 ): Promise<SubmitIntakeResult> {
+  if (!areFormsEnabled()) {
+    return { ok: false, message: FORMS_DISABLED_MESSAGE };
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Debes iniciar sesión." };

@@ -1,9 +1,10 @@
 "use server";
 
-import { ConsultationCode, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { validateDynamicFormPayload } from "@/lib/dynamic-form-schema";
+import { areFormsEnabled, FORMS_DISABLED_MESSAGE } from "@/lib/feature-flags";
 import {
   intakeExtendedPayload,
   mapFlatPayloadToIntake,
@@ -343,6 +344,10 @@ export async function submitDynamicConsultationForm(
   appointmentId: string,
   payload: unknown,
 ): Promise<SubmitDynamicFormResult> {
+  if (!areFormsEnabled()) {
+    return { ok: false, message: FORMS_DISABLED_MESSAGE };
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, message: "Debes iniciar sesión." };
@@ -395,7 +400,7 @@ export async function submitDynamicConsultationForm(
         break;
       }
       case "nutrition": {
-        if (appointment.consultationType.code !== ConsultationCode.NUT_01) {
+        if (appointment.consultationType.code !== "NUT_01") {
           return { ok: false, message: "Cita nutricional no válida." };
         }
         if (appointment.nutritionFormSubmission) {
@@ -408,7 +413,7 @@ export async function submitDynamicConsultationForm(
         break;
       }
       case "anthropometry": {
-        if (appointment.consultationType.code !== ConsultationCode.ANT_03) {
+        if (appointment.consultationType.code !== "ANT_03") {
           return { ok: false, message: "Cita de antropometría no válida." };
         }
         if (appointment.anthropometryFormSubmission) {
@@ -426,7 +431,7 @@ export async function submitDynamicConsultationForm(
         break;
       }
       case "training": {
-        if (appointment.consultationType.code !== ConsultationCode.ENT_02) {
+        if (appointment.consultationType.code !== "ENT_02") {
           return { ok: false, message: "Cita de entrenamiento no válida." };
         }
         if (appointment.trainingFormSubmission) {

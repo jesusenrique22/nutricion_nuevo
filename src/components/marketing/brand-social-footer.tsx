@@ -8,7 +8,10 @@ import { BRAND_TAGLINE, SOCIAL_LINKS } from "@/lib/brand-links";
 
 export function BrandSocialFooter() {
   return (
-    <footer className="border-t border-primary/10 bg-gradient-to-b from-muted/40 to-background">
+    <footer
+      id="contacto"
+      className="scroll-mt-20 border-t border-primary/10 bg-gradient-to-b from-muted/40 to-background"
+    >
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-start md:py-20">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -31,18 +34,23 @@ export function BrandSocialFooter() {
           transition={{ duration: 0.5, delay: 0.1 }}
         >
           <p className="text-center text-xs font-semibold uppercase tracking-[0.24em] text-foreground/50 md:text-left">
-            Asesorías y planes · Síguenos
+            Contáctame · Síguenos
           </p>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 flex w-full flex-nowrap items-stretch gap-2 overflow-x-auto pb-1 sm:gap-3 md:overflow-visible">
             {SOCIAL_LINKS.map((link, i) => (
-              <BrandLinkButton
+              <div
                 key={link.id}
-                href={link.href}
-                label={link.label}
-                external={link.external}
-                delay={i * 0.05}
-                wide
-              />
+                className="min-w-[4.75rem] flex-1 shrink-0 sm:min-w-0"
+              >
+                <BrandLinkButton
+                  href={link.href}
+                  label={link.label}
+                  external={link.external}
+                  delay={i * 0.05}
+                  wide
+                  compact
+                />
+              </div>
             ))}
           </div>
           <p className="mt-8 text-center text-xs text-foreground/45 md:text-left">

@@ -14,6 +14,7 @@ export function BrandLinkButton({
   type = "link",
   disabled = false,
   wide = false,
+  compact = false,
 }: {
   href?: string;
   label: string;
@@ -25,9 +26,16 @@ export function BrandLinkButton({
   type?: "link" | "button";
   disabled?: boolean;
   wide?: boolean;
+  compact?: boolean;
 }) {
   const widthClass = wide ? "w-full" : "w-full max-w-[344px]";
-  const className = `group flex ${widthClass} flex-col items-center justify-center rounded-[28px] px-6 py-4 text-center transition-shadow disabled:pointer-events-none disabled:opacity-50 ${
+  const sizeClass = compact
+    ? "rounded-2xl px-2 py-2.5 sm:rounded-[28px] sm:px-4 sm:py-3.5"
+    : "rounded-[28px] px-6 py-4";
+  const labelClass = compact
+    ? "text-xs font-semibold tracking-wide sm:text-sm"
+    : "text-base font-semibold tracking-wide";
+  const className = `group flex ${widthClass} flex-col items-center justify-center ${sizeClass} text-center transition-shadow disabled:pointer-events-none disabled:opacity-50 ${
     selected
       ? "bg-[#5a1728] text-primary-foreground shadow-lg ring-2 ring-accent-soft/50"
       : "bg-primary text-primary-foreground shadow-md hover:shadow-xl"
@@ -35,7 +43,7 @@ export function BrandLinkButton({
 
   const inner = (
     <>
-      <span className="text-base font-semibold tracking-wide">{label}</span>
+      <span className={labelClass}>{label}</span>
       {subtitle && (
         <span className="mt-0.5 text-xs font-normal text-primary-foreground/75">
           {subtitle}

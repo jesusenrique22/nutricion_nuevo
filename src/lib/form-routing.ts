@@ -1,4 +1,5 @@
-import { ConsultationCode, AppointmentFlow } from "@prisma/client";
+import { AppointmentFlow } from "@prisma/client";
+import type { ConsultationCode } from "@/lib/consultation-codes";
 
 export type ConsultationFormType =
   | "anthropometry"

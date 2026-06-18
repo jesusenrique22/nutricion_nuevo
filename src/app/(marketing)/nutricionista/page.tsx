@@ -1,5 +1,5 @@
 import { ContentLobbyShell } from "@/components/brand/content-lobby-shell";
-import { NutricionistaCvDocument } from "@/components/marketing/nutricionista-cv-document";
+import { NutricionistaAboutSection } from "@/components/marketing/nutricionista-about-section";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function NutricionistaPage() {
           title={page.pageTitle}
           description={page.pageDescription}
         >
-          <NutricionistaCvDocument cv={page.cv} />
+          <NutricionistaAboutSection about={page.about} cv={page.cv} />
         </ContentLobbyShell>
       </div>
     </div>

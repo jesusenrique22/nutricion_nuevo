@@ -7,7 +7,7 @@ export default async function CalendarPage() {
   const appointments = await getAllAppointments();
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="flex w-full min-w-0 flex-1 flex-col">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-accent">
@@ -22,7 +22,7 @@ export default async function CalendarPage() {
         </p>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col">
         <CalendarWithPanel appointments={appointments} />
       </div>
     </div>

@@ -1,24 +1,64 @@
+import type { ConsultationCode } from "@/lib/consultation-codes";
+
 export const PAYMENT_CHAT_POLICY_SLUG = "payment_chat_policy";
 
-export interface PaymentChatPolicy {
-  /** Porcentaje de adelanto al agendar (ej. 50) */
+export type PaymentSplitMode = "single" | "two_phase";
+
+/** Cuándo se cobra el pago único (modo single). */
+export type SinglePaymentTiming = "on_booking" | "on_completion";
+
+export interface ConsultationPaymentRule {
+  consultationCode: ConsultationCode;
+  /** Si está desactivado, se usa pago único al agendar por defecto. */
+  enabled: boolean;
+  mode: PaymentSplitMode;
+  /** Porcentaje de adelanto (solo modo two_phase). */
   advancePercent: number;
-  /** Porcentaje al finalizar la consulta (ej. 50) */
-  remainderPercent: number;
-  /** Habilitar chat al agendar cita de ese tipo */
+  /** Momento del cobro (solo modo single). */
+  singleTiming: SinglePaymentTiming;
+}
+
+export interface PaymentChatPolicy {
+  consultationRules: ConsultationPaymentRule[];
   chatUnlockOnAppointment: boolean;
-  /** Habilitar chat al registrar adelanto pagado */
   chatUnlockOnAdvancePaid: boolean;
-  /** Habilitar chat al registrar saldo final pagado */
   chatUnlockOnRemainderPaid: boolean;
 }
 
+export interface ResolvedPaymentSplit {
+  mode: PaymentSplitMode;
+  advancePercent: number;
+  remainderPercent: number;
+  singleTiming?: SinglePaymentTiming;
+}
+
 export const DEFAULT_PAYMENT_CHAT_POLICY: PaymentChatPolicy = {
-  advancePercent: 50,
-  remainderPercent: 50,
-  chatUnlockOnAppointment: true,
-  chatUnlockOnAdvancePaid: true,
-  chatUnlockOnRemainderPaid: true,
+  consultationRules: [
+    {
+      consultationCode: "NUT_01",
+      enabled: true,
+      mode: "two_phase",
+      advancePercent: 50,
+      singleTiming: "on_booking",
+    },
+    {
+      consultationCode: "ENT_02",
+      enabled: true,
+      mode: "two_phase",
+      advancePercent: 50,
+      singleTiming: "on_booking",
+    },
+    {
+      consultationCode: "ANT_03",
+      enabled: true,
+      mode: "two_phase",
+      advancePercent: 50,
+      singleTiming: "on_booking",
+    },
+  ],
+  chatUnlockOnAppointment: false,
+  chatUnlockOnAdvancePaid: false,
+  chatUnlockOnRemainderPaid: false,
 };
 
 export type ChatUnlockReason =

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ResourceCoverImage } from "@/components/resources/resource-cover-image";
-import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requestResourceAccess } from "@/server/actions/resource.actions";
+import { ResourceCoverImage } from "@/components/resources/resource-cover-image";
+import { DisplayPrice } from "@/components/currency/display-price";
+import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { addResourceToCart } from "@/server/actions/cart.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
 
 const typeLabels: Record<string, string> = {
@@ -28,7 +29,7 @@ export function ResourceCatalog({
   if (resources.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-foreground/15 px-6 py-12 text-center text-sm text-foreground/50">
-        Próximamente nuevos recursos.
+        No hay recursos disponibles por ahora.
       </p>
     );
   }
@@ -38,17 +39,19 @@ export function ResourceCatalog({
       {resources.map((r) => (
         <article
           key={r.id}
-          className="overflow-hidden rounded-3xl ring-1 ring-primary/10 bg-white"
+          className="overflow-hidden rounded-3xl bg-white ring-1 ring-primary/10"
         >
-          <div className="relative aspect-[4/3] bg-muted/30">
-            {r.coverUrl && isDisplayableCoverUrl(r.coverUrl) ? (
-              <ResourceCoverImage src={r.coverUrl} alt={r.title} />
-            ) : (
-              <div className="flex h-full items-center justify-center text-xs font-bold uppercase tracking-wider text-foreground/40">
-                {typeLabels[r.type] ?? r.type}
-              </div>
-            )}
-          </div>
+          <Link href={`/dashboard/patient/library/${r.id}/preview`}>
+            <div className="relative aspect-[4/3] bg-muted/30">
+              {r.coverUrl && isDisplayableCoverUrl(r.coverUrl) ? (
+                <ResourceCoverImage src={r.coverUrl} alt={r.title} />
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs font-bold uppercase tracking-wider text-foreground/40">
+                  {typeLabels[r.type] ?? r.type}
+                </div>
+              )}
+            </div>
+          </Link>
           <div className="p-4">
             <span className="text-xs font-bold text-primary">
               {typeLabels[r.type] ?? r.type}
@@ -62,31 +65,29 @@ export function ResourceCatalog({
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
               <span className="font-bold text-primary">
-                {Number(r.price) === 0
-                  ? "Gratis"
-                  : `$${Number(r.price).toLocaleString("es-AR")} ${r.currency}`}
+                <DisplayPrice
+                  amount={r.price}
+                  currency={r.currency === "USD" ? "USD" : "ARS"}
+                />
               </span>
-              {r.owned ? (
-                <Link
-                  href="/dashboard/patient/library"
-                  className="text-sm font-semibold text-primary hover:underline"
-                >
-                  Ver en mi librería →
-                </Link>
+              {r.accessStatus === "PENDING" ? (
+                <span className="text-xs font-semibold text-amber-600">
+                  Solicitud pendiente
+                </span>
               ) : showPurchase ? (
                 <button
                   type="button"
                   disabled={isPending}
                   onClick={() =>
                     startTransition(async () => {
-                      const res = await requestResourceAccess(r.id);
-                      if (res.ok) router.refresh();
+                      const res = await addResourceToCart(r.id);
+                      if (res.ok) router.push("/dashboard/patient/cart");
                       else alert(res.message);
                     })
                   }
                   className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                 >
-                  {Number(r.price) === 0 ? "Obtener" : "Solicitar acceso"}
+                  Agregar al carrito
                 </button>
               ) : null}
             </div>
@@ -105,11 +106,7 @@ export function LibraryResourceList({
   if (resources.length === 0) {
     return (
       <p className="rounded-2xl border border-foreground/10 bg-white px-6 py-10 text-center text-sm text-foreground/50">
-        Aún no tienes recursos. Explora la{" "}
-        <Link href="/resources" className="font-semibold text-primary">
-          tienda
-        </Link>
-        .
+        Aún no tienes recursos comprados. Explora la sección Disponibles.
       </p>
     );
   }
@@ -117,50 +114,24 @@ export function LibraryResourceList({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {resources.map((r) => (
-        <article
+        <Link
           key={r.id}
-          className="rounded-2xl border border-foreground/10 bg-white p-4"
+          href={`/dashboard/patient/library/${r.id}`}
+          className="rounded-2xl border border-foreground/10 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-md"
         >
           <div className="text-xs font-bold text-primary">
             {typeLabels[r.type] ?? r.type}
           </div>
           <h3 className="mt-1 font-semibold">{r.title}</h3>
-          {r.body && (
-            <p className="mt-2 text-sm text-foreground/65">{r.body}</p>
+          {r.description && (
+            <p className="mt-2 line-clamp-2 text-sm text-foreground/65">
+              {r.description}
+            </p>
           )}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {r.contentUrl && (
-              <a
-                href={r.contentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-              >
-                Descargar / ver PDF
-              </a>
-            )}
-            {r.videoUrl && (
-              <a
-                href={r.videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold"
-              >
-                Ver video
-              </a>
-            )}
-            {r.linkUrl && (
-              <a
-                href={r.linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full border px-3 py-1.5 text-xs font-semibold"
-              >
-                Abrir enlace
-              </a>
-            )}
-          </div>
-        </article>
+          <span className="mt-3 inline-block text-xs font-semibold text-accent">
+            Ver recurso →
+          </span>
+        </Link>
       ))}
     </div>
   );
