@@ -412,7 +412,7 @@ function ProfilePreview({ data }: { data: NutricionistaPageData }) {
 // ─── Checkout/Payments preview ────────────────────────────────────────────
 
 function CheckoutPreview({ policy }: { policy: PaymentCheckoutPolicy }) {
-  const enabledMethods = policy.methods.filter((m) => m.enabled !== false);
+  const methods = policy.methods;
 
   return (
     <div className="space-y-3">
@@ -446,10 +446,10 @@ function CheckoutPreview({ policy }: { policy: PaymentCheckoutPolicy }) {
       {/* Métodos */}
       <div className="rounded-xl bg-white p-3 shadow-sm">
         <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-primary/50">
-          Métodos de pago ({enabledMethods.length})
+          Métodos de pago ({methods.length})
         </p>
         <div className="space-y-1.5">
-          {enabledMethods.map((m) => (
+          {methods.map((m) => (
             <div key={m.id} className="rounded-lg border border-foreground/10 bg-muted/40 p-2">
               <p className="text-[10px] font-bold">{m.label || m.id}</p>
               {m.detail && (
