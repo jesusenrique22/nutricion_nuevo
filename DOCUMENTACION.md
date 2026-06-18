@@ -74,7 +74,7 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 | Server Actions | `src/server/actions/` | Mutaciones y queries |
 | Servicios | `src/server/services/` | Slots, disponibilidad |
 | CMS | `src/lib/form-templates-catalog.ts`, `SiteContent` | Plantillas y contenido editable |
-| Auth | `src/lib/auth.ts` + `src/proxy.ts` | NextAuth + protección de rutas |
+| Auth | `src/lib/auth.ts`, `src/lib/auth-edge.ts`, `src/proxy.ts` | NextAuth + protección de rutas (Edge vs servidor) |
 | BD relacional | `prisma/schema.prisma` | PostgreSQL |
 | BD documental | `src/server/db/mongo.ts` | MongoDB |
 
@@ -90,7 +90,7 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 - Roles: `ADMIN` (nutricionista) · `PATIENT`.
 - Registro de pacientes con `PatientProfile`.
 - **Recuperar contraseña:** `/forgot-password`, `/reset-password` (en dev el enlace aparece en pantalla/consola; falta SMTP en producción).
-- Protección de rutas en `src/proxy.ts`.
+- Protección de rutas en `src/proxy.ts` (Edge). El proxy usa `auth-edge.ts`; login con Prisma solo en `auth.ts`. Ver reglas en **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** (sección *Regla Edge*).
 
 ### 3.2 Marketing
 

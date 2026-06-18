@@ -44,11 +44,21 @@ Consulta **[DOCUMENTACION.md](./DOCUMENTACION.md)** para arquitectura, módulos 
 
 Pacientes: registro en `/register`.
 
+### Antes de subir a Vercel
+
+```bash
+pnpm run check:deploy
+```
+
+Simula build de producción y prueba `/login` con `next start`. Detecta errores de middleware que `pnpm run dev` no muestra.
+
 ## Scripts
 
 | Comando | Descripción |
 |---------|-------------|
 | `pnpm run dev` | Servidor de desarrollo |
+| `pnpm run check:deploy` | **Pre-push:** Edge + build + smoke (`/login`) |
+| `pnpm run check:edge` | Verificar proxy sin Prisma (rápido) |
 | `pnpm run build` | Build de producción |
 | `pnpm run db:migrate` | Migraciones Prisma |
 | `pnpm run db:seed` | Datos iniciales |

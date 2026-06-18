@@ -89,6 +89,7 @@ async function migrateDeployWithRetry() {
 
 async function main() {
   loadEnvFile();
+  run("node scripts/check-edge-boundaries.mjs");
   run("pnpm exec prisma generate");
   await migrateDeployWithRetry();
   run("pnpm exec next build");

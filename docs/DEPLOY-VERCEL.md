@@ -60,6 +60,7 @@ El código usa `autoSelectFamily: false` y `family: 4` para Vercel.
 | Síntoma | Causa probable | Solución |
 |---------|----------------|----------|
 | 404 en `/dashboard` o `/login` | Dominio incorrecto | Usá la URL del deploy activo en Vercel |
+| **500 en `/login` (Middleware)** | Proxy importa Prisma/`auth.ts` | Usá `@/lib/auth-edge` en `proxy.ts`; corré `pnpm run check:deploy` |
 | Login con “Credenciales inválidas” | `DATABASE_URL` o seed | Verificá Neon y ejecutá seed en prod si hace falta |
 | Error 500 al iniciar sesión | Falta `AUTH_SECRET` | Agregá `AUTH_SECRET` en Vercel y redeploy |
 | Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio que usás en el navegador |
@@ -76,12 +77,45 @@ El código usa `autoSelectFamily: false` y `family: 4` para Vercel.
 
 ## 7. Comandos locales útiles
 
+**Antes de cada push a producción**, ejecutá el mismo flujo que Vercel:
+
+```bash
+pnpm run check:deploy
+```
+
+Eso hace tres cosas:
+
+1. **Límites Edge** — el proxy (`src/proxy.ts`) no puede importar Prisma ni `@/lib/auth` (solo `@/lib/auth-edge`). Evita **500 en `/login`** en Vercel cuando en local con `next dev` parece OK.
+2. **Build de producción** — `prisma generate` + migraciones + `next build` (igual que Vercel).
+3. **Smoke test** — levanta `next start` y prueba `/login`, `/register` y `/` (detecta fallos de middleware).
+
+Si Neon no responde y solo querés compilar:
+
+```bash
+SKIP_MIGRATE=1 pnpm run check:deploy
+```
+
+Comandos sueltos:
+
 ```bash
 pnpm run db:check        # Verificar Neon
 pnpm run db:check:mongo  # Verificar Atlas
+pnpm run check:edge      # Solo proxy/middleware (rápido)
+pnpm run check:smoke     # Requiere .next ya compilado
 pnpm run vercel-build    # Simular build de Vercel
 pnpm run db:seed         # Re-ejecutar datos iniciales
 ```
+
+### Regla Edge (middleware / proxy)
+
+| Archivo | Puede importar |
+|---------|----------------|
+| `src/proxy.ts` | `@/lib/auth-edge`, `next/server` |
+| `src/lib/auth-edge.ts` | `@/lib/auth.config`, `next-auth` |
+| `src/lib/auth.config.ts` | `next-auth`, tipos de `@prisma/client` |
+| `src/lib/auth.ts` | Prisma, bcrypt, providers (solo servidor) |
+
+**Nunca** importar `@/lib/auth` ni `@/server/db/prisma` desde `proxy.ts`.
 
 ## 8. CLI (opcional)
 

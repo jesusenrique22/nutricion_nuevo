@@ -1,0 +1,38 @@
+name: Deploy check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      SKIP_MIGRATE: "1"
+      AUTH_SECRET: ci-check-auth-secret-min-32-chars-long
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?sslmode=require
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Edge boundaries (proxy sin Prisma)
+        run: pnpm run check:edge
+
+      - name: Production build
+        run: pnpm run vercel-build
+
+      - name: Smoke test (login / middleware)
+        run: pnpm run check:smoke
