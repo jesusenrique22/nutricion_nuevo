@@ -548,7 +548,7 @@ export function PageSectionPreview({
   })();
 
   return (
-    <div className="sticky top-4 flex flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-md">
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-md">
       {/* Chrome del "mini browser" */}
       <div className="flex shrink-0 items-center gap-2 border-b border-foreground/8 bg-muted/60 px-3 py-2.5">
         <div className="flex gap-1.5">
@@ -569,7 +569,7 @@ export function PageSectionPreview({
       </div>
 
       {/* Contenido desplazable */}
-      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 220px)", minHeight: 400 }}>
+      <div className="min-h-[220px] max-h-[min(52vh,28rem)] overflow-y-auto md:min-h-[280px] md:max-h-[calc(100vh-220px)] xl:min-h-[400px]">
         <div className="p-3">{sectionContent}</div>
       </div>
 

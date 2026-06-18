@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PaymentCheckoutPolicyEditor } from "@/components/cms/payment-checkout-policy-editor";
 import { LandingImagesEditor } from "@/components/cms/landing-images-editor";
 import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
@@ -51,6 +51,18 @@ const tabs = [
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
+type MobilePanel = "edit" | "preview";
+
+function PreviewPanel(props: {
+  tab: TabId;
+  imageSection: "hero" | "gallery" | "plans" | "services" | "other";
+  images: LandingImagesData;
+  textBlocks: SiteContentDTO[];
+  nutricionista: NutricionistaPageData;
+  paymentPolicy: PaymentCheckoutPolicy;
+}) {
+  return <PageSectionPreview {...props} />;
+}
 
 export function PersonalizarTabs({
   siteBlocks,
@@ -66,6 +78,11 @@ export function PersonalizarTabs({
   paymentCheckoutPolicy: PaymentCheckoutPolicy;
 }) {
   const [tab, setTab] = useState<TabId>("imagenes");
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("edit");
+
+  useEffect(() => {
+    setMobilePanel("edit");
+  }, [tab]);
 
   // ── Estado en vivo para cada sección (se actualiza sin guardar) ──
   const [liveImages, setLiveImages] = useState(landingImages);
@@ -87,9 +104,89 @@ export function PersonalizarTabs({
 
   const activeTab = tabs.find((t) => t.id === tab)!;
 
+  const previewProps = {
+    tab,
+    imageSection: liveImageSection,
+    images: liveImages,
+    textBlocks: liveTextBlocks,
+    nutricionista: liveNutricionista,
+    paymentPolicy: livePaymentPolicy,
+  };
+
+  const editorContent = (
+    <>
+      <div className="rounded-2xl border border-foreground/8 bg-white px-5 py-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-base font-bold text-primary">{activeTab.label}</h2>
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-semibold text-foreground/50 sm:ml-auto">
+            Afecta: {activeTab.affects}
+          </span>
+        </div>
+      </div>
+
+      {tab === "imagenes" && (
+        <LandingImagesEditor
+          initial={landingImages}
+          onLiveChange={(data, section) => {
+            setLiveImages(data);
+            if (section) setLiveImageSection(section);
+          }}
+        />
+      )}
+
+      {tab === "web" && (
+        <SiteContentEditor
+          blocks={textBlocks}
+          onLiveChange={(updatedBlocks) => setLiveTextBlocks(updatedBlocks)}
+        />
+      )}
+
+      {tab === "conocerme" && (
+        <NutricionistaCvEditor
+          initial={nutricionistaPage}
+          onLiveChange={(data) => setLiveNutricionista(data)}
+        />
+      )}
+
+      {tab === "pagos" && (
+        <PaymentCheckoutPolicyEditor
+          initial={paymentCheckoutPolicy}
+          onLiveChange={(data) => setLivePaymentPolicy(data)}
+        />
+      )}
+
+      {tab === "recursos" && (
+        <div className="rounded-2xl border border-foreground/10 bg-white p-6">
+          <h3 className="text-lg font-bold">Biblioteca digital</h3>
+          <p className="mt-1.5 text-sm text-foreground/60">
+            Subí portadas, archivos y enlaces para tus pacientes. Los recursos
+            tipo <strong>Paquete</strong> publicados aparecen en{" "}
+            <Link
+              href="/resources"
+              target="_blank"
+              className="font-semibold text-primary hover:underline"
+            >
+              /resources ↗
+            </Link>{" "}
+            para visitantes públicos.
+          </p>
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-foreground/10 bg-muted/40 px-4 py-3">
+            <span className="text-2xl font-bold text-primary">{resourceCount}</span>
+            <span className="text-sm text-foreground/60">recurso(s) publicado(s)</span>
+          </div>
+          <Link
+            href="/dashboard/admin/resources"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+          >
+            Gestionar recursos →
+          </Link>
+        </div>
+      )}
+    </>
+  );
+
   return (
-    /* Layout de 3 columnas: nav | editor | preview */
-    <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_380px] xl:items-start">
+    <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)_380px] xl:items-start">
 
       {/* ── 1. Navegación lateral ── */}
       <nav className="flex gap-2 overflow-x-auto pb-1 xl:sticky xl:top-4 xl:flex-col xl:overflow-x-visible xl:pb-0">
@@ -119,88 +216,46 @@ export function PersonalizarTabs({
         })}
       </nav>
 
-      {/* ── 2. Editor ── */}
-      <div className="min-w-0 space-y-4">
-        {/* Cabecera de contexto */}
-        <div className="rounded-2xl border border-foreground/8 bg-white px-5 py-3.5">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-primary">{activeTab.label}</h2>
-            <span className="ml-auto rounded-full bg-muted px-2.5 py-0.5 text-[10px] font-semibold text-foreground/50">
-              Afecta: {activeTab.affects}
-            </span>
-          </div>
+      {/* Editor + preview: 2 cols en tablet, 3 cols en desktop (xl:contents) */}
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:contents">
+        {/* Toggle móvil: Editar ↔ Vista previa */}
+        <div className="flex rounded-full border border-foreground/10 bg-white p-0.5 md:col-span-2 xl:hidden">
+          {(
+            [
+              ["edit", "Editar"],
+              ["preview", "Vista previa"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setMobilePanel(id)}
+              className={`flex-1 rounded-full px-3 py-2 text-xs font-bold transition sm:text-sm ${
+                mobilePanel === id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-foreground/55 hover:text-primary"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
-        {tab === "imagenes" && (
-          <LandingImagesEditor
-            initial={landingImages}
-            onLiveChange={(data, section) => {
-              setLiveImages(data);
-              if (section) setLiveImageSection(section);
-            }}
-          />
-        )}
+        <div
+          className={`min-w-0 space-y-4 ${
+            mobilePanel === "preview" ? "hidden md:block" : ""
+          }`}
+        >
+          {editorContent}
+        </div>
 
-        {tab === "web" && (
-          <SiteContentEditor
-            blocks={textBlocks}
-            onLiveChange={(updatedBlocks) => setLiveTextBlocks(updatedBlocks)}
-          />
-        )}
-
-        {tab === "conocerme" && (
-          <NutricionistaCvEditor
-            initial={nutricionistaPage}
-            onLiveChange={(data) => setLiveNutricionista(data)}
-          />
-        )}
-
-        {tab === "pagos" && (
-          <PaymentCheckoutPolicyEditor
-            initial={paymentCheckoutPolicy}
-            onLiveChange={(data) => setLivePaymentPolicy(data)}
-          />
-        )}
-
-        {tab === "recursos" && (
-          <div className="rounded-2xl border border-foreground/10 bg-white p-6">
-            <h3 className="text-lg font-bold">Biblioteca digital</h3>
-            <p className="mt-1.5 text-sm text-foreground/60">
-              Subí portadas, archivos y enlaces para tus pacientes. Los
-              recursos tipo <strong>Paquete</strong> publicados aparecen en{" "}
-              <Link
-                href="/resources"
-                target="_blank"
-                className="font-semibold text-primary hover:underline"
-              >
-                /resources ↗
-              </Link>{" "}
-              para visitantes públicos.
-            </p>
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-foreground/10 bg-muted/40 px-4 py-3">
-              <span className="text-2xl font-bold text-primary">{resourceCount}</span>
-              <span className="text-sm text-foreground/60">recurso(s) publicado(s)</span>
-            </div>
-            <Link
-              href="/dashboard/admin/resources"
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-            >
-              Gestionar recursos →
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* ── 3. Panel de previsualización en vivo ── */}
-      <div className="hidden xl:block">
-        <PageSectionPreview
-          tab={tab}
-          imageSection={liveImageSection}
-          images={liveImages}
-          textBlocks={liveTextBlocks}
-          nutricionista={liveNutricionista}
-          paymentPolicy={livePaymentPolicy}
-        />
+        <div
+          className={`min-w-0 xl:sticky xl:top-4 ${
+            mobilePanel === "edit" ? "hidden md:block" : ""
+          }`}
+        >
+          <PreviewPanel {...previewProps} />
+        </div>
       </div>
     </div>
   );
