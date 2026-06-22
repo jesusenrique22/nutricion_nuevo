@@ -9,6 +9,7 @@ import {
 } from "@/lib/validators/appointment-status";
 import { syncPatientAndAdmins } from "@/server/realtime/sync";
 import { notifyAppointmentStatusChange, notifyAppointmentCancelled } from "@/server/services/appointment-notify.service";
+import { refreshAppointmentGoogleCalendar } from "@/server/services/google-calendar-sync.service";
 import { formatActionError } from "@/lib/db-errors";
 
 export type StatusActionResult =
@@ -97,6 +98,9 @@ export async function updateAppointmentStatus(
         startTime: appt.startTime,
         cancelledBy: "ADMIN",
       });
+      void refreshAppointmentGoogleCalendar(appt.id);
+    } else {
+      void refreshAppointmentGoogleCalendar(appt.id);
     }
 
     await revalidateAppointmentPaths(appt.patientId);
@@ -168,6 +172,8 @@ export async function cancelAppointment(
       startTime: appt.startTime,
       cancelledBy,
     });
+
+    void refreshAppointmentGoogleCalendar(appt.id);
 
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };

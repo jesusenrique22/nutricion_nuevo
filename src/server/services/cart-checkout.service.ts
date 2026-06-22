@@ -6,6 +6,7 @@ import type {
 import { prisma } from "@/server/db/prisma";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
 import { buildPaymentCreateData } from "@/lib/payment-split";
+import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
 
@@ -101,6 +102,7 @@ async function createCartAppointment(params: {
   });
   const flow = profile?.hasCompletedIntake ? "FOLLOW_UP" : "INTAKE";
   const paymentPolicy = await getPaymentChatPolicy();
+  const calendarAdminId = await resolveCalendarAdminIdForNewAppointment();
 
   const appointment = await prisma.$transaction(async (tx) => {
     const created = await tx.appointment.create({
@@ -112,6 +114,7 @@ async function createCartAppointment(params: {
         modality: params.item.modality,
         flow,
         status: "PENDING",
+        ...(calendarAdminId ? { calendarAdminId } : {}),
       },
       select: { id: true },
     });
@@ -239,6 +242,10 @@ export async function fulfillCartCheckout(params: {
       startTime: appt.startTime,
       appointmentId: appt.id,
     });
+    const { syncAppointmentToGoogleCalendar } = await import(
+      "@/server/services/google-calendar-sync.service"
+    );
+    void syncAppointmentToGoogleCalendar(appt.id);
   }
 
   return { ok: true, newAppointmentIds };

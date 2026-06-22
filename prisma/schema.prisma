@@ -93,6 +93,10 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  googleCalendarConnection GoogleCalendarConnection?
+  /** Admin que recibe nuevas citas en su Google Calendar (solo uno activo). */
+  isDefaultCalendarAdmin Boolean @default(false)
+  calendarAdminAppointments Appointment[] @relation("CalendarAdminAppointments")
 
   @@index([role])
 }
@@ -164,6 +168,10 @@ model Appointment {
   reminderSentAt     DateTime?
   cancelledBy        AppointmentCancelledBy?
   cancelledAt        DateTime?
+  googleEventId      String?
+  /** Admin cuyo Google Calendar recibe este evento. */
+  calendarAdminId    String?
+  calendarAdmin      User?   @relation("CalendarAdminAppointments", fields: [calendarAdminId], references: [id], onDelete: SetNull)
 
   payment Payment?
 
@@ -180,6 +188,7 @@ model Appointment {
   @@index([patientId])
   @@index([status])
   @@index([consultationTypeId])
+  @@index([calendarAdminId])
 }
 
 // ──────────────────────────────────────────────
@@ -525,6 +534,20 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GoogleCalendarConnection {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken   String   @db.Text
+  accessToken    String?  @db.Text
+  tokenExpiry    DateTime?
+  calendarId     String   @default("primary")
+  connectedEmail String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model VerificationToken {

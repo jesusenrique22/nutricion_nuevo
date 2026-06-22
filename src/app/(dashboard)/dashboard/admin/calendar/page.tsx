@@ -1,10 +1,28 @@
 import { CalendarWithPanel } from "@/components/calendar/calendar-with-panel";
-import { getAllAppointments } from "@/server/actions/booking.queries";
+import { GoogleCalendarConnect } from "@/components/calendar/google-calendar-connect";
+import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
+import { auth } from "@/lib/auth";
+import { getAllAppointments } from "@/server/actions/scheduling.queries";
+import {
+  getCalendarAdminStatus,
+  getGoogleCalendarConnectionSummary,
+} from "@/server/services/google-calendar.service";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const appointments = await getAllAppointments();
+  const session = await auth();
+  const adminUserId = session?.user?.id;
+
+  const [appointments, connection, adminStatus] = await Promise.all([
+    getAllAppointments(),
+    adminUserId
+      ? getGoogleCalendarConnectionSummary(adminUserId)
+      : Promise.resolve(null),
+    adminUserId
+      ? getCalendarAdminStatus(adminUserId)
+      : Promise.resolve({ isDefaultCalendarAdmin: false }),
+  ]);
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
@@ -21,6 +39,12 @@ export default async function CalendarPage() {
           Mini calendario + agenda sincronizados. Toca una cita para gestionarla.
         </p>
       </div>
+
+      <GoogleCalendarConnect
+        configured={isGoogleCalendarConfigured()}
+        connection={connection}
+        isDefaultCalendarAdmin={adminStatus.isDefaultCalendarAdmin}
+      />
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
         <CalendarWithPanel appointments={appointments} />

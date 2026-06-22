@@ -10,6 +10,7 @@ import { syncPatientAndAdmins } from "@/server/realtime/sync";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
 import { buildPaymentCreateData } from "@/lib/payment-split";
+import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
 
 export type CreateAppointmentResult =
   | { ok: true; appointmentId: string; flow: "INTAKE" | "FOLLOW_UP" }
@@ -62,6 +63,8 @@ export async function createAppointment(
   });
   const flow = profile?.hasCompletedIntake ? "FOLLOW_UP" : "INTAKE";
 
+  const calendarAdminId = await resolveCalendarAdminIdForNewAppointment();
+
   // 6) Persistencia + registro de pago manual pendiente (adelanto + saldo)
   const paymentPolicy = await getPaymentChatPolicy();
 
@@ -75,6 +78,7 @@ export async function createAppointment(
         modality,
         flow,
         status: "PENDING",
+        ...(calendarAdminId ? { calendarAdminId } : {}),
       },
       select: { id: true },
     });
@@ -100,6 +104,11 @@ export async function createAppointment(
     startTime: new Date(startTime),
     appointmentId: appointment.id,
   });
+
+  const { syncAppointmentToGoogleCalendar } = await import(
+    "@/server/services/google-calendar-sync.service"
+  );
+  void syncAppointmentToGoogleCalendar(appointment.id);
 
   revalidatePath("/dashboard/patient/appointments");
 
