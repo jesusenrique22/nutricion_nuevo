@@ -2,7 +2,7 @@ import { CalendarWithPanel } from "@/components/calendar/calendar-with-panel";
 import { GoogleCalendarConnect } from "@/components/calendar/google-calendar-connect";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
 import { auth } from "@/lib/auth";
-import { getAllAppointments } from "@/server/actions/scheduling.queries";
+import { getAllAppointments } from "@/server/actions/booking.queries";
 import {
   getCalendarAdminStatus,
   getGoogleCalendarConnectionSummary,
