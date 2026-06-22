@@ -3,7 +3,7 @@ import type { GoogleCalendarConnection } from "@prisma/client";
 import { getGoogleCalendarConfig } from "@/lib/google-calendar/config";
 import { prisma } from "@/server/db/prisma";
 
-function createOAuthClient() {
+function createOAuthClient(redirectUri?: string) {
   const config = getGoogleCalendarConfig();
   if (!config.clientId || !config.clientSecret) {
     throw new Error("Google Calendar OAuth no configurado.");
@@ -12,12 +12,15 @@ function createOAuthClient() {
   return new google.auth.OAuth2(
     config.clientId,
     config.clientSecret,
-    config.redirectUri,
+    redirectUri ?? config.redirectUri,
   );
 }
 
-export function getGoogleCalendarAuthUrl(state: string): string {
-  const oauth2 = createOAuthClient();
+export function getGoogleCalendarAuthUrl(
+  state: string,
+  redirectUri?: string,
+): string {
+  const oauth2 = createOAuthClient(redirectUri);
   const { scopes } = getGoogleCalendarConfig();
 
   return oauth2.generateAuthUrl({
@@ -28,8 +31,11 @@ export function getGoogleCalendarAuthUrl(state: string): string {
   });
 }
 
-export async function exchangeCodeForTokens(code: string) {
-  const oauth2 = createOAuthClient();
+export async function exchangeCodeForTokens(
+  code: string,
+  redirectUri?: string,
+) {
+  const oauth2 = createOAuthClient(redirectUri);
   const { tokens } = await oauth2.getToken(code);
   return tokens;
 }

@@ -103,23 +103,35 @@ async function seedConsultationTypes() {
   }
 }
 
-async function main() {
-  await seedConsultationTypes();
-
+async function seedAdminUser() {
   const adminEmail = "admin@gmail.com";
   const passwordHash = await bcrypt.hash("Admin123", 10);
-  await prisma.user.upsert({
+
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { emailVerified: new Date(), isDefaultCalendarAdmin: true },
+    update: { emailVerified: new Date() },
     create: {
       email: adminEmail,
       name: "Lic. Ma Antonieta Lanza",
       role: "ADMIN",
       passwordHash,
       emailVerified: new Date(),
-      isDefaultCalendarAdmin: true,
     },
   });
+
+  await prisma.$executeRaw`
+    UPDATE "User"
+    SET "isDefaultCalendarAdmin" = true
+    WHERE "id" = ${admin.id}
+  `;
+
+  return adminEmail;
+}
+
+async function main() {
+  await seedConsultationTypes();
+
+  const adminEmail = await seedAdminUser();
 
   for (const [slug, content] of Object.entries(SITE_CONTENT_DEFAULTS)) {
     await prisma.siteContent.upsert({

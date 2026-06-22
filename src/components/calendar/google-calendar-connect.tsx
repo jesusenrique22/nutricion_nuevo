@@ -12,10 +12,11 @@ type ConnectionInfo = {
 
 const statusMessages: Record<string, string> = {
   connected: "Google Calendar conectado correctamente.",
-  denied: "No se otorgó permiso a Google Calendar.",
+  denied:
+    "Google bloqueó la autorización. Revisá que tu Gmail esté en Test users del OAuth consent screen y que el scope calendar.events esté agregado.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
   no_refresh: "Google no devolvió token persistente. Desconectá y volvé a conectar.",
-  error: "Error al conectar Google Calendar.",
+  error: "Error al conectar Google Calendar. Revisá el detalle abajo o intentá Desconectar y volver a conectar.",
   missing_config: "Faltan GOOGLE_CALENDAR_CLIENT_ID y CLIENT_SECRET en el servidor.",
 };
 
@@ -35,8 +36,11 @@ function GoogleCalendarConnectInner({
 
   useEffect(() => {
     const gcal = params.get("gcal");
+    const detail = params.get("gcal_detail");
     if (gcal && statusMessages[gcal]) {
-      setMessage(statusMessages[gcal]);
+      setMessage(
+        detail ? `${statusMessages[gcal]} (${detail})` : statusMessages[gcal],
+      );
       router.replace("/dashboard/admin/calendar", { scroll: false });
     }
   }, [params, router]);

@@ -41,7 +41,7 @@ Reemplazá `nutricion-phi.vercel.app` por tu dominio si cambia.
 
 1. **APIs & Services → Library** → habilitar **Google Calendar API**
 2. **OAuth consent screen** → External → nombre **Anttova**
-3. Scope: `https://www.googleapis.com/auth/calendar.events`
+3. Scope: `https://www.googleapis.com/auth/calendar.events` y `https://www.googleapis.com/auth/userinfo.email`
 4. **Test users**: Gmail de cada admin que vaya a conectar (modo Testing)
 
 Copiá **Client ID** y **Client Secret** al crear el cliente.
@@ -60,7 +60,19 @@ GOOGLE_CALENDAR_TIMEZONE="America/Argentina/Buenos_Aires"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-En producción, `GOOGLE_CALENDAR_REDIRECT_URI` y `NEXTAUTH_URL` deben usar la URL de Vercel.
+En producción, `NEXTAUTH_URL` debe ser la URL de Vercel.
+
+**Importante (Vercel):** cada variable va en su **propia fila**. No pegues todo el bloque `.env` en un solo campo; eso corrompe el `redirect_uri` y Google devuelve `Error 400: solicitud no válida`.
+
+| Variable | Valor (solo esto, sin otras líneas) |
+|----------|-------------------------------------|
+| `GOOGLE_CALENDAR_CLIENT_ID` | `530408512020-....apps.googleusercontent.com` |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | `GOCSPX-...` |
+| `GOOGLE_CALENDAR_TIMEZONE` | `America/Argentina/Buenos_Aires` |
+| `NEXTAUTH_URL` | `https://nutricion-phi.vercel.app` |
+
+`GOOGLE_CALENDAR_REDIRECT_URI` es **opcional** (la app la calcula sola). Si la definís, debe ser **solo**:
+`https://nutricion-phi.vercel.app/api/google/calendar/callback`
 
 ---
 
@@ -105,6 +117,36 @@ Las citas **anteriores** a conectar Google no se importan solas.
 ---
 
 ## 6. Solución de problemas
+
+### Error 400: invalid_request / "no cumple con la política OAuth 2.0"
+
+Suele ser **configuración en Google Cloud**, no un bug de la app. Revisá en este orden:
+
+1. **OAuth consent screen → Test users**  
+   Agregá el Gmail con el que intentás conectar (ej. `david.30249427@uru.edu`).  
+   Si la app está en modo **Testing**, solo esos emails pueden autorizar.
+
+2. **OAuth consent screen → Data Access (Scopes)**  
+   Agregá el scope: `https://www.googleapis.com/auth/calendar.events`  
+   (Google Calendar API → Ver, editar, compartir y eliminar eventos).
+
+3. **Pantalla de consentimiento completa**  
+   Completá al menos:
+   - **App name:** Anttova  
+   - **User support email:** tu email  
+   - **App home page:** `https://nutricion-phi.vercel.app`  
+   - **Privacy policy:** URL pública (puede ser una página de privacidad del sitio)
+
+4. **Authorized domains** (en consent screen)  
+   Agregá: `vercel.app` (o tu dominio custom si tenés uno).
+
+5. **Redirect URIs** (en el cliente OAuth) deben coincidir exactamente:
+   ```
+   https://nutricion-phi.vercel.app/api/google/calendar/callback
+   http://localhost:3000/api/google/calendar/callback
+   ```
+
+6. **Variables en Vercel** — `GOOGLE_CALENDAR_CLIENT_ID` y `GOOGLE_CALENDAR_CLIENT_SECRET` deben estar definidas (sin espacios extra).
 
 | Problema | Causa |
 |----------|--------|
