@@ -29,6 +29,8 @@ next-env.d.ts
 # env files (secrets — nunca subir)
 .env*
 !.env.example
+.env.backup
+.env.*.backup
 
 # vercel
 .vercel
@@ -59,9 +61,10 @@ _tmp_*
 .idea/
 .cursor/
 
-# archivos locales de sesión / handoff
+# handoff / notas locales de sesión
 HANDOFF-CONTEXTO-CHAT.txt
 *.handoff.txt
+*.handoff.md
 
 # assets de diseño (fuentes pesadas; en web se usa public/brand/)
 Anttova-Diseños/
@@ -81,3 +84,7 @@ Anttova _ Brandbook/
 # prisma — bases locales de desarrollo
 *.db
 *.db-journal
+
+# tests e2e (si se agregan)
+/playwright-report/
+/test-results/

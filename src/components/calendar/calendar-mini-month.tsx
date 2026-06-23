@@ -25,6 +25,7 @@ export function CalendarMiniMonth({
   onSelectDay,
   onChangeMonth,
   compact = false,
+  className = "",
 }: {
   month: Date;
   selected: Date;
@@ -32,13 +33,14 @@ export function CalendarMiniMonth({
   onSelectDay: (day: Date) => void;
   onChangeMonth: (month: Date) => void;
   compact?: boolean;
+  className?: string;
 }) {
   const weeks = getMonthWeeks(month);
   const counts = countByDay(appointments);
 
   return (
     <div
-      className={`rounded-xl border border-foreground/8 bg-surface shadow-sm ${compact ? "p-2.5" : "p-4"}`}
+      className={`h-fit w-full rounded-xl border border-foreground/8 bg-surface shadow-sm ${compact ? "p-2.5" : "p-4"} ${className}`.trim()}
     >
       <div className="flex items-center justify-between gap-1">
         <button

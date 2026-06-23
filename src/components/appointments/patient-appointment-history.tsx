@@ -3,6 +3,7 @@
 import { DisplayPrice } from "@/components/currency/display-price";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 import { CancelAppointmentButton } from "@/components/booking/cancel-appointment-button";
+import { RescheduleAppointmentButton } from "@/components/booking/reschedule-appointment-button";
 import {
   appointmentStatusLabels,
   modalityLabels,
@@ -37,10 +38,20 @@ function fmt(iso: string) {
   });
 }
 
+function canModify(status: string, start: string) {
+  if (!["PENDING", "CONFIRMED"].includes(status)) return false;
+  const startDate = new Date(start);
+  if (startDate <= new Date()) return false;
+  const hoursUntil = (startDate.getTime() - Date.now()) / (1000 * 60 * 60);
+  return hoursUntil >= 2;
+}
+
 function canCancel(status: string, start: string) {
-  return (
-    ["PENDING", "CONFIRMED"].includes(status) && new Date(start) > new Date()
-  );
+  return canModify(status, start);
+}
+
+function canReschedule(status: string, start: string) {
+  return canModify(status, start);
 }
 
 export function PatientAppointmentHistory({
@@ -141,9 +152,14 @@ export function PatientAppointmentHistory({
                     </p>
                   )}
                 </div>
-                {canCancel(a.status, a.start) && (
-                  <CancelAppointmentButton appointmentId={a.id} />
-                )}
+                <div className="flex flex-col items-end gap-2">
+                  {canReschedule(a.status, a.start) && (
+                    <RescheduleAppointmentButton appointmentId={a.id} />
+                  )}
+                  {canCancel(a.status, a.start) && (
+                    <CancelAppointmentButton appointmentId={a.id} />
+                  )}
+                </div>
               </div>
             </div>
           );

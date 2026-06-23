@@ -1,5 +1,5 @@
 import { getAdminUserIds } from "@/lib/admin-users";
-import { createNotification } from "@/server/actions/notification.actions";
+import { createNotification } from "@/server/services/notification.service";
 
 async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
@@ -23,7 +23,6 @@ export async function notifyRefundRequested(params: {
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
-          _serverOnly: true,
           recipientId: id,
           type: "REFUND_REQUESTED",
           title: "Solicitud de reembolso",
@@ -54,7 +53,6 @@ export async function notifyRefundResolved(params: {
         }`;
 
     await createNotification({
-      _serverOnly: true,
       recipientId: params.patientId,
       type: "REFUND_RESOLVED",
       title: params.approved ? "Reembolso aceptado" : "Reembolso no aceptado",

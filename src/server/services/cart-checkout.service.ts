@@ -7,8 +7,15 @@ import { prisma } from "@/server/db/prisma";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
 import { buildPaymentCreateData } from "@/lib/payment-split";
 import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
-import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import {
+  assertNoOverlapInTransaction,
+  validateAppointmentSlot,
+} from "@/server/services/scheduling.service";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
+import {
+  isTimeSlotConflictError,
+  TIME_SLOT_TAKEN_MESSAGE,
+} from "@/lib/scheduling-errors";
 
 export type CartPaymentPayload = {
   patientPaymentMethod: string;
@@ -104,36 +111,49 @@ async function createCartAppointment(params: {
   const paymentPolicy = await getPaymentChatPolicy();
   const calendarAdminId = await resolveCalendarAdminIdForNewAppointment();
 
-  const appointment = await prisma.$transaction(async (tx) => {
-    const created = await tx.appointment.create({
-      data: {
-        patientId: params.patientId,
-        consultationTypeId: params.item.consultationTypeId,
+  try {
+    const appointment = await prisma.$transaction(async (tx) => {
+      await assertNoOverlapInTransaction(tx, {
         startTime: params.item.appointmentStart,
         endTime: validation.endTime,
-        modality: params.item.modality,
-        flow,
-        status: "PENDING",
-        ...(calendarAdminId ? { calendarAdminId } : {}),
-      },
-      select: { id: true },
+        excludeAppointmentId: params.excludeAppointmentId,
+      });
+
+      const created = await tx.appointment.create({
+        data: {
+          patientId: params.patientId,
+          consultationTypeId: params.item.consultationTypeId,
+          startTime: params.item.appointmentStart,
+          endTime: validation.endTime,
+          modality: params.item.modality,
+          flow,
+          status: "PENDING",
+          ...(calendarAdminId ? { calendarAdminId } : {}),
+        },
+        select: { id: true },
+      });
+
+      await tx.payment.create({
+        data: {
+          appointmentId: created.id,
+          ...buildPaymentCreateData({
+            totalPrice: params.item.consultationType.price,
+            consultationCode: params.item.consultationType.code,
+            policy: paymentPolicy,
+          }),
+        },
+      });
+
+      return created;
     });
 
-    await tx.payment.create({
-      data: {
-        appointmentId: created.id,
-        ...buildPaymentCreateData({
-          totalPrice: params.item.consultationType.price,
-          consultationCode: params.item.consultationType.code,
-          policy: paymentPolicy,
-        }),
-      },
-    });
-
-    return created;
-  });
-
-  return { ok: true as const, appointmentId: appointment.id, created: true };
+    return { ok: true as const, appointmentId: appointment.id, created: true };
+  } catch (err) {
+    if (isTimeSlotConflictError(err)) {
+      return { ok: false as const, message: TIME_SLOT_TAKEN_MESSAGE };
+    }
+    throw err;
+  }
 }
 
 export async function fulfillCartCheckout(params: {
@@ -245,7 +265,7 @@ export async function fulfillCartCheckout(params: {
     const { syncAppointmentToGoogleCalendar } = await import(
       "@/server/services/google-calendar-sync.service"
     );
-    void syncAppointmentToGoogleCalendar(appt.id);
+    await syncAppointmentToGoogleCalendar(appt.id);
   }
 
   return { ok: true, newAppointmentIds };

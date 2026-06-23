@@ -5,12 +5,20 @@ import { auth } from "@/lib/auth";
 import { assertBookingRequestAllowed } from "@/lib/booking-guard";
 import { prisma } from "@/server/db/prisma";
 import { createAppointmentSchema } from "@/lib/validators/appointment";
-import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import {
+  assertNoOverlapInTransaction,
+  validateAppointmentSlot,
+} from "@/server/services/scheduling.service";
 import { syncPatientAndAdmins } from "@/server/realtime/sync";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
 import { buildPaymentCreateData } from "@/lib/payment-split";
 import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
+import {
+  isTimeSlotConflictError,
+  TIME_SLOT_TAKEN_MESSAGE,
+} from "@/lib/scheduling-errors";
+import { formatActionError } from "@/lib/db-errors";
 
 export type CreateAppointmentResult =
   | { ok: true; appointmentId: string; flow: "INTAKE" | "FOLLOW_UP" }
@@ -68,34 +76,51 @@ export async function createAppointment(
   // 6) Persistencia + registro de pago manual pendiente (adelanto + saldo)
   const paymentPolicy = await getPaymentChatPolicy();
 
-  const appointment = await prisma.$transaction(async (tx) => {
-    const created = await tx.appointment.create({
-      data: {
-        patientId,
-        consultationTypeId,
+  let appointment: { id: string };
+  try {
+    appointment = await prisma.$transaction(async (tx) => {
+      await assertNoOverlapInTransaction(tx, {
         startTime: new Date(startTime),
         endTime: validation.endTime,
-        modality,
-        flow,
-        status: "PENDING",
-        ...(calendarAdminId ? { calendarAdminId } : {}),
-      },
-      select: { id: true },
-    });
+      });
 
-    await tx.payment.create({
-      data: {
-        appointmentId: created.id,
-        ...buildPaymentCreateData({
-          totalPrice: consultationType.price,
-          consultationCode: consultationType.code,
-          policy: paymentPolicy,
-        }),
-      },
-    });
+      const created = await tx.appointment.create({
+        data: {
+          patientId,
+          consultationTypeId,
+          startTime: new Date(startTime),
+          endTime: validation.endTime,
+          modality,
+          flow,
+          status: "PENDING",
+          ...(calendarAdminId ? { calendarAdminId } : {}),
+        },
+        select: { id: true },
+      });
 
-    return created;
-  });
+      await tx.payment.create({
+        data: {
+          appointmentId: created.id,
+          ...buildPaymentCreateData({
+            totalPrice: consultationType.price,
+            consultationCode: consultationType.code,
+            policy: paymentPolicy,
+          }),
+        },
+      });
+
+      return created;
+    });
+  } catch (err) {
+    if (isTimeSlotConflictError(err)) {
+      return { ok: false, message: TIME_SLOT_TAKEN_MESSAGE };
+    }
+    console.error("[createAppointment]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo agendar la cita."),
+    };
+  }
 
   await notifyAppointmentBooked({
     patientId,
@@ -108,7 +133,7 @@ export async function createAppointment(
   const { syncAppointmentToGoogleCalendar } = await import(
     "@/server/services/google-calendar-sync.service"
   );
-  void syncAppointmentToGoogleCalendar(appointment.id);
+  await syncAppointmentToGoogleCalendar(appointment.id);
 
   revalidatePath("/dashboard/patient/appointments");
 

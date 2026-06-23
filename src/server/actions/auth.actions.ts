@@ -7,18 +7,21 @@ import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { withDb } from "@/lib/db-errors";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { assertAuthRateLimit } from "@/lib/security/auth-rate-limit";
 import { normalizeEmail } from "@/lib/normalize-email";
 import {
   passwordResetEmail,
+  passwordResetCodeEmail,
   resetIdentifier,
   verifyEmailMessage,
   verifyIdentifier,
 } from "@/lib/email-messages";
+import { passwordSchema } from "@/lib/validators/password";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Nombre demasiado corto"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(8, "Mínimo 8 caracteres"),
+  password: passwordSchema,
 });
 
 const forgotSchema = z.object({
@@ -28,7 +31,13 @@ const forgotSchema = z.object({
 const resetSchema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8, "Mínimo 8 caracteres"),
+  password: passwordSchema,
+});
+
+const resetWithCodeSchema = z.object({
+  email: z.string().email("Email inválido"),
+  code: z.string().length(6, "El código debe tener 6 dígitos"),
+  password: passwordSchema,
 });
 
 const verifySchema = z.object({
@@ -65,6 +74,27 @@ async function createVerificationToken(
   });
 
   return token;
+}
+
+function generateNumericCode(): string {
+  // 6 dígitos criptográficamente seguros (100000–999999)
+  const num = (randomBytes(4).readUInt32BE(0) % 900000) + 100000;
+  return num.toString();
+}
+
+async function createNumericCodeToken(
+  identifier: string,
+  ttlMs: number,
+): Promise<string> {
+  const code = generateNumericCode();
+  const expires = new Date(Date.now() + ttlMs);
+
+  await prisma.verificationToken.deleteMany({ where: { identifier } });
+  await prisma.verificationToken.create({
+    data: { identifier, token: code, expires },
+  });
+
+  return code;
 }
 
 async function sendVerificationEmailToUser(
@@ -106,6 +136,9 @@ export async function signOutAction(): Promise<void> {
 export async function registerPatient(
   formData: unknown,
 ): Promise<RegisterResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
   const parsed = registerSchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
@@ -156,6 +189,9 @@ export async function registerPatient(
 export async function verifyEmail(
   formData: unknown,
 ): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
   const parsed = verifySchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: "Enlace inválido." };
@@ -195,6 +231,9 @@ export async function verifyEmail(
 export async function resendVerificationEmail(
   formData: unknown,
 ): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
   const parsed = resendVerifySchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
@@ -226,6 +265,9 @@ export async function resendVerificationEmail(
 export async function requestPasswordReset(
   formData: unknown,
 ): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
   const parsed = forgotSchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
@@ -268,6 +310,9 @@ export async function requestPasswordReset(
 export async function resetPassword(
   formData: unknown,
 ): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
   const parsed = resetSchema.safeParse(formData);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
@@ -300,6 +345,131 @@ export async function resetPassword(
           token: parsed.data.token,
         },
       },
+    }),
+  ]);
+
+  return { ok: true };
+}
+
+// ── Flujo de recuperación con código de 6 dígitos ──────────────────────────
+
+export async function requestPasswordResetCode(
+  formData: unknown,
+): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
+  const parsed = forgotSchema.safeParse(formData);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0].message };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
+
+  // Siempre responder ok para no revelar si el email existe
+  if (!user?.passwordHash) {
+    return { ok: true, email };
+  }
+
+  const identifier = resetIdentifier(email);
+  const code = await createNumericCodeToken(identifier, 15 * 60 * 1000); // 15 min
+
+  const message = passwordResetCodeEmail(code);
+  const sent = await sendEmail(
+    {
+      to: email,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    },
+    // En dev sin SMTP, muestra el código en consola/pantalla como devResetUrl
+    `/forgot-password?dev_code=${code}&email=${encodeURIComponent(email)}`,
+  );
+
+  if (!sent.ok) return sent;
+
+  return {
+    ok: true,
+    email,
+    devResetUrl: sent.devPreviewUrl,
+  };
+}
+
+export async function verifyResetCode(formData: unknown): Promise<
+  | { ok: true }
+  | { ok: false; message: string }
+> {
+  const schema = z.object({
+    email: z.string().email(),
+    code: z.string().length(6),
+  });
+  const parsed = schema.safeParse(formData);
+  if (!parsed.success) {
+    return { ok: false, message: "Código inválido." };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const identifier = resetIdentifier(email);
+  const record = await prisma.verificationToken.findFirst({
+    where: {
+      identifier,
+      token: parsed.data.code,
+      expires: { gt: new Date() },
+    },
+  });
+
+  if (!record) {
+    return { ok: false, message: "Código incorrecto o expirado." };
+  }
+
+  return { ok: true };
+}
+
+export async function resetPasswordWithCode(
+  formData: unknown,
+): Promise<AuthActionResult> {
+  const rate = await assertAuthRateLimit();
+  if (!rate.ok) return rate;
+
+  const parsed = resetWithCodeSchema.safeParse(formData);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0].message };
+  }
+
+  const email = normalizeEmail(parsed.data.email);
+  const identifier = resetIdentifier(email);
+
+  const record = await prisma.verificationToken.findFirst({
+    where: {
+      identifier,
+      token: parsed.data.code,
+      expires: { gt: new Date() },
+    },
+  });
+
+  if (!record) {
+    return { ok: false, message: "Código incorrecto o expirado." };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+  });
+  if (!user) {
+    return { ok: false, message: "No se encontró la cuenta." };
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 10);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    }),
+    prisma.verificationToken.delete({
+      where: { identifier_token: { identifier, token: parsed.data.code } },
     }),
   ]);
 

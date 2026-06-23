@@ -23,11 +23,8 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
 
     const payload = {
       profile: {
-        birthDate: fd.get("birthDate"),
         gender: fd.get("gender"),
         height: fd.get("height"),
-        occupation: fd.get("occupation"),
-        emergencyPhone: fd.get("emergencyPhone"),
       },
       medicalHistory: {
         conditions: fd.get("conditions"),
@@ -75,12 +72,9 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <FormSection
         title="Datos personales"
-        description="Información básica para tu expediente clínico."
+        description="Género y estatura para tu expediente clínico."
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Fecha de nacimiento">
-            <input name="birthDate" type="date" required className={inputClass} />
-          </Field>
           <Field label="Género">
             <select name="gender" required className={selectClass}>
               <option value="">Seleccionar…</option>
@@ -96,17 +90,6 @@ export function IntakeFormClient({ appointmentId }: { appointmentId: string }) {
               type="number"
               min={50}
               max={250}
-              required
-              className={inputClass}
-            />
-          </Field>
-          <Field label="Ocupación">
-            <input name="occupation" type="text" required minLength={2} className={inputClass} />
-          </Field>
-          <Field label="Teléfono de emergencia">
-            <input
-              name="emergencyPhone"
-              type="tel"
               required
               className={inputClass}
             />

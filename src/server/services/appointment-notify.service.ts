@@ -1,5 +1,5 @@
 import { getAdminUserIds } from "@/lib/admin-users";
-import { createNotification } from "@/server/actions/notification.actions";
+import { createNotification } from "@/server/services/notification.service";
 
 function fmtDate(iso: Date | string) {
   return new Date(iso).toLocaleString("es", {
@@ -31,7 +31,6 @@ export async function notifyAppointmentBooked(params: {
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
-          _serverOnly: true,
           recipientId: id,
           type: "APPOINTMENT_REMINDER",
           title: "Nueva cita solicitada",
@@ -57,7 +56,6 @@ export async function notifyAppointmentStatusChange(params: {
 
   await safeNotify(async () => {
     await createNotification({
-      _serverOnly: true,
       recipientId: params.patientId,
       type: "APPOINTMENT_CONFIRMED",
       title: "Cita confirmada",
@@ -86,7 +84,6 @@ export async function notifyAppointmentCancelled(params: {
       await Promise.all(
         adminIds.map((id) =>
           createNotification({
-            _serverOnly: true,
             recipientId: id,
             type: "APPOINTMENT_CANCELLED",
             title: "Cita cancelada por paciente",
@@ -102,7 +99,6 @@ export async function notifyAppointmentCancelled(params: {
     }
 
     await createNotification({
-      _serverOnly: true,
       recipientId: params.patientId,
       type: "APPOINTMENT_CANCELLED",
       title: "Cita cancelada",
@@ -129,10 +125,11 @@ export async function notifyAppointmentReminder(params: {
   consultationName: string;
   startTime: Date;
   appointmentId: string;
+  patientEmail?: string | null;
+  patientName?: string;
 }) {
   await safeNotify(async () => {
     await createNotification({
-      _serverOnly: true,
       recipientId: params.patientId,
       type: "APPOINTMENT_REMINDER",
       title: "Recordatorio de cita",
@@ -142,5 +139,48 @@ export async function notifyAppointmentReminder(params: {
         appointmentId: params.appointmentId,
       },
     });
+  });
+}
+
+export async function notifyAppointmentRescheduled(params: {
+  patientId: string;
+  patientName: string;
+  patientEmail?: string | null;
+  consultationName: string;
+  newStartTime: Date;
+  appointmentId: string;
+  rescheduledBy: "PATIENT" | "ADMIN";
+}) {
+  await safeNotify(async () => {
+    const when = fmtDate(params.newStartTime);
+
+    if (params.rescheduledBy === "PATIENT") {
+      const adminIds = await getAdminUserIds();
+      await Promise.all(
+        adminIds.map((id) =>
+          createNotification({
+            recipientId: id,
+            type: "APPOINTMENT_REMINDER",
+            title: "Cita reagendada por paciente",
+            body: `${params.patientName} movió ${params.consultationName} al ${when}.`,
+            payload: {
+              deepLink: "/dashboard/admin/calendar",
+              appointmentId: params.appointmentId,
+            },
+          }),
+        ),
+      );
+    } else {
+      await createNotification({
+        recipientId: params.patientId,
+        type: "APPOINTMENT_REMINDER",
+        title: "Cita reagendada",
+        body: `${params.consultationName} · ${when}`,
+        payload: {
+          deepLink: "/dashboard/patient/appointments",
+          appointmentId: params.appointmentId,
+        },
+      });
+    }
   });
 }

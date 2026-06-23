@@ -14,6 +14,16 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
+const FLYER_PNG_TO_JPG: Record<string, string> = {
+  "/brand/flyers/jump.png": "/brand/flyers/jump.jpg",
+  "/brand/flyers/medical.png": "/brand/flyers/medical.jpg",
+  "/brand/flyers/training.png": "/brand/flyers/training.jpg",
+};
+
+function optimizeHeroFlyerSrc(src: string): string {
+  return FLYER_PNG_TO_JPG[src] ?? src;
+}
+
 function parseHeroSlides(value: unknown): HeroSlide[] | null {
   if (!Array.isArray(value)) return null;
   const slides: HeroSlide[] = [];
@@ -29,7 +39,7 @@ function parseHeroSlides(value: unknown): HeroSlide[] | null {
       continue;
     }
     slides.push({
-      src: row.src,
+      src: optimizeHeroFlyerSrc(row.src),
       alt: row.alt,
       line1: row.line1,
       line2: row.line2,

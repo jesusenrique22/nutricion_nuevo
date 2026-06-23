@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { assertBookingRequestAllowed } from "@/lib/booking-guard";
 import { prisma } from "@/server/db/prisma";
 import { getPaymentCheckoutPolicy } from "@/lib/payment-checkout-policy";
-import { createNotification } from "@/server/actions/notification.actions";
+import { createNotification } from "@/server/services/notification.service";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { fulfillCartCheckout, findReusableCartAppointment } from "@/server/services/cart-checkout.service";
 import { formatActionError } from "@/lib/db-errors";
@@ -350,7 +350,6 @@ export async function submitCart(options?: {
       if (item.resource.price.toNumber() === 0) {
         try {
           await createNotification({
-            _serverOnly: true,
             recipientId: session.user.id,
             type: "RESOURCE_UNLOCKED",
             title: "Recurso desbloqueado",

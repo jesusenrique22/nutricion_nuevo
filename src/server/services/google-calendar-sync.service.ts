@@ -1,4 +1,5 @@
 import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
+import { isAppointmentEligibleForGoogleSync, getCalendarSyncFromDate } from "@/lib/google-calendar/sync-eligibility";
 import { modalityLabels, appointmentStatusLabels } from "@/lib/appointment-labels";
 import {
   createGoogleCalendarEvent,
@@ -37,26 +38,54 @@ function buildEventPayload(appt: {
   };
 }
 
+async function adminHasGoogleConnection(userId: string): Promise<boolean> {
+  const row = await prisma.googleCalendarConnection.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
 async function resolveAdminForAppointment(
   appointmentId: string,
   calendarAdminId: string | null,
 ): Promise<string | null> {
-  if (calendarAdminId) return calendarAdminId;
+  if (calendarAdminId && (await adminHasGoogleConnection(calendarAdminId))) {
+    return calendarAdminId;
+  }
 
   const resolved = await resolveCalendarAdminIdForNewAppointment();
-  if (!resolved) return null;
+  if (resolved && (await adminHasGoogleConnection(resolved))) {
+    if (calendarAdminId !== resolved) {
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: { calendarAdminId: resolved },
+      });
+    }
+    return resolved;
+  }
+
+  const fallback = await prisma.user.findFirst({
+    where: {
+      role: "ADMIN",
+      googleCalendarConnection: { isNot: null },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!fallback) return null;
 
   await prisma.appointment.update({
     where: { id: appointmentId },
-    data: { calendarAdminId: resolved },
+    data: { calendarAdminId: fallback.id },
   });
-  return resolved;
+  return fallback.id;
 }
 
 /** Crea o actualiza el evento en Google Calendar para una cita. */
 export async function syncAppointmentToGoogleCalendar(
   appointmentId: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const appt = await prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -65,31 +94,83 @@ export async function syncAppointmentToGoogleCalendar(
         consultationType: true,
       },
     });
-    if (!appt || appt.status === "CANCELLED") return;
+    if (!appt || appt.status === "CANCELLED") return false;
+
+    if (!isAppointmentEligibleForGoogleSync(appt.startTime)) {
+      return false;
+    }
 
     const adminUserId = await resolveAdminForAppointment(
       appointmentId,
       appt.calendarAdminId,
     );
-    if (!adminUserId) return;
+    if (!adminUserId) {
+      console.warn(
+        "[google-calendar/sync] sin admin con calendario conectado",
+        appointmentId,
+      );
+      return false;
+    }
 
     const payload = buildEventPayload(appt);
 
     if (appt.googleEventId) {
       await updateGoogleCalendarEvent(adminUserId, appt.googleEventId, payload);
-      return;
+      return true;
     }
 
     const eventId = await createGoogleCalendarEvent(adminUserId, payload);
-    if (eventId) {
-      await prisma.appointment.update({
-        where: { id: appointmentId },
-        data: { googleEventId: eventId, calendarAdminId: adminUserId },
-      });
+    if (!eventId) {
+      console.warn(
+        "[google-calendar/sync] Google no devolvió eventId",
+        appointmentId,
+        adminUserId,
+      );
+      return false;
     }
+
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { googleEventId: eventId, calendarAdminId: adminUserId },
+    });
+    return true;
   } catch (err) {
-    console.error("[google-calendar/sync create]", err);
+    console.error("[google-calendar/sync create]", appointmentId, err);
+    return false;
   }
+}
+
+/** Sincroniza citas existentes que aún no tienen evento en Google Calendar. */
+export async function syncUnsyncedAppointmentsForAdmin(
+  adminUserId: string,
+): Promise<{ synced: number; failed: number }> {
+  const hasConnection = await adminHasGoogleConnection(adminUserId);
+  if (!hasConnection) {
+    return { synced: 0, failed: 0 };
+  }
+
+  const since = getCalendarSyncFromDate();
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      status: { not: "CANCELLED" },
+      googleEventId: null,
+      startTime: { gte: since },
+    },
+    select: { id: true },
+    orderBy: { startTime: "asc" },
+  });
+
+  let synced = 0;
+  let failed = 0;
+
+  for (const { id } of appointments) {
+    const ok = await syncAppointmentToGoogleCalendar(id);
+    if (ok) synced++;
+    else failed++;
+  }
+
+  return { synced, failed };
 }
 
 /** Elimina el evento de Google al cancelar. */

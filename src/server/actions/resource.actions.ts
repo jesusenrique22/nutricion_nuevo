@@ -7,7 +7,7 @@ import {
   grantResourceSchema,
   upsertResourceSchema,
 } from "@/lib/validators/resource";
-import { createNotification } from "@/server/actions/notification.actions";
+import { createNotification } from "@/server/services/notification.service";
 import { syncUser } from "@/server/realtime/sync";
 import { formatActionError } from "@/lib/db-errors";
 
@@ -202,7 +202,6 @@ export async function grantResourceAccess(
     });
 
     await createNotification({
-      _serverOnly: true,
       recipientId: parsed.data.userId,
       type: "RESOURCE_UNLOCKED",
       title: "Recurso desbloqueado",

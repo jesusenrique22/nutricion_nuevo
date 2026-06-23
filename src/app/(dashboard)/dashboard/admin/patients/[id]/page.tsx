@@ -4,21 +4,16 @@ import { DeletePatientAccountButton } from "@/components/admin/delete-patient-ac
 import { PatientFichaSections } from "@/components/admin/patient-ficha-sections";
 import { ProfileEmojiBanner } from "@/components/brand/profile-emoji-banner";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
+import {
+  formatPatientGender,
+  formatPatientHeight,
+} from "@/lib/patient-ficha-format";
 import { getPatientPendingPayments } from "@/server/actions/payment-admin.queries";
 import {
   getPatientAppointmentsAdmin,
   getPatientDetail,
   getPatientPurchasesAdmin,
 } from "@/server/actions/patient.queries";
-
-function fmt(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 export default async function PatientDetailPage({
   params,
@@ -80,33 +75,20 @@ export default async function PatientDetailPage({
       {patient.profile ? (
         <section className="mt-8 w-full rounded-2xl border border-foreground/10 bg-white p-6">
           <h2 className="text-lg font-bold">Datos personales</h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <dt className="text-foreground/50">Nacimiento</dt>
-              <dd className="font-medium">{fmt(patient.profile.birthDate)}</dd>
-            </div>
-            <div>
+          <p className="mt-1 text-sm text-foreground/50">
+            Se completan al enviar un formulario de consulta o ingreso.
+          </p>
+          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+            <div className="rounded-xl border border-foreground/8 bg-surface/50 px-4 py-3">
               <dt className="text-foreground/50">Género</dt>
-              <dd className="font-medium capitalize">
-                {patient.profile.gender ?? "—"}
+              <dd className="mt-1 text-base font-semibold">
+                {formatPatientGender(patient.profile.gender)}
               </dd>
             </div>
-            <div>
+            <div className="rounded-xl border border-foreground/8 bg-surface/50 px-4 py-3">
               <dt className="text-foreground/50">Estatura</dt>
-              <dd className="font-medium">
-                {patient.profile.height ? `${patient.profile.height} cm` : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-foreground/50">Ocupación</dt>
-              <dd className="font-medium">
-                {patient.profile.occupation ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-foreground/50">Emergencia</dt>
-              <dd className="font-medium">
-                {patient.profile.emergencyPhone ?? "—"}
+              <dd className="mt-1 text-base font-semibold">
+                {formatPatientHeight(patient.profile.height)}
               </dd>
             </div>
           </dl>

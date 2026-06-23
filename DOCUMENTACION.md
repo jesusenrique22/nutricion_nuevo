@@ -18,6 +18,9 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 8. [Comandos útiles](#8-comandos-útiles)
 9. [Credenciales de desarrollo](#9-credenciales-de-desarrollo)
 10. [Pendiente / próximos pasos](#10-pendiente--próximos-pasos)
+11. [Seguridad](#11-seguridad)
+12. [Email (SMTP)](#12-email-smtp)
+13. [Google Calendar](#13-google-calendar)
 
 ---
 
@@ -28,16 +31,16 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 | Área | Estado | Notas |
 |------|--------|-------|
 | Infraestructura | ✅ ~95% | Next.js, Prisma, seed, scripts cron/reminders |
-| Auth | ✅ ~90% | Login, registro, recuperar contraseña (dev: link en pantalla) |
+| Auth | ✅ ~95% | Login, registro, recuperación con código por email |
 | Landing / marketing | ✅ ~85% | Brand Anttova, imágenes editables desde CMS |
 | Formularios clínicos | ✅ ~95% | **100% dinámicos** vía CMS (5 plantillas) |
-| Agendamiento | ✅ ~90% | Slots, reservas, confirmar/cancelar/completar, recordatorios |
+| Agendamiento | ✅ ~95% | Slots, reservas, reagendar, bloqueos admin, recordatorios email+in-app |
 | Panel admin | ✅ ~80% | Pacientes, calendario, analytics, mediciones |
 | Chat | ✅ ~85% | UI + Socket.io + MongoDB + badges unread |
 | Recursos digitales | ✅ ~85% | CRUD, tienda, librería; pagos manuales |
 | CMS / Personalizar | ✅ ~90% | Imágenes, precios, textos, formularios, plan semanal |
 | Pagos online | 🔴 ~10% | Modelo `Payment` + registro manual; sin Stripe |
-| Deploy / prod | 🔴 0% | Pendiente VPS, dominio, SMTP |
+| Deploy / prod | 🟡 ~50% | Vercel + Neon; SMTP y Upstash configurables |
 
 **Leyenda:** ✅ funcional · 🟡 parcial · 🔴 pendiente
 
@@ -48,10 +51,10 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Next.js App (App Router)                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │  Marketing   │  │    Auth      │  │    Dashboard     │  │
-│  │  (público)   │  │ login/reg    │  │ admin / patient  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Marketing   │  │    Auth      │  │    Dashboard     │   │
+│  │  (público)   │  │ login/reg    │  │ admin / patient  │   │
+│  └──────────────┘  └──────────────┘  └──────────────────┘   │
 │                          │                    │             │
 │                    Server Actions         Server Actions    │
 └──────────────────────────┼────────────────────┼─────────────┘
@@ -88,9 +91,9 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 
 - NextAuth v5 (Credentials, bcrypt).
 - Roles: `ADMIN` (nutricionista) · `PATIENT`.
-- Registro de pacientes con `PatientProfile`.
-- **Recuperar contraseña:** `/forgot-password`, `/reset-password` (en dev el enlace aparece en pantalla/consola; falta SMTP en producción).
-- Protección de rutas en `src/proxy.ts` (Edge). El proxy usa `auth-edge.ts`; login con Prisma solo en `auth.ts`. Ver reglas en **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** (sección *Regla Edge*).
+- Registro de pacientes con `PatientProfile` y verificación por email.
+- **Recuperar contraseña:** `/forgot-password` — código de 6 dígitos por correo (15 min) → nueva contraseña. Ver [§12 Email](#12-email-smtp).
+- Protección de rutas en `src/proxy.ts` (Edge). Ver **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** (regla Edge).
 
 ### 3.2 Marketing
 
@@ -124,9 +127,9 @@ Todos los formularios de cita usan plantillas editables en **Personalizar → Fo
 - Tipos de consulta con reglas (ANT-03 solo presencial matutino).
 - Precios editables desde CMS (seed: $35.000 / $40.000 / $25.000 ARS).
 - Crear cita, slots disponibles, rate limit (Upstash opcional).
-- **Admin:** confirmar, cancelar, completar, no-show desde calendario.
-- **Paciente:** cancelar citas propias.
-- **Recordatorios:** notificaciones in-app + `GET /api/cron/reminders` + `pnpm run reminders`.
+- **Admin:** confirmar, cancelar, completar, no-show, **reagendar**, **bloquear días sin atención** y bloqueos parciales desde calendario.
+- **Paciente:** cancelar y **reagendar** citas propias (mín. 2 h de anticipación).
+- **Recordatorios:** notificaciones in-app + **correo al paciente** (si SMTP) + `GET /api/cron/reminders` + `pnpm run reminders`.
 - Pagos **manuales** (`payment.actions.ts`); sin Stripe.
 
 ### 3.5 Panel admin
@@ -220,7 +223,7 @@ FormTemplate (code + fields JSON) — formularios editables
 | `/resources` | Tienda de recursos |
 | `/nutricionista` | Perfil / CV |
 | `/login` · `/register` | Auth |
-| `/forgot-password` · `/reset-password` | Recuperar contraseña |
+| `/forgot-password` | Recuperar contraseña (código por email) |
 
 ### Dashboard — común
 
@@ -258,17 +261,19 @@ FormTemplate (code + fields JSON) — formularios editables
 |----------|-----------|-----|
 | `DATABASE_URL` | ✅ | PostgreSQL |
 | `AUTH_SECRET` | ✅ | NextAuth JWT |
-| `NEXTAUTH_URL` | ✅ | URL base (links en emails) |
-| `SMTP_HOST` | ⚠️ prod | Envío de correo propio (ver `docs/EMAIL.md`) |
-| `SMTP_PORT` | Opcional | Default 587 (25 si host local) |
-| `SMTP_USER` / `SMTP_PASS` | Opcional | Vacío si usás Postfix local |
-| `EMAIL_FROM` | Recomendado | Remitente, ej. `Anttova <consultas@tudominio.com>` |
+| `AUTH_URL` / `NEXTAUTH_URL` | ✅ prod | URL base (sesión + links en emails) |
+| `SMTP_HOST` | ⚠️ prod | Envío de correo — [§12](#12-email-smtp) |
+| `SMTP_PORT` | Opcional | Default `587` |
+| `SMTP_USER` / `SMTP_PASS` | ⚠️ prod | Usuario y contraseña de aplicación |
+| `EMAIL_FROM` | Recomendado | Remitente visible |
 | `MONGODB_URI` | ⚠️ | Chat |
-| `UPSTASH_*` | Opcional | Rate limit |
+| `UPSTASH_*` | ✅ prod | Rate limit auth y citas |
+| `GOOGLE_CALENDAR_*` | Opcional | Sync calendario admin — [§13](#13-google-calendar) |
 | `SOCKET_PORT` / `NEXT_PUBLIC_SOCKET_URL` | Opcional | Chat en tiempo real |
 | `CRON_SECRET` | Opcional | Recordatorios |
+| `RECAPTCHA_*` | Recomendado | Anti-spam al agendar |
 
-**Email:** solo SMTP (VPS Postfix, buzón del dominio o Gmail gratuito). Sin Resend/SendGrid. Guía completa: [`docs/EMAIL.md`](docs/EMAIL.md).
+**Deploy Vercel:** lista completa de variables en **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)**.
 
 ---
 
@@ -319,9 +324,9 @@ Pacientes: registro en `/register`.
 
 | Tarea | Detalle |
 |-------|---------|
-| Deploy VPS + dominio | HTTPS, variables de entorno, procesos PM2/systemd |
-| Email SMTP propio | Postfix en VPS o buzón `@tudominio` — ver `docs/EMAIL.md` |
-| Migraciones formales | Usar `db:migrate` en prod (hoy mucho `db push` en dev) |
+| Deploy Vercel + dominio | Ver [DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md) |
+| Upstash en producción | Obligatorio para rate limit de auth |
+| Migraciones formales | `pnpm run db:migrate` en prod |
 
 ### Prioridad media (producto)
 
@@ -329,7 +334,6 @@ Pacientes: registro en `/register`.
 |-------|---------|
 | Pasarela de pago | Stripe u otra; hoy pagos manuales |
 | Otorgar recursos desde admin | Action existe; falta UI clara en ficha o recursos |
-| Reagendar citas | Cambiar fecha/hora sin cancelar |
 | Ficha admin completa | Mostrar todos los campos de formularios (incl. `extendedPayload`) |
 | Landing textos 100% CMS | Algunos bloques de copy siguen hardcodeados en componentes |
 | Sidebar móvil | Menú hamburguesa en pantallas pequeñas |
@@ -338,10 +342,106 @@ Pacientes: registro en `/register`.
 
 | Tarea | Detalle |
 |-------|---------|
-| OAuth / verificación email | Tablas NextAuth listas |
+| OAuth / verificación email | Verificación email ✅; OAuth login no implementado |
 | Tests + CI/CD | Sin suite configurada |
 | Cloud storage | Uploads locales; migrar a S3/Cloudinary si escala |
 | i18n | Textos en español hardcodeados |
+
+---
+
+## 11. Seguridad
+
+Medidas activas en el código (detalle en [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md)):
+
+- **SQL:** Prisma parametrizado; script `pnpm run check:sql` prohíbe `*RawUnsafe` en `src/`.
+- **Auth / IDOR:** guards en `src/lib/security/auth-guards.ts`; planes semanales solo para el paciente o admin.
+- **Notificaciones:** servicio interno (no invocable desde el cliente).
+- **Rate limit:** Upstash Redis — citas y endpoints de auth (`UPSTASH_REDIS_REST_*` obligatorio en prod).
+- **Headers:** CSP, HSTS (prod), X-Frame-Options, nosniff en `next.config.ts`.
+
+---
+
+## 12. Email (SMTP)
+
+Anttova envía correos solo por **SMTP** (sin Resend/SendGrid): verificación de cuenta y **código de 6 dígitos** para recuperar contraseña.
+
+### Variables
+
+```env
+SMTP_HOST="smtp.gmail.com"       # Google Workspace / Gmail
+SMTP_PORT="587"
+SMTP_SECURE="false"
+SMTP_USER="tu@correo.com"
+SMTP_PASS="contraseña_de_aplicación"   # sin espacios
+EMAIL_FROM="Anttova <tu@correo.com>"
+```
+
+| Proveedor | `SMTP_HOST` | Notas |
+|-----------|-------------|-------|
+| Google Workspace / Gmail | `smtp.gmail.com` | Verificación 2 pasos + [contraseña de aplicación](https://myaccount.google.com/apppasswords). `SMTP_USER` debe ser la misma cuenta. |
+| Hotmail / Outlook | `smtp-mail.outlook.com` | Contraseña de aplicación de **Microsoft**, no de Google. |
+| Buzón del dominio | `mail.tudominio.com` | Credenciales del hosting |
+| VPS (Postfix local) | `127.0.0.1` | Puerto `25`; configurar SPF/DKIM en DNS |
+
+### Desarrollo sin SMTP
+
+Si `SMTP_HOST` está vacío: registro sin verificación email; códigos de reset en consola y pantalla (modo dev).
+
+### Comandos
+
+```bash
+pnpm run email:check   # Verificar conexión SMTP
+pnpm run dev           # Reiniciar tras cambiar .env
+```
+
+### Vercel
+
+Copiar las 6 variables SMTP en **Settings → Environment Variables** y redeploy. Ver [DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md).
+
+---
+
+## 13. Google Calendar
+
+Las citas agendadas se sincronizan al **Google Calendar del admin** asignado. Requiere **OAuth Client ID + Secret** (una API key no alcanza).
+
+### Google Cloud Console
+
+1. Habilitar **Google Calendar API**
+2. **OAuth consent screen** → External → agregar scope `calendar.events` y **Test users** (Gmail de cada admin)
+3. Crear **OAuth Client ID** (Web application)
+4. **Redirect URIs** (exactas):
+
+```
+http://localhost:3000/api/google/calendar/callback
+https://TU-DOMINIO.vercel.app/api/google/calendar/callback
+```
+
+### Variables
+
+```env
+GOOGLE_CALENDAR_CLIENT_ID="....apps.googleusercontent.com"
+GOOGLE_CALENDAR_CLIENT_SECRET="GOCSPX-..."
+GOOGLE_CALENDAR_TIMEZONE="America/Argentina/Buenos_Aires"
+NEXTAUTH_URL="https://TU-DOMINIO.vercel.app"
+```
+
+`GOOGLE_CALENDAR_REDIRECT_URI` es opcional (se calcula desde `NEXTAUTH_URL`).
+
+### Uso en la app
+
+1. Admin → **Calendario** → **Conectar mi Google Calendar**
+2. El primer admin conectado queda como calendario principal para nuevas citas
+3. Citas desde hoy en adelante se sincronizan (zona `GOOGLE_CALENDAR_TIMEZONE`)
+
+### Problemas frecuentes
+
+| Error | Solución |
+|-------|----------|
+| `redirect_uri_mismatch` | URI en Google Cloud = `{NEXTAUTH_URL}/api/google/calendar/callback` |
+| `access_denied` | Email del admin en **Test users** del consent screen |
+| `invalid_request` | Completar pantalla de consentimiento (nombre, email soporte, dominios autorizados) |
+
+Archivos: `src/server/services/google-calendar-sync.service.ts`, `src/server/actions/google-calendar.actions.ts`.
 
 ---
 
@@ -363,7 +463,8 @@ src/
 ├── lib/
 │   ├── form-templates-catalog.ts   plantillas default
 │   ├── dynamic-form-schema.ts      validación CMS
-│   └── validators/
+│   ├── validators/
+│   └── security/            auth guards, rate limit, client IP
 ├── server/
 │   ├── actions/             dominio (auth, cms, chat, forms…)
 │   ├── queries/             landing, analytics

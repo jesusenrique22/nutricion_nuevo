@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { limitHeroSlides } from "@/lib/landing-images-parse";
 import { scrollToLobbySection } from "@/lib/lobby-scroll";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { HeroSlide } from "@/types/landing-images";
 
 export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
@@ -21,6 +22,14 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
     return () => clearInterval(timer);
   }, [items.length]);
 
+  // Precargar la siguiente diapositiva para transiciones suaves
+  useEffect(() => {
+    const next = items[(index + 1) % items.length];
+    if (!next) return;
+    const img = new window.Image();
+    img.src = next.src;
+  }, [index, items]);
+
   const slide = items[index];
 
   return (
@@ -28,31 +37,28 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
       id="inicio"
       className="lobby-panel relative min-h-[100svh] scroll-mt-20 overflow-hidden bg-primary"
     >
-      {items.map((s, i) => (
+      <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
-          key={`${s.src}-${i}`}
-          aria-hidden={i !== index}
-          initial={false}
-          animate={{
-            opacity: i === index ? 1 : 0,
-            scale: i === index ? 1 : 1.04,
-          }}
+          key={slide.src}
+          initial={{ opacity: 0, scale: 1.04 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           className="absolute inset-0"
         >
           <Image
-            src={s.src}
-            alt={s.alt}
+            src={slide.src}
+            alt={slide.alt}
             fill
-            priority={i === 0}
-            loading="eager"
-            fetchPriority={i === 0 ? "high" : "auto"}
+            priority={index === 0}
+            loading={index === 0 ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "high" : "auto"}
             className="object-cover object-center"
             sizes="100vw"
-            unoptimized={s.src.startsWith("/uploads/")}
+            unoptimized={shouldUnoptimizeImage(slide.src)}
           />
         </motion.div>
-      ))}
+      </AnimatePresence>
 
       <div className="absolute inset-0 bg-gradient-to-r from-primary/92 via-primary/55 to-primary/20" />
       <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-primary/25" />

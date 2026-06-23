@@ -12,13 +12,8 @@
 }
 
 @media (min-width: 1024px) {
-  .anttova-calendar > .grid {
-    min-height: calc(100dvh - 13.5rem);
-    align-items: stretch;
-  }
-
   .anttova-calendar > .grid > .anttova-calendar__main {
-    min-height: 0;
+    min-height: calc(100dvh - 13.5rem);
   }
 }
 

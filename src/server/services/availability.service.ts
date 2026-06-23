@@ -32,7 +32,14 @@ export interface Slot {
 export async function getAvailableSlots(
   consultationType: ConsultationType,
   dateStr: string,
+  excludeAppointmentId?: string,
 ): Promise<Slot[]> {
+  const blockedDay = await prisma.blockedDay.findUnique({
+    where: { date: dateStr },
+    select: { id: true },
+  });
+  if (blockedDay) return [];
+
   const windowStart = consultationType.morningOnly
     ? toMinutes(consultationType.morningStart ?? "08:00")
     : toMinutes(CLINIC_OPEN);
@@ -49,6 +56,15 @@ export async function getAvailableSlots(
     where: {
       status: { in: ["PENDING", "CONFIRMED"] },
       startTime: { gte: dayStart, lt: dayEnd },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+    },
+    select: { startTime: true, endTime: true },
+  });
+
+  const blocks = await prisma.scheduleBlock.findMany({
+    where: {
+      startTime: { lt: dayEnd },
+      endTime: { gt: dayStart },
     },
     select: { startTime: true, endTime: true },
   });
@@ -66,6 +82,11 @@ export async function getAvailableSlots(
       (a) => a.startTime < end && a.endTime > start,
     );
     if (overlaps) continue;
+
+    const blocked = blocks.some(
+      (b) => b.startTime < end && b.endTime > start,
+    );
+    if (blocked) continue;
 
     const hh = String(Math.floor(t / 60)).padStart(2, "0");
     const mm = String(t % 60).padStart(2, "0");

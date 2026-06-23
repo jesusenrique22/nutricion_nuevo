@@ -17,6 +17,7 @@ import {
 import { getFormTemplateByCode } from "@/server/actions/cms.actions";
 import type { FormDisplayRow } from "@/lib/form-submission-display";
 import { toPaymentPhaseView } from "@/lib/payment-split";
+import { demographicsFromPayload } from "@/server/services/patient-profile-sync";
 
 export interface AppointmentFormContext {
   appointmentId: string;
@@ -180,13 +181,59 @@ export interface PatientDetailDTO {
   email: string;
   phone: string | null;
   profile: {
-    birthDate: string | null;
     gender: string | null;
     height: number | null;
-    occupation: string | null;
-    emergencyPhone: string | null;
     hasCompletedIntake: boolean;
   } | null;
+}
+
+async function resolveFichaDemographics(
+  patientId: string,
+  profile: { gender: string | null; height: number | null } | null,
+): Promise<{ gender: string | null; height: number | null }> {
+  let gender = profile?.gender ?? null;
+  let height = profile?.height ?? null;
+
+  if (gender && height != null) {
+    return { gender, height };
+  }
+
+  const [nutrition, anthropometry, training] = await Promise.all([
+    prisma.nutritionFormSubmission.findFirst({
+      where: { appointment: { patientId } },
+      orderBy: { createdAt: "desc" },
+      select: { gender: true, extendedPayload: true },
+    }),
+    prisma.anthropometryFormSubmission.findFirst({
+      where: { appointment: { patientId } },
+      orderBy: { createdAt: "desc" },
+      select: { gender: true, extendedPayload: true },
+    }),
+    prisma.trainingFormSubmission.findFirst({
+      where: { appointment: { patientId } },
+      orderBy: { createdAt: "desc" },
+      select: { gender: true, extendedPayload: true },
+    }),
+  ]);
+
+  for (const row of [nutrition, anthropometry, training]) {
+    if (!row) continue;
+    const extended =
+      row.extendedPayload &&
+      typeof row.extendedPayload === "object" &&
+      !Array.isArray(row.extendedPayload)
+        ? (row.extendedPayload as Record<string, unknown>)
+        : {};
+    const demo = demographicsFromPayload({
+      gender: row.gender,
+      height: extended.height,
+    });
+    if (!gender && demo.gender) gender = demo.gender;
+    if (height == null && demo.height != null) height = demo.height;
+    if (gender && height != null) break;
+  }
+
+  return { gender, height };
 }
 
 export interface PatientFichaAppointment {
@@ -260,6 +307,12 @@ export async function getPatientDetail(
   if (!patient) return null;
 
   const profile = patient.patientProfile;
+  const demographics = profile
+    ? await resolveFichaDemographics(patientId, {
+        gender: profile.gender,
+        height: profile.height,
+      })
+    : { gender: null, height: null };
 
   return {
     id: patient.id,
@@ -268,11 +321,8 @@ export async function getPatientDetail(
     phone: patient.phone,
     profile: profile
       ? {
-          birthDate: profile.birthDate?.toISOString() ?? null,
-          gender: profile.gender,
-          height: profile.height,
-          occupation: profile.occupation,
-          emergencyPhone: profile.emergencyPhone,
+          gender: demographics.gender,
+          height: demographics.height,
           hasCompletedIntake: profile.hasCompletedIntake,
         }
       : null,
@@ -509,6 +559,9 @@ export async function getAdminFormSubmissionDetail(
       supplementsUse: profile.intakeForm.supplementsUse,
       extendedPayload: profile.intakeForm.extendedPayload,
     });
+
+    if (profile.gender) flat.gender = profile.gender;
+    if (profile.height != null) flat.height = profile.height;
 
     return {
       patientId: patient.id,

@@ -77,6 +77,7 @@ export function ImageUploadField({
             fill
             className="object-cover"
             sizes="320px"
+            loading="eager"
             unoptimized={shouldUnoptimizeImage(value)}
           />
         </div>

@@ -1,4 +1,8 @@
 import { Prisma } from "@prisma/client";
+import {
+  isTimeSlotConflictError,
+  TIME_SLOT_TAKEN_MESSAGE,
+} from "@/lib/scheduling-errors";
 
 /** Mensaje amigable cuando Prisma no puede conectar a PostgreSQL. */
 export function getDbErrorMessage(error: unknown): string | null {
@@ -39,6 +43,10 @@ export function formatActionError(
   error: unknown,
   fallback = "No se pudo completar la acción. Intentá de nuevo.",
 ): string {
+  if (isTimeSlotConflictError(error)) {
+    return TIME_SLOT_TAKEN_MESSAGE;
+  }
+
   const dbMessage = getDbErrorMessage(error);
   if (dbMessage) return dbMessage;
 

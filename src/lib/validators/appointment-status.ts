@@ -18,6 +18,32 @@ export const cancelAppointmentSchema = z.object({
   appointmentId: z.string().min(1),
 });
 
+export const rescheduleAppointmentSchema = z.object({
+  appointmentId: z.string().min(1),
+  startTime: z.string().datetime(),
+});
+
+export const createScheduleBlockSchema = z.object({
+  dateStr: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+  reason: z.string().max(200).optional(),
+});
+
+export const deleteScheduleBlockSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const createBlockedDaysSchema = z.object({
+  fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  reason: z.string().max(200).optional(),
+});
+
+export const deleteBlockedDaySchema = z.object({
+  id: z.string().min(1),
+});
+
 export const markPaymentSchema = z.object({
   appointmentId: z.string().min(1),
   adminNote: z.string().max(300).optional(),

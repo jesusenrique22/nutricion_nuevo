@@ -1,38 +1,68 @@
 # Deploy en Vercel (Neon + MongoDB Atlas)
 
-## 1. Bases de datos (ya configuradas)
+Guía operativa para producción. Arquitectura y módulos: **[DOCUMENTACION.md](../DOCUMENTACION.md)**.
 
-- **PostgreSQL:** Neon — migraciones aplicadas y seed ejecutado.
-- **MongoDB:** Atlas — colección `nutricion_chat` (chat se crea al primer uso).
-
-## 2. Subir a Vercel
+## 1. Subir a Vercel
 
 1. Push del repo a GitHub.
 2. [vercel.com](https://vercel.com) → **Add New Project** → importar el repo.
 3. Framework: **Next.js** (detectado automático).
 4. `vercel.json` ya define build con `pnpm run vercel-build`.
 
-## 3. Variables de entorno en Vercel
+## 2. Variables de entorno (Production)
 
-Project → **Settings** → **Environment Variables** (Production):
+Project → **Settings** → **Environment Variables**. Cada variable en su **propia fila** (no pegar bloques `.env` enteros).
+
+### Obligatorias
 
 | Variable | Descripción |
 |----------|-------------|
 | `DATABASE_URL` | Connection string de Neon (`?sslmode=require`) |
 | `MONGODB_URI` | URI de MongoDB Atlas |
 | `MONGODB_DB` | `nutricion_chat` |
-| `AUTH_SECRET` | Secreto NextAuth (mismo que en `.env` local) |
-| `AUTH_URL` | `https://TU-PROYECTO.vercel.app` (URL exacta, sin `/` final) |
-| `NEXTAUTH_URL` | Mismo valor que `AUTH_URL` (compatibilidad emails) |
-| `CRON_SECRET` | Token para `/api/cron/reminders` |
-| `NEXT_PUBLIC_SOCKET_URL` | Opcional — URL del servidor Socket.io |
-| `SOCKET_INTERNAL_SECRET` | Opcional — mismo valor en servidor socket |
+| `AUTH_SECRET` | Secreto NextAuth (`openssl rand -base64 32`) |
+| `AUTH_URL` | `https://TU-PROYECTO.vercel.app` (sin `/` final) |
+| `NEXTAUTH_URL` | Mismo valor que `AUTH_URL` |
+| `UPSTASH_REDIS_REST_URL` | Rate limit (auth, citas) — [console.upstash.com](https://console.upstash.com) |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST de Upstash |
 
-**Importante:** Tras el primer deploy, actualiza `AUTH_URL` y `NEXTAUTH_URL` con la URL **real** del proyecto (ej. `https://nutricion-phi.vercel.app`) y **redeploy**.
+### Email (verificación de cuenta + código de recuperación)
 
-### URL correcta del proyecto
+| Variable | Ejemplo |
+|----------|---------|
+| `SMTP_HOST` | `smtp.gmail.com` (Google Workspace) |
+| `SMTP_PORT` | `587` |
+| `SMTP_SECURE` | `false` |
+| `SMTP_USER` | email emisor |
+| `SMTP_PASS` | contraseña de aplicación (sin espacios) |
+| `EMAIL_FROM` | `Anttova <tu@correo.com>` |
 
-Vercel puede asignar varios dominios (`nutricion.vercel.app`, `nutricion-phi.vercel.app`, etc.). Usá siempre el dominio del deploy activo que aparece en **Deployments → Visit**. Si entrás a un dominio viejo o de otro proyecto, verás **404** en `/dashboard` o `/login`.
+Probar localmente antes del deploy: `pnpm run email:check`.
+
+### Recomendadas
+
+| Variable | Descripción |
+|----------|-------------|
+| `CRON_SECRET` | Token para `GET /api/cron/reminders` |
+| `NEXT_PUBLIC_RECAPTCHA_SITE` | reCAPTCHA v3 (agendar citas) |
+| `RECAPTCHA_SECRET` | Secret de reCAPTCHA |
+| `GOOGLE_CALENDAR_CLIENT_ID` | OAuth Calendar (admin) |
+| `GOOGLE_CALENDAR_CLIENT_SECRET` | OAuth Calendar |
+| `GOOGLE_CALENDAR_TIMEZONE` | `America/Argentina/Buenos_Aires` |
+
+### Opcionales
+
+| Variable | Descripción |
+|----------|-------------|
+| `NEXT_PUBLIC_SOCKET_URL` | URL del servidor Socket.io (chat en vivo) |
+| `SOCKET_INTERNAL_SECRET` | Mismo valor en servidor socket |
+| `GOOGLE_CALENDAR_REDIRECT_URI` | Solo si la auto-calculada falla; debe ser `{NEXTAUTH_URL}/api/google/calendar/callback` |
+
+**Tras el primer deploy:** confirmá `AUTH_URL` y `NEXTAUTH_URL` con la URL real (**Deployments → Visit**) y **redeploy**.
+
+## 3. URL correcta del proyecto
+
+Vercel puede asignar varios dominios. Usá siempre el del deploy activo. Si entrás a un dominio viejo verás **404** en `/dashboard` o `/login`.
 
 ## 4. Credenciales de demo
 
@@ -42,69 +72,56 @@ Vercel puede asignar varios dominios (`nutricion.vercel.app`, `nutricion-phi.ver
 
 Pacientes: registro en `/register`.
 
-## 5. MongoDB Atlas — si chat/notificaciones fallan
+## 5. MongoDB Atlas
 
-En **Atlas → Network Access**, agrega **`0.0.0.0/0`** (Allow access from anywhere) para que Vercel pueda conectar.
+En **Network Access**, agregá **`0.0.0.0/0`** para que Vercel conecte.
 
-Si ves `MongoServerSelectionError` o `SSL routines` en los logs:
+Si ves `MongoServerSelectionError`:
 
-1. Atlas → **Network Access** → `0.0.0.0/0`
-2. Verificá que `MONGODB_URI` y `MONGODB_DB` estén en Vercel (Production)
-3. Si la contraseña del usuario Atlas tiene caracteres especiales, codificala en la URI (`@` → `%40`, etc.)
-4. Redeploy tras cambiar variables
+1. Verificá `MONGODB_URI` y `MONGODB_DB` en Vercel
+2. Codificá caracteres especiales en la URI (`@` → `%40`)
+3. Redeploy
 
-El código usa `autoSelectFamily: false` y `family: 4` para Vercel.
-
-## 5b. Login no funciona / 404 en `/dashboard`
+## 6. Solución de problemas
 
 | Síntoma | Causa probable | Solución |
 |---------|----------------|----------|
-| 404 en `/dashboard` o `/login` | Dominio incorrecto | Usá la URL del deploy activo en Vercel |
-| **500 en `/login` (Middleware)** | Proxy importa Prisma/`auth.ts` | Usá `@/lib/auth-edge` en `proxy.ts`; corré `pnpm run check:deploy` |
-| **500 en `/dashboard/admin/payments`** | Migraciones pendientes en Neon | Redeploy en Vercel; o `pnpm exec prisma migrate deploy` contra `DATABASE_URL` de prod |
-| Login con “Credenciales inválidas” | `DATABASE_URL` o seed | Verificá Neon y ejecutá seed en prod si hace falta |
-| Error 500 al iniciar sesión | Falta `AUTH_SECRET` | Agregá `AUTH_SECRET` en Vercel y redeploy |
-| Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio que usás en el navegador |
+| 404 en `/dashboard` | Dominio incorrecto | URL del deploy activo |
+| 500 en `/login` (Middleware) | Proxy importa Prisma | `pnpm run check:deploy` |
+| Login “Credenciales inválidas” | BD sin seed | `pnpm run db:seed` contra Neon |
+| Error 500 al login | Falta `AUTH_SECRET` | Agregar en Vercel + redeploy |
+| Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio del navegador |
+| “Demasiados intentos” en auth | Sin Upstash en prod | Configurar `UPSTASH_*` |
+| Emails no llegan | SMTP mal configurado | `pnpm run email:check` local; mismas vars en Vercel |
+| Google Calendar `redirect_uri_mismatch` | URI en Google Cloud | `{NEXTAUTH_URL}/api/google/calendar/callback` |
 
-## 6. Limitaciones en Vercel
+## 7. Limitaciones en Vercel
 
 | Funcionalidad | Estado |
 |---------------|--------|
-| Login, citas, formularios, admin | ✅ |
+| Login, citas, formularios, admin, emails SMTP | ✅ |
 | Chat (mensajes al recargar) | ✅ con MongoDB |
 | Chat en tiempo real | ⚠️ Requiere `pnpm run socket` en Railway/Render |
-| Archivos del chat | ⚠️ Disco efímero — no persisten entre deploys |
-| Emails | ⚠️ Configurar SMTP en variables |
+| Archivos del chat en disco local | ⚠️ No persisten entre deploys (usar GridFS) |
 
-## 7. Comandos locales útiles
-
-**Antes de cada push a producción**, ejecutá el mismo flujo que Vercel:
+## 8. Antes de cada push
 
 ```bash
 pnpm run check:deploy
 ```
 
-Eso hace tres cosas:
+1. **Límites Edge** — `src/proxy.ts` solo importa `@/lib/auth-edge` (no Prisma).
+2. **Build** — `prisma generate` + migraciones + `next build`.
+3. **Smoke** — `/login`, `/register`, `/`.
 
-1. **Límites Edge** — el proxy (`src/proxy.ts`) no puede importar Prisma ni `@/lib/auth` (solo `@/lib/auth-edge`). Evita **500 en `/login`** en Vercel cuando en local con `next dev` parece OK.
-2. **Build de producción** — `prisma generate` + migraciones + `next build` (igual que Vercel).
-3. **Smoke test** — levanta `next start` y prueba `/login`, `/register` y `/` (detecta fallos de middleware).
-
-Si Neon no responde y solo querés compilar:
+Si Neon no responde: `SKIP_MIGRATE=1 pnpm run check:deploy`
 
 ```bash
-SKIP_MIGRATE=1 pnpm run check:deploy
-```
-
-Comandos sueltos:
-
-```bash
-pnpm run db:check        # Verificar Neon
-pnpm run db:check:mongo  # Verificar Atlas
-pnpm run check:edge      # Solo proxy/middleware (rápido)
-pnpm run check:smoke     # Requiere .next ya compilado
-pnpm run vercel-build    # Simular build de Vercel
-pnpm run db:seed         # Re-ejecutar datos iniciales
+pnpm run db:check        # PostgreSQL
+pnpm run db:check:mongo  # MongoDB
+pnpm run email:check     # SMTP
+pnpm run check:edge      # Solo proxy
+pnpm run vercel-build    # Simular Vercel
 ```
 
 ### Regla Edge (middleware / proxy)
@@ -113,12 +130,11 @@ pnpm run db:seed         # Re-ejecutar datos iniciales
 |---------|----------------|
 | `src/proxy.ts` | `@/lib/auth-edge`, `next/server` |
 | `src/lib/auth-edge.ts` | `@/lib/auth.config`, `next-auth` |
-| `src/lib/auth.config.ts` | `next-auth`, tipos de `@prisma/client` |
-| `src/lib/auth.ts` | Prisma, bcrypt, providers (solo servidor) |
+| `src/lib/auth.ts` | Prisma, bcrypt (solo servidor Node) |
 
 **Nunca** importar `@/lib/auth` ni `@/server/db/prisma` desde `proxy.ts`.
 
-## 8. CLI (opcional)
+## 9. CLI (opcional)
 
 ```bash
 npx vercel login

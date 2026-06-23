@@ -2,11 +2,8 @@ import type { IntakeFormInput } from "@/lib/validators/intake";
 
 /** Campos planos del template `intake` mapeados al esquema anidado legacy. */
 export const INTAKE_KNOWN_FIELDS = new Set([
-  "birthDate",
   "gender",
   "height",
-  "occupation",
-  "emergencyPhone",
   "conditions",
   "surgeries",
   "medications",
@@ -33,11 +30,8 @@ export function mapFlatPayloadToIntake(
 ): IntakeFormInput {
   return {
     profile: {
-      birthDate: String(data.birthDate ?? ""),
       gender: data.gender as IntakeFormInput["profile"]["gender"],
       height: Number(data.height),
-      occupation: String(data.occupation ?? ""),
-      emergencyPhone: String(data.emergencyPhone ?? ""),
     },
     medicalHistory: {
       conditions: String(data.conditions ?? ""),

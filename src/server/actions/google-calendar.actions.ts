@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
+import { syncUnsyncedAppointmentsForAdmin } from "@/server/services/google-calendar-sync.service";
 
 export async function setDefaultCalendarAdminAction(): Promise<
   { ok: true } | { ok: false; message: string }
@@ -35,4 +36,31 @@ export async function setDefaultCalendarAdminAction(): Promise<
 
   revalidatePath("/dashboard/admin/calendar");
   return { ok: true };
+}
+
+export async function syncExistingAppointmentsAction(): Promise<
+  | { ok: true; synced: number; failed: number }
+  | { ok: false; message: string }
+> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN" || !session.user.id) {
+    return { ok: false, message: "No autorizado." };
+  }
+
+  const connection = await prisma.googleCalendarConnection.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!connection) {
+    return {
+      ok: false,
+      message: "Conectá Google Calendar antes de sincronizar citas.",
+    };
+  }
+
+  const { synced, failed } = await syncUnsyncedAppointmentsForAdmin(
+    session.user.id,
+  );
+
+  revalidatePath("/dashboard/admin/calendar");
+  return { ok: true, synced, failed };
 }

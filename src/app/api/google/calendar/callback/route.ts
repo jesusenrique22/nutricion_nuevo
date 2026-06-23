@@ -12,6 +12,7 @@ import {
   exchangeCodeForTokens,
   saveGoogleCalendarConnection,
 } from "@/server/services/google-calendar.service";
+import { syncUnsyncedAppointmentsForAdmin } from "@/server/services/google-calendar-sync.service";
 
 const STATE_COOKIE = "gcal_oauth_state";
 const REDIRECT_COOKIE = "gcal_oauth_redirect";
@@ -85,6 +86,13 @@ export async function GET(request: Request) {
       await ensureDefaultCalendarAdmin(session.user.id);
     } catch (defaultErr) {
       console.warn("[google-calendar/callback] default admin:", defaultErr);
+    }
+
+    try {
+      const result = await syncUnsyncedAppointmentsForAdmin(session.user.id);
+      console.info("[google-calendar/callback] backfill", result);
+    } catch (backfillErr) {
+      console.warn("[google-calendar/callback] backfill:", backfillErr);
     }
 
     return NextResponse.redirect(`${calendarUrl}?gcal=connected`);

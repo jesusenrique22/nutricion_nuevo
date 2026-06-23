@@ -191,6 +191,29 @@ model Appointment {
   @@index([calendarAdminId])
 }
 
+/** Bloqueos de agenda del admin (vacaciones, compromisos, etc.). */
+model ScheduleBlock {
+  id        String   @id @default(cuid())
+  startTime DateTime
+  endTime   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startTime, endTime])
+}
+
+/** Días enteros sin atención (no se pueden agendar citas). */
+model BlockedDay {
+  id        String   @id @default(cuid())
+  date      String   @unique // YYYY-MM-DD (hora local de la clínica)
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
 // ──────────────────────────────────────────────
 // ANAMNESIS Y MEDICIONES (Módulo 1)
 // ──────────────────────────────────────────────

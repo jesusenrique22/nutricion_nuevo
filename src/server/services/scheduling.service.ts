@@ -1,40 +1,104 @@
-import { ConsultationType, ConsultationModality } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import {
+  ConsultationType,
+  ConsultationModality,
+  type PrismaClient,
+} from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
+import { toDateKey } from "@/lib/scheduling-dates";
+import { TimeSlotTakenError } from "@/lib/scheduling-errors";
 
 export type SchedulingError =
   | "MODALITY_NOT_ALLOWED"
   | "OUTSIDE_MORNING_WINDOW"
   | "TIME_SLOT_TAKEN"
-  | "INVALID_TIME";
+  | "INVALID_TIME"
+  | "BLOCKED_TIME";
 
 export type ValidationResult =
   | { ok: true; endTime: Date }
   | { ok: false; error: SchedulingError; message: string };
+
+type DbLike = PrismaClient | Prisma.TransactionClient;
 
 function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
 
+function overlapWhere(params: {
+  startTime: Date;
+  endTime: Date;
+  excludeAppointmentId?: string;
+}): Prisma.AppointmentWhereInput {
+  return {
+    ...(params.excludeAppointmentId
+      ? { id: { not: params.excludeAppointmentId } }
+      : {}),
+    status: { in: ["PENDING", "CONFIRMED"] },
+    startTime: { lt: params.endTime },
+    endTime: { gt: params.startTime },
+  };
+}
+
+/** Busca otra cita activa que se solape con el rango [startTime, endTime). */
+export async function findOverlappingAppointment(
+  db: DbLike,
+  params: {
+    startTime: Date;
+    endTime: Date;
+    excludeAppointmentId?: string;
+  },
+) {
+  return db.appointment.findFirst({
+    where: overlapWhere(params),
+    select: { id: true },
+  });
+}
+
+/** Busca un bloqueo de agenda que se solape con el rango [startTime, endTime). */
+export async function findOverlappingBlock(
+  db: DbLike,
+  params: { startTime: Date; endTime: Date },
+) {
+  return db.scheduleBlock.findFirst({
+    where: {
+      startTime: { lt: params.endTime },
+      endTime: { gt: params.startTime },
+    },
+    select: { id: true },
+  });
+}
+
 /**
- * Valida una solicitud de cita contra TODAS las reglas de negocio (Módulo 1 y 2):
- *  - Modalidad permitida por el tipo de consulta (ANT_03 solo presencial).
- *  - Ventana matutina obligatoria para consultas morningOnly (ANT_03 08:00-12:00).
- *  - Sin cruce de horarios con otras citas activas (consulta a PostgreSQL).
+ * Revalida solapamiento dentro de una transacción (antes del INSERT).
+ * La garantía final la da el exclusion constraint en PostgreSQL.
  */
-export async function validateAppointmentSlot(params: {
+export async function assertNoOverlapInTransaction(
+  tx: Prisma.TransactionClient,
+  params: {
+    startTime: Date;
+    endTime: Date;
+    excludeAppointmentId?: string;
+  },
+): Promise<void> {
+  const overlap = await findOverlappingAppointment(tx, params);
+  if (overlap) {
+    throw new TimeSlotTakenError();
+  }
+}
+
+function validateBusinessRules(params: {
   consultationType: ConsultationType;
   startTime: Date;
   modality: ConsultationModality;
-  excludeAppointmentId?: string;
-}): Promise<ValidationResult> {
-  const { consultationType, startTime, modality, excludeAppointmentId } = params;
+}): ValidationResult | { ok: true; endTime: Date } {
+  const { consultationType, startTime, modality } = params;
 
   if (Number.isNaN(startTime.getTime())) {
     return { ok: false, error: "INVALID_TIME", message: "Fecha inválida." };
   }
 
-  // 1) Modalidad permitida
   if (modality === "ONLINE" && !consultationType.allowsOnline) {
     return {
       ok: false,
@@ -54,7 +118,6 @@ export async function validateAppointmentSlot(params: {
     startTime.getTime() + consultationType.durationMinutes * 60_000,
   );
 
-  // 2) Ventana matutina obligatoria (ANT_03)
   if (consultationType.morningOnly) {
     const start = consultationType.morningStart ?? "08:00";
     const end = consultationType.morningEnd ?? "12:00";
@@ -70,15 +133,41 @@ export async function validateAppointmentSlot(params: {
     }
   }
 
-  // 3) Validación estricta de cruce de horarios (overlap)
-  const overlap = await prisma.appointment.findFirst({
-    where: {
-      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
-      status: { in: ["PENDING", "CONFIRMED"] },
-      startTime: { lt: endTime },
-      endTime: { gt: startTime },
-    },
+  return { ok: true, endTime };
+}
+
+/**
+ * Valida una solicitud de cita contra reglas de negocio y solapamiento (lectura previa).
+ * Al persistir, se revalida dentro de la transacción + constraint PostgreSQL.
+ */
+export async function validateAppointmentSlot(params: {
+  consultationType: ConsultationType;
+  startTime: Date;
+  modality: ConsultationModality;
+  excludeAppointmentId?: string;
+}): Promise<ValidationResult> {
+  const { consultationType, startTime, modality, excludeAppointmentId } =
+    params;
+
+  const rules = validateBusinessRules({ consultationType, startTime, modality });
+  if (!rules.ok) return rules;
+
+  const blockedDay = await prisma.blockedDay.findUnique({
+    where: { date: toDateKey(startTime) },
     select: { id: true },
+  });
+  if (blockedDay) {
+    return {
+      ok: false,
+      error: "BLOCKED_TIME",
+      message: "Ese día no hay atención.",
+    };
+  }
+
+  const overlap = await findOverlappingAppointment(prisma, {
+    startTime,
+    endTime: rules.endTime,
+    excludeAppointmentId,
   });
 
   if (overlap) {
@@ -89,5 +178,18 @@ export async function validateAppointmentSlot(params: {
     };
   }
 
-  return { ok: true, endTime };
+  const blocked = await findOverlappingBlock(prisma, {
+    startTime,
+    endTime: rules.endTime,
+  });
+
+  if (blocked) {
+    return {
+      ok: false,
+      error: "BLOCKED_TIME",
+      message: "Ese horario está bloqueado en la agenda.",
+    };
+  }
+
+  return { ok: true, endTime: rules.endTime };
 }

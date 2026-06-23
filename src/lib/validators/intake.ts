@@ -1,11 +1,8 @@
 import { z } from "zod";
 
 export const intakeProfileSchema = z.object({
-  birthDate: z.string().min(1, "Fecha de nacimiento requerida"),
   gender: z.enum(["femenino", "masculino", "otro", "prefiero_no_decir"]),
   height: z.coerce.number().min(50).max(250),
-  occupation: z.string().trim().min(2, "Ocupación requerida"),
-  emergencyPhone: z.string().min(6, "Teléfono de emergencia requerido"),
 });
 
 export const intakeFormSchema = z.object({

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { requireSelfOrAdmin } from "@/lib/security/auth-guards";
 import { upsertWeeklyPlanSchema } from "@/lib/validators/cms";
 import { prisma } from "@/server/db/prisma";
 import type { WeeklyDayPlan, WeeklyPlanData } from "@/types/weekly-plan";
@@ -57,6 +58,8 @@ export async function getWeeklyPlanForPatientAdmin(
 export async function getPublishedWeeklyPlanForPatient(
   patientId: string,
 ): Promise<WeeklyPlanData | null> {
+  if (!(await requireSelfOrAdmin(patientId))) return null;
+
   const row = await prisma.patientWeeklyPlan.findFirst({
     where: { patientId, isPublished: true },
     orderBy: { updatedAt: "desc" },

@@ -61,11 +61,8 @@ export async function submitIntakeForm(
     prisma.patientProfile.update({
       where: { id: profile.id },
       data: {
-        birthDate: new Date(prof.birthDate),
         gender: prof.gender,
         height: prof.height,
-        occupation: prof.occupation ?? null,
-        emergencyPhone: prof.emergencyPhone,
         hasCompletedIntake: true,
       },
     }),

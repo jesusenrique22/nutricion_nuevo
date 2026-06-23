@@ -1,9 +1,9 @@
 /** Rutas de assets del brandbook (Anttova-Diseños → public/brand) */
 
 export const BRAND_FLYERS = {
-  jump: "/brand/flyers/jump.png",
-  medical: "/brand/flyers/medical.png",
-  training: "/brand/flyers/training.png",
+  jump: "/brand/flyers/jump.jpg",
+  medical: "/brand/flyers/medical.jpg",
+  training: "/brand/flyers/training.jpg",
 } as const;
 
 export const BRAND_PORTADAS = {

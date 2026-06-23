@@ -12,6 +12,7 @@ import {
 import { intakeFormSchema } from "@/lib/validators/intake";
 import { getFormTemplateByCode } from "@/server/actions/cms.actions";
 import { prisma } from "@/server/db/prisma";
+import { demographicsProfileUpdate } from "@/server/services/patient-profile-sync";
 import { withDb } from "@/lib/db-errors";
 
 export type SubmitDynamicFormResult =
@@ -39,6 +40,22 @@ function extendedOnly(
     if (!known.has(k)) extra[k] = v;
   }
   return extra as Prisma.InputJsonValue;
+}
+
+function profileUpsert(userId: string, data: Record<string, unknown>) {
+  const demo = demographicsProfileUpdate(data);
+  return {
+    where: { userId },
+    create: {
+      userId,
+      ...demo,
+      hasCompletedIntake: true,
+    },
+    update: {
+      ...demo,
+      hasCompletedIntake: true,
+    },
+  };
 }
 
 async function persistFollowUp(
@@ -139,22 +156,7 @@ async function persistNutrition(
         extendedPayload: extendedOnly(data, known),
       },
     }),
-    prisma.patientProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        birthDate: new Date(birthDate),
-        gender: str(data.gender),
-        emergencyPhone: str(data.phone),
-        hasCompletedIntake: true,
-      },
-      update: {
-        birthDate: new Date(birthDate),
-        gender: str(data.gender),
-        emergencyPhone: str(data.phone),
-        hasCompletedIntake: true,
-      },
-    }),
+    prisma.patientProfile.upsert(profileUpsert(userId, data)),
     prisma.user.update({
       where: { id: userId },
       data: {
@@ -223,22 +225,7 @@ async function persistAnthropometryOrTraining(
   if (templateCode === "anthropometry") {
     await prisma.$transaction([
       prisma.anthropometryFormSubmission.create({ data: base }),
-      prisma.patientProfile.upsert({
-        where: { userId },
-        create: {
-          userId,
-          birthDate: new Date(birthDate),
-          gender: str(data.gender),
-          emergencyPhone: str(data.phone),
-          hasCompletedIntake: true,
-        },
-        update: {
-          birthDate: new Date(birthDate),
-          gender: str(data.gender),
-          emergencyPhone: str(data.phone),
-          hasCompletedIntake: true,
-        },
-      }),
+      prisma.patientProfile.upsert(profileUpsert(userId, data)),
       prisma.user.update({
         where: { id: userId },
         data: {
@@ -250,22 +237,7 @@ async function persistAnthropometryOrTraining(
   } else {
     await prisma.$transaction([
       prisma.trainingFormSubmission.create({ data: base }),
-      prisma.patientProfile.upsert({
-        where: { userId },
-        create: {
-          userId,
-          birthDate: new Date(birthDate),
-          gender: str(data.gender),
-          emergencyPhone: str(data.phone),
-          hasCompletedIntake: true,
-        },
-        update: {
-          birthDate: new Date(birthDate),
-          gender: str(data.gender),
-          emergencyPhone: str(data.phone),
-          hasCompletedIntake: true,
-        },
-      }),
+      prisma.patientProfile.upsert(profileUpsert(userId, data)),
       prisma.user.update({
         where: { id: userId },
         data: {
@@ -313,11 +285,8 @@ async function persistIntake(
     prisma.patientProfile.update({
       where: { id: profile.id },
       data: {
-        birthDate: new Date(prof.birthDate),
         gender: prof.gender,
         height: prof.height,
-        occupation: prof.occupation ?? null,
-        emergencyPhone: prof.emergencyPhone,
         hasCompletedIntake: true,
       },
     }),

@@ -43,12 +43,35 @@ export async function getConsultationTypes(): Promise<ConsultationTypeDTO[]> {
 export async function getSlotsForDay(
   consultationTypeId: string,
   dateStr: string,
+  excludeAppointmentId?: string,
 ): Promise<Slot[]> {
   const type = await prisma.consultationType.findUnique({
     where: { id: consultationTypeId },
   });
   if (!type) return [];
-  return getAvailableSlots(type, dateStr);
+  return getAvailableSlots(type, dateStr, excludeAppointmentId);
+}
+
+/** Slots disponibles para reagendar una cita existente. */
+export async function getRescheduleSlots(
+  appointmentId: string,
+  dateStr: string,
+): Promise<Slot[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    include: { consultationType: true },
+  });
+  if (!appt) return [];
+
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isAdmin && appt.patientId !== session.user.id) return [];
+
+  if (!["PENDING", "CONFIRMED"].includes(appt.status)) return [];
+
+  return getAvailableSlots(appt.consultationType, dateStr, appt.id);
 }
 
 import { toPaymentPhaseView } from "@/lib/payment-split";

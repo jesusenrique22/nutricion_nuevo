@@ -105,7 +105,7 @@ async function seedConsultationTypes() {
 
 async function seedAdminUser() {
   const adminEmail = "admin@gmail.com";
-  const passwordHash = await bcrypt.hash("Admin123", 10);
+  const passwordHash = await bcrypt.hash("Admin123!", 10);
 
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
@@ -179,7 +179,7 @@ async function main() {
   });
 
   console.log("Seed completado: consultas, admin, CMS, recurso demo.");
-  console.log(`Admin -> ${adminEmail} / Admin123`);
+  console.log(`Admin -> ${adminEmail} / Admin123!`);
 }
 
 main()

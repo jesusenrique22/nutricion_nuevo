@@ -1,8 +1,10 @@
 import { CalendarWithPanel } from "@/components/calendar/calendar-with-panel";
+import { ScheduleBlocksPanel } from "@/components/calendar/schedule-blocks-panel";
 import { GoogleCalendarConnect } from "@/components/calendar/google-calendar-connect";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
 import { auth } from "@/lib/auth";
 import { getAllAppointments } from "@/server/actions/booking.queries";
+import { getBlockedDays, getScheduleBlocks } from "@/server/actions/schedule-block.actions";
 import {
   getCalendarAdminStatus,
   getGoogleCalendarConnectionSummary,
@@ -14,7 +16,8 @@ export default async function CalendarPage() {
   const session = await auth();
   const adminUserId = session?.user?.id;
 
-  const [appointments, connection, adminStatus] = await Promise.all([
+  const [appointments, connection, adminStatus, scheduleBlocks, blockedDays] =
+    await Promise.all([
     getAllAppointments(),
     adminUserId
       ? getGoogleCalendarConnectionSummary(adminUserId)
@@ -22,6 +25,8 @@ export default async function CalendarPage() {
     adminUserId
       ? getCalendarAdminStatus(adminUserId)
       : Promise.resolve({ isDefaultCalendarAdmin: false }),
+    getScheduleBlocks(),
+    getBlockedDays(),
   ]);
 
   return (
@@ -44,6 +49,11 @@ export default async function CalendarPage() {
         configured={isGoogleCalendarConfigured()}
         connection={connection}
         isDefaultCalendarAdmin={adminStatus.isDefaultCalendarAdmin}
+      />
+
+      <ScheduleBlocksPanel
+        blockedDays={blockedDays}
+        blocks={scheduleBlocks}
       />
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">

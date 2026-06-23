@@ -35,20 +35,20 @@ function LoginForm() {
       redirect: false,
     });
     setLoading(false);
-      if (res?.error) {
-        if (res.error === "EMAIL_NOT_VERIFIED") {
-          setError(
-            "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
-          );
-          return;
-        }
-        if (res.error === "ACCOUNT_DEACTIVATED") {
-          setError(
-            "Esta cuenta fue desactivada. Contactá a Anttova si necesitás ayuda.",
-          );
-          return;
-        }
-        setError("Credenciales inválidas.");
+    if (res?.error) {
+      if (res.error === "EMAIL_NOT_VERIFIED") {
+        setError(
+          "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
+        );
+        return;
+      }
+      if (res.error === "ACCOUNT_DEACTIVATED") {
+        setError(
+          "Esta cuenta fue desactivada. Contactá a Anttova si necesitás ayuda.",
+        );
+        return;
+      }
+      setError("Credenciales inválidas.");
       return;
     }
     router.refresh();

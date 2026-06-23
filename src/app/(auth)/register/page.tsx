@@ -11,6 +11,7 @@ import {
   authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { PASSWORD_REQUIREMENTS_HINT } from "@/lib/validators/password";
 import { registerPatient } from "@/server/actions/auth.actions";
 
 export default function RegisterPage() {
@@ -80,6 +81,9 @@ export default function RegisterPage() {
             autoComplete="new-password"
             inputClassName={`${authInputClass} pr-12`}
           />
+          <p className="text-xs text-foreground/55 sm:text-sm">
+            {PASSWORD_REQUIREMENTS_HINT}
+          </p>
           <p className="text-xs text-foreground/55 sm:text-sm">
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
           </p>

@@ -41,19 +41,19 @@ export const SITE_CONTENT_DEFAULTS: Record<
     data: {
       heroSlides: [
         {
-          src: "/brand/flyers/jump.png",
+          src: "/brand/flyers/jump.jpg",
           alt: "Energía y wellness Anttova",
           line1: "Happy · Healthy",
           line2: "Nutrición con intención",
         },
         {
-          src: "/brand/flyers/medical.png",
+          src: "/brand/flyers/medical.jpg",
           alt: "Asesoría Anttova",
           line1: "Tu cuerpo cambia",
           line2: "Cuando tu estilo de vida cambia contigo",
         },
         {
-          src: "/brand/flyers/training.png",
+          src: "/brand/flyers/training.jpg",
           alt: "Entrenamiento Anttova",
           line1: "Entrena tu cuerpo",
           line2: "Equilibra tu vida",

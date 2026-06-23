@@ -5,11 +5,19 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import {
   cancelAppointmentSchema,
+  rescheduleAppointmentSchema,
   updateAppointmentStatusSchema,
 } from "@/lib/validators/appointment-status";
 import { syncPatientAndAdmins } from "@/server/realtime/sync";
-import { notifyAppointmentStatusChange, notifyAppointmentCancelled } from "@/server/services/appointment-notify.service";
+import {
+  notifyAppointmentStatusChange,
+  notifyAppointmentCancelled,
+  notifyAppointmentRescheduled,
+} from "@/server/services/appointment-notify.service";
 import { refreshAppointmentGoogleCalendar } from "@/server/services/google-calendar-sync.service";
+import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { appointmentRescheduledEmail } from "@/lib/email-messages";
 import { formatActionError } from "@/lib/db-errors";
 
 export type StatusActionResult =
@@ -17,6 +25,7 @@ export type StatusActionResult =
   | { ok: false; message: string };
 
 const MIN_CANCEL_HOURS = 2;
+const MIN_RESCHEDULE_HOURS = 2;
 
 const ADMIN_TRANSITIONS: Record<string, string[]> = {
   PENDING: ["CONFIRMED", "CANCELLED", "NO_SHOW"],
@@ -98,9 +107,9 @@ export async function updateAppointmentStatus(
         startTime: appt.startTime,
         cancelledBy: "ADMIN",
       });
-      void refreshAppointmentGoogleCalendar(appt.id);
+      await refreshAppointmentGoogleCalendar(appt.id);
     } else {
-      void refreshAppointmentGoogleCalendar(appt.id);
+      await refreshAppointmentGoogleCalendar(appt.id);
     }
 
     await revalidateAppointmentPaths(appt.patientId);
@@ -173,7 +182,7 @@ export async function cancelAppointment(
       cancelledBy,
     });
 
-    void refreshAppointmentGoogleCalendar(appt.id);
+    await refreshAppointmentGoogleCalendar(appt.id);
 
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };
@@ -182,6 +191,113 @@ export async function cancelAppointment(
     return {
       ok: false,
       message: formatActionError(err, "No se pudo cancelar la cita."),
+    };
+  }
+}
+
+export async function rescheduleAppointment(
+  formData: unknown,
+): Promise<StatusActionResult> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { ok: false, message: "Debes iniciar sesión." };
+
+    const parsed = rescheduleAppointmentSchema.safeParse(formData);
+    if (!parsed.success) return { ok: false, message: "Datos inválidos." };
+
+    const appt = await loadAppointment(parsed.data.appointmentId);
+    if (!appt) return { ok: false, message: "Cita no encontrada." };
+
+    const isAdmin = session.user.role === "ADMIN";
+    const isOwner = appt.patientId === session.user.id;
+
+    if (!isAdmin && !isOwner) {
+      return { ok: false, message: "No autorizado." };
+    }
+
+    if (!["PENDING", "CONFIRMED"].includes(appt.status)) {
+      return { ok: false, message: "Esta cita ya no se puede reagendar." };
+    }
+
+    if (appt.startTime <= new Date()) {
+      return { ok: false, message: "No puedes reagendar una cita pasada." };
+    }
+
+    if (!isAdmin) {
+      const hoursUntil =
+        (appt.startTime.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (hoursUntil < MIN_RESCHEDULE_HOURS) {
+        return {
+          ok: false,
+          message: `Solo puedes reagendar con al menos ${MIN_RESCHEDULE_HOURS} horas de anticipación.`,
+        };
+      }
+    }
+
+    const startTime = new Date(parsed.data.startTime);
+    if (startTime <= new Date()) {
+      return { ok: false, message: "El nuevo horario debe ser en el futuro." };
+    }
+
+    const validation = await validateAppointmentSlot({
+      consultationType: appt.consultationType,
+      startTime,
+      modality: appt.modality,
+      excludeAppointmentId: appt.id,
+    });
+
+    if (!validation.ok) {
+      return { ok: false, message: validation.message };
+    }
+
+    const rescheduledBy = isAdmin ? ("ADMIN" as const) : ("PATIENT" as const);
+
+    await prisma.appointment.update({
+      where: { id: appt.id },
+      data: {
+        startTime,
+        endTime: validation.endTime,
+        reminderSentAt: null,
+      },
+    });
+
+    await notifyAppointmentRescheduled({
+      patientId: appt.patientId,
+      patientName: appt.patient.name,
+      patientEmail: appt.patient.email,
+      consultationName: appt.consultationType.name,
+      newStartTime: startTime,
+      appointmentId: appt.id,
+      rescheduledBy,
+    });
+
+    if (
+      appt.patient.email &&
+      isEmailDeliveryConfigured() &&
+      rescheduledBy === "ADMIN"
+    ) {
+      const msg = appointmentRescheduledEmail({
+        name: appt.patient.name,
+        consultationName: appt.consultationType.name,
+        newStartTime: startTime,
+        appointmentsUrl: absoluteUrl("/dashboard/patient/appointments"),
+      });
+      await sendEmail({
+        to: appt.patient.email,
+        subject: msg.subject,
+        html: msg.html,
+        text: msg.text,
+      });
+    }
+
+    await refreshAppointmentGoogleCalendar(appt.id);
+    await revalidateAppointmentPaths(appt.patientId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[rescheduleAppointment]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo reagendar la cita."),
     };
   }
 }

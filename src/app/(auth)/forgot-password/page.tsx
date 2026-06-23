@@ -1,79 +1,242 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { requestPasswordReset } from "@/server/actions/auth.actions";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
+import { PasswordInput } from "@/components/auth/password-input";
+import { PASSWORD_REQUIREMENTS_HINT } from "@/lib/validators/password";
+import {
+  requestPasswordResetCode,
+  verifyResetCode,
+  resetPasswordWithCode,
+} from "@/server/actions/auth.actions";
+import {
+  AuthFormCard,
+  AuthShell,
+  authButtonClass,
+  authInputClass,
+  authLabelClass,
+} from "@/components/auth/auth-shell";
 
-export default function ForgotPasswordPage() {
-  const [message, setMessage] = useState<string | null>(null);
-  const [devLink, setDevLink] = useState<string | null>(null);
+type Step = "email" | "code" | "password";
+
+function ForgotPasswordFlow() {
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [devLink, setDevLink] = useState<string | null>(
+    // En dev sin SMTP el código aparece en la URL como ?dev_code=
+    params.get("dev_code") ?? null,
+  );
   const [isPending, startTransition] = useTransition();
 
+  // ── Paso 1: solicitar código ────────────────────────────────────────────
+  function handleEmailSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setDevLink(null);
+    const fd = new FormData(e.currentTarget);
+    const inputEmail = fd.get("email") as string;
+    startTransition(async () => {
+      const res = await requestPasswordResetCode({ email: inputEmail });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      setEmail(inputEmail);
+      if ("devResetUrl" in res && res.devResetUrl) {
+        setDevLink(res.devResetUrl);
+      }
+      setStep("code");
+    });
+  }
+
+  // ── Paso 2: verificar código ────────────────────────────────────────────
+  function handleCodeSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const fd = new FormData(e.currentTarget);
+    const inputCode = (fd.get("code") as string).trim();
+    startTransition(async () => {
+      const res = await verifyResetCode({ email, code: inputCode });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      setCode(inputCode);
+      setStep("password");
+    });
+  }
+
+  // ── Paso 3: nueva contraseña ────────────────────────────────────────────
+  function handlePasswordSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await resetPasswordWithCode({
+        email,
+        code,
+        password: fd.get("password"),
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      router.push("/login?reset=1");
+    });
+  }
+
   return (
-    <div className="mx-auto max-w-md px-6 py-16">
-      <h1 className="text-2xl font-bold">Recuperar contraseña</h1>
-      <p className="mt-2 text-sm text-foreground/60">
-        Te enviaremos un enlace para restablecer tu contraseña.
-      </p>
+    <AuthFormCard>
+      {/* Indicador de pasos */}
+      <div className="mb-6 flex items-center gap-2">
+        {(["email", "code", "password"] as Step[]).map((s, i) => (
+          <div key={s} className="flex items-center gap-2">
+            <div
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                step === s
+                  ? "bg-primary text-primary-foreground"
+                  : i < (["email", "code", "password"] as Step[]).indexOf(step)
+                    ? "bg-primary/20 text-primary"
+                    : "bg-foreground/10 text-foreground/40"
+              }`}
+            >
+              {i + 1}
+            </div>
+            {i < 2 && (
+              <div
+                className={`h-px w-6 transition-colors ${
+                  i < (["email", "code", "password"] as Step[]).indexOf(step)
+                    ? "bg-primary/40"
+                    : "bg-foreground/10"
+                }`}
+              />
+            )}
+          </div>
+        ))}
+        <span className="ml-2 text-xs text-foreground/50">
+          {step === "email" && "Ingresá tu email"}
+          {step === "code" && "Ingresá el código"}
+          {step === "password" && "Nueva contraseña"}
+        </span>
+      </div>
 
-      <form
-        className="mt-8 space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setMessage(null);
-          setDevLink(null);
-          const fd = new FormData(e.currentTarget);
-          startTransition(async () => {
-            const res = await requestPasswordReset({
-              email: fd.get("email"),
-            });
-            if (!res.ok) {
-              setMessage(res.message);
-              return;
-            }
-            setMessage(
-              "Si el email está registrado, recibirás instrucciones en breve.",
-            );
-            if (res.devResetUrl) setDevLink(res.devResetUrl);
-          });
-        }}
-      >
-        <label className="block text-sm">
-          <span className="font-semibold">Email</span>
-          <input
-            name="email"
-            type="email"
+      {/* Paso 1: Email */}
+      {step === "email" && (
+        <form onSubmit={handleEmailSubmit} className="space-y-5">
+          <div>
+            <label className={authLabelClass}>Email de tu cuenta</label>
+            <input
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              autoFocus
+              className={authInputClass}
+            />
+          </div>
+          <p className="text-xs text-foreground/55">
+            Te enviaremos un código de 6 dígitos a tu correo. Válido por 15 minutos.
+          </p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={isPending} className={authButtonClass}>
+            {isPending ? "Enviando…" : "Enviar código"}
+          </button>
+          {devLink && (
+            <p className="break-all rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Dev (sin SMTP): código visible en la URL:{" "}
+              <Link href={devLink} className="font-mono font-bold underline">
+                {devLink}
+              </Link>
+            </p>
+          )}
+        </form>
+      )}
+
+      {/* Paso 2: Código */}
+      {step === "code" && (
+        <form onSubmit={handleCodeSubmit} className="space-y-5">
+          <p className="rounded-xl bg-primary/8 px-4 py-3 text-sm">
+            Enviamos un código de 6 dígitos a <strong>{email}</strong>.
+            Revisá tu bandeja de entrada (y la carpeta de spam).
+          </p>
+          <div>
+            <label className={authLabelClass}>Código de verificación</label>
+            <input
+              name="code"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              required
+              autoFocus
+              autoComplete="one-time-code"
+              placeholder="000000"
+              className={`${authInputClass} text-center font-mono text-2xl tracking-[0.4em]`}
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={isPending} className={authButtonClass}>
+            {isPending ? "Verificando…" : "Verificar código"}
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            className="w-full text-center text-sm text-foreground/55 hover:text-primary hover:underline disabled:opacity-50"
+            onClick={() => {
+              setError(null);
+              setStep("email");
+            }}
+          >
+            No recibí el código — reenviar
+          </button>
+        </form>
+      )}
+
+      {/* Paso 3: Nueva contraseña */}
+      {step === "password" && (
+        <form onSubmit={handlePasswordSubmit} className="space-y-5">
+          <p className="rounded-xl bg-primary/8 px-4 py-3 text-sm">
+            Código verificado. Elegí tu nueva contraseña.
+          </p>
+          <PasswordInput
+            label="Nueva contraseña"
             required
-            className="mt-1 w-full rounded-xl border border-foreground/15 px-4 py-2.5 outline-none focus:border-primary"
+            minLength={8}
+            autoComplete="new-password"
+            inputClassName={`${authInputClass} pr-12`}
           />
-        </label>
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full rounded-full bg-primary py-3 font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {isPending ? "Enviando…" : "Enviar enlace"}
-        </button>
-      </form>
-
-      {message && (
-        <p className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm">{message}</p>
+          <p className="text-xs text-foreground/55">{PASSWORD_REQUIREMENTS_HINT}</p>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={isPending} className={authButtonClass}>
+            {isPending ? "Guardando…" : "Guardar nueva contraseña"}
+          </button>
+        </form>
       )}
-      {devLink && (
-        <p className="mt-3 break-all text-xs text-foreground/50">
-          Dev:{" "}
-          <Link href={devLink} className="text-primary underline">
-            {devLink}
-          </Link>
-        </p>
-      )}
+    </AuthFormCard>
+  );
+}
 
-      <Link
-        href="/login"
-        className="mt-6 inline-block text-sm font-semibold text-primary hover:underline"
-      >
-        ← Volver al login
-      </Link>
-    </div>
+export default function ForgotPasswordPage() {
+  return (
+    <AuthShell
+      title="Recuperar contraseña"
+      subtitle="Te enviamos un código a tu correo para verificar tu identidad antes de cambiar la contraseña."
+    >
+      <Suspense>
+        <ForgotPasswordFlow />
+      </Suspense>
+
+      <p className="mt-6 pb-4 text-center text-sm text-foreground/65">
+        <Link href="/login" className="font-semibold text-primary hover:underline">
+          ← Volver al inicio de sesión
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

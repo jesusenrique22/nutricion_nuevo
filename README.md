@@ -32,9 +32,9 @@ npm run reminders          # script directo (usa PostgreSQL + MongoDB)
 
 ## Documentación
 
-Consulta **[DOCUMENTACION.md](./DOCUMENTACION.md)** para arquitectura, módulos y roadmap.
+Consulta **[DOCUMENTACION.md](./DOCUMENTACION.md)** para arquitectura, módulos, email SMTP y Google Calendar.
 
-**Deploy en Vercel:** **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)**
+**Deploy en Vercel:** **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** · **Seguridad:** **[docs/SEGURIDAD.md](./docs/SEGURIDAD.md)**
 
 ## Credenciales de prueba
 

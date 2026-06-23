@@ -1,36 +1,58 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-// Anti-spam (Módulo 2). Si Upstash no está configurado, se desactiva en dev.
 const url = process.env.UPSTASH_REDIS_REST_URL;
 const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const enabled = Boolean(url && token);
+export const rateLimitEnabled = Boolean(url && token);
 
-const redis = enabled
+const redis = rateLimitEnabled
   ? new Redis({ url: url as string, token: token as string })
   : null;
 
-// Límite para creación de citas: 5 peticiones cada 60s por identificador
-export const appointmentLimiter = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(5, "60 s"),
-      analytics: true,
-      prefix: "rl:appointment",
-    })
-  : null;
+const isProduction = process.env.NODE_ENV === "production";
+
+function createLimiter(prefix: string, limit: number, window: `${number} s`) {
+  return redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(limit, window),
+        analytics: true,
+        prefix,
+      })
+    : null;
+}
+
+export const appointmentLimiter = createLimiter("rl:appointment", 5, "60 s");
+export const authLimiter = createLimiter("rl:auth", 10, "60 s");
 
 type LimitResult = { success: boolean; remaining: number };
 
-/**
- * Aplica rate limit por identificador (IP o userId).
- * En dev sin Upstash, permite todo (success=true).
- */
-export async function limitByKey(key: string): Promise<LimitResult> {
-  if (!appointmentLimiter) {
-    return { success: true, remaining: Infinity };
+function failClosedInProduction(): LimitResult {
+  if (isProduction && !rateLimitEnabled) {
+    console.error(
+      "[security] UPSTASH_REDIS_REST_URL/TOKEN requeridos en producción para rate limiting.",
+    );
+    return { success: false, remaining: 0 };
   }
-  const { success, remaining } = await appointmentLimiter.limit(key);
+  return { success: true, remaining: Infinity };
+}
+
+async function runLimit(
+  limiter: Ratelimit | null,
+  key: string,
+): Promise<LimitResult> {
+  if (!limiter) return failClosedInProduction();
+  const { success, remaining } = await limiter.limit(key);
   return { success, remaining };
+}
+
+/** Citas públicas / reservas — 5 req / 60 s por clave (IP o userId). */
+export async function limitByKey(key: string): Promise<LimitResult> {
+  return runLimit(appointmentLimiter, key);
+}
+
+/** Registro, reset de contraseña, reenvío de verificación — 10 req / 60 s por IP. */
+export async function limitAuthByIp(ip: string): Promise<LimitResult> {
+  return runLimit(authLimiter, ip);
 }

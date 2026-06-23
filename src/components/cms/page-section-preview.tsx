@@ -38,7 +38,10 @@ function HeroPreview({ images }: { images: LandingImagesData }) {
               fill
               className="object-cover object-center"
               sizes="400px"
-              unoptimized={slide.src.startsWith("/uploads/")}
+              priority={i === 0}
+              loading={i === 0 ? "eager" : "lazy"}
+              fetchPriority={i === 0 ? "high" : "auto"}
+              unoptimized={shouldUnoptimizeImage(slide.src)}
             />
           ) : (
             <div className="absolute inset-0 bg-primary" />

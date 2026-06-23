@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { ObjectId } from "mongodb";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { getMongoDb, Collections } from "@/server/db/mongo";
 import { syncUser } from "@/server/realtime/sync";
 import type { NotificationDoc, NotificationType } from "@/types/chat";
 import { VISIBLE_NOTIFICATION_TYPES } from "@/types/chat";
+
+const notificationIdSchema = z.string().regex(/^[a-f0-9]{24}$/i);
 
 export interface NotificationDTO {
   id: string;
@@ -16,36 +19,6 @@ export interface NotificationDTO {
   payload?: Record<string, unknown>;
   isRead: boolean;
   createdAt: string;
-}
-
-/**
- * Internal server-only function. NOT a Server Action callable from the client.
- * Import only from server-side services/actions.
- */
-export async function createNotification(params: {
-  recipientId: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  payload?: Record<string, unknown>;
-  /** Must be true to confirm the call is from internal server code. */
-  _serverOnly?: true;
-}) {
-  const db = await getMongoDb();
-  await db.collection<NotificationDoc>(Collections.notifications).insertOne({
-    recipientId: params.recipientId,
-    type: params.type,
-    title: params.title,
-    body: params.body,
-    payload: params.payload,
-    isRead: false,
-    createdAt: new Date(),
-  });
-
-  await syncUser(params.recipientId, "notifications", {
-    type: params.type,
-    action: "created",
-  });
 }
 
 export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
@@ -98,12 +71,15 @@ export async function markNotificationRead(
   const session = await auth();
   if (!session?.user?.id) return { ok: false };
 
+  const idParsed = notificationIdSchema.safeParse(notificationId);
+  if (!idParsed.success) return { ok: false };
+
   const db = await getMongoDb();
   const res = await db
     .collection<NotificationDoc>(Collections.notifications)
     .updateOne(
       {
-        _id: new ObjectId(notificationId),
+        _id: new ObjectId(idParsed.data),
         recipientId: session.user.id,
       },
       { $set: { isRead: true } },

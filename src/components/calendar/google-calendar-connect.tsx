@@ -2,7 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useTransition } from "react";
-import { setDefaultCalendarAdminAction } from "@/server/actions/google-calendar.actions";
+import {
+  setDefaultCalendarAdminAction,
+  syncExistingAppointmentsAction,
+} from "@/server/actions/google-calendar.actions";
 
 type ConnectionInfo = {
   connectedEmail: string | null;
@@ -11,7 +14,8 @@ type ConnectionInfo = {
 } | null;
 
 const statusMessages: Record<string, string> = {
-  connected: "Google Calendar conectado correctamente.",
+  connected:
+    "Google Calendar conectado. Las citas nuevas se sincronizan solas; usá «Sincronizar citas existentes» si faltan en Google.",
   denied:
     "Google bloqueó la autorización. Revisá que tu Gmail esté en Test users del OAuth consent screen y que el scope calendar.events esté agregado.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
@@ -51,7 +55,7 @@ function GoogleCalendarConnectInner({
         <p className="font-semibold">Google Calendar sin configurar</p>
         <p className="mt-1 text-xs opacity-80">
           Necesitás OAuth Client ID y Secret (no solo API key). Ver{" "}
-          <code className="rounded bg-white/60 px-1">docs/GOOGLE-CALENDAR.md</code>
+          <code className="rounded bg-white/60 px-1">DOCUMENTACION.md § Google Calendar</code>
         </p>
       </div>
     );
@@ -110,6 +114,30 @@ function GoogleCalendarConnectInner({
                   Usar para nuevas citas
                 </button>
               )}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  startTransition(async () => {
+                    const result = await syncExistingAppointmentsAction();
+                    if (result.ok) {
+                      setMessage(
+                        result.synced > 0
+                          ? `Sincronizadas ${result.synced} cita(s) con Google Calendar.`
+                          : result.failed > 0
+                            ? "No se pudieron sincronizar las citas. Revisá los logs en Vercel."
+                            : "No hay citas pendientes de sincronizar (desde hoy en adelante, no canceladas).",
+                      );
+                      router.refresh();
+                    } else {
+                      setMessage(result.message);
+                    }
+                  });
+                }}
+                className="rounded-full border border-foreground/15 px-4 py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                Sincronizar citas existentes
+              </button>
               <button
                 type="button"
                 disabled={isPending}

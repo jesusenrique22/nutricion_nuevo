@@ -19,6 +19,7 @@ async function main() {
   console.log("═══ Check deploy (local ≈ Vercel) ═══\n");
 
   run("node scripts/check-edge-boundaries.mjs");
+  run("node scripts/check-sql-safety.mjs");
 
   const skipMigrate = process.env.SKIP_MIGRATE === "1" ? "1" : "0";
   if (skipMigrate === "1") {

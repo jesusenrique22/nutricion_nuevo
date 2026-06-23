@@ -10,6 +10,7 @@
     "build:skip-migrate": "SKIP_MIGRATE=1 node scripts/vercel-build.mjs",
     "vercel-build": "node scripts/vercel-build.mjs",
     "check:edge": "node scripts/check-edge-boundaries.mjs",
+    "check:sql": "node scripts/check-sql-safety.mjs",
     "check:smoke": "node scripts/smoke-production.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
     "start": "next start",

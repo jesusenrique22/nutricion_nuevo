@@ -32,12 +32,14 @@ export function DoctorCalendar({
 }) {
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [view, setView] = useState<CalendarView>(() =>
-    isMobile ? "day" : "week",
-  );
+  const [view, setView] = useState<CalendarView>("week");
   const [miniMonth, setMiniMonth] = useState(() =>
     startOfMonth(new Date()),
   );
+
+  useEffect(() => {
+    if (isMobile) setView("day");
+  }, [isMobile]);
 
   useEffect(() => {
     setMiniMonth(startOfMonth(selectedDate));
@@ -77,15 +79,15 @@ export function DoctorCalendar({
 
   return (
     <div className="anttova-calendar flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col overflow-hidden">
-      <div className="grid w-full min-w-0 flex-1 items-stretch gap-3 lg:grid-cols-[minmax(0,228px)_minmax(0,1fr)] lg:gap-5">
-        <aside className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-3">
+      <div className="grid w-full min-w-0 flex-1 items-start gap-3 lg:grid-cols-[minmax(0,264px)_minmax(0,1fr)] lg:gap-5">
+        <aside className="flex w-full min-w-0 flex-col gap-2.5 self-start lg:gap-3">
           <CalendarMiniMonth
             month={miniMonth}
             selected={selectedDate}
             appointments={appointments}
             onSelectDay={pickDay}
             onChangeMonth={setMiniMonth}
-            compact
+            compact={isMobile}
           />
 
           <StatPill
@@ -250,21 +252,21 @@ function StatPill({
 }) {
   return (
     <div
-      className={`rounded-xl border px-3 py-2.5 ${
+      className={`h-fit w-full rounded-xl border px-3.5 py-3 lg:rounded-2xl lg:px-4 lg:py-3.5 ${
         active
           ? "border-primary/20 bg-primary/8 ring-1 ring-primary/15"
-          : "border-foreground/8 bg-surface"
+          : "border-foreground/8 bg-surface shadow-sm"
       }`}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[9px] font-bold uppercase tracking-wider text-foreground/45">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/45 lg:text-[11px]">
           {label}
         </p>
-        <p className="text-xl font-bold tabular-nums leading-none text-primary">
+        <p className="text-2xl font-bold tabular-nums leading-none text-primary lg:text-[1.75rem]">
           {day}
         </p>
       </div>
-      <p className="mt-1 truncate text-[10px] capitalize text-foreground/50">
+      <p className="mt-1.5 truncate text-[11px] capitalize text-foreground/50 lg:text-xs">
         {detail} · {count} cita{count !== 1 ? "s" : ""}
       </p>
     </div>
