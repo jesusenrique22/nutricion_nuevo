@@ -273,7 +273,7 @@ FormTemplate (code + fields JSON) — formularios editables
 | `CRON_SECRET` | Opcional | Recordatorios |
 | `RECAPTCHA_*` | Recomendado | Anti-spam al agendar |
 
-**Deploy Vercel:** lista completa de variables en **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)**.
+**Deploy:** variables en **[docs/DEPLOY-RENDER.md](./docs/DEPLOY-RENDER.md)** (Render) o **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** (Vercel).
 
 ---
 

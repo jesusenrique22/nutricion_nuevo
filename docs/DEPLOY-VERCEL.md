@@ -91,7 +91,7 @@ Si ves `MongoServerSelectionError`:
 | Login “Credenciales inválidas” | BD sin seed | `pnpm run db:seed` contra Neon |
 | Error 500 al login | Falta `AUTH_SECRET` | Agregar en Vercel + redeploy |
 | Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio del navegador |
-| “Demasiados intentos” en auth | Sin Upstash en prod | Configurar `UPSTASH_*` |
+| “Demasiadas solicitudes” en prod | Sin Upstash (antes bloqueaba todo) | Configurar `UPSTASH_*` o usar build con fallback en memoria |
 | Emails no llegan | SMTP mal configurado | `pnpm run email:check` local; mismas vars en Vercel |
 | Google Calendar `redirect_uri_mismatch` | URI en Google Cloud | `{NEXTAUTH_URL}/api/google/calendar/callback` |
 
