@@ -91,9 +91,22 @@ Alternativa local: `pnpm run reminders`
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
-| Admin | `admin@gmail.com` | `Admin123` |
+| Admin | `admin@gmail.com` | `Admin123!` |
 
 Pacientes: registro en `/register`.
+
+**Si el login falla en producción** (mensaje “Credenciales inválidas” con POST 200 en `/api/auth/callback/credentials`):
+
+1. Confirmá que `DATABASE_URL` en el hosting apunta a la misma base Neon que usás en local.
+2. Ejecutá el seed contra esa base (una vez):
+
+```bash
+pnpm run db:seed
+```
+
+Con `DATABASE_URL` de producción en tu `.env` local, o desde el panel de Neon → SQL / seed manual.
+
+3. Verificá con `pnpm run db:check` que exista el admin y usuarios en la BD.
 
 ## 6. Solución de problemas
 
@@ -101,7 +114,7 @@ Pacientes: registro en `/register`.
 |---------|----------------|----------|
 | 404 en `/dashboard` | Dominio incorrecto | URL del deploy activo |
 | 500 en `/login` (proxy) | Proxy importa Prisma | `pnpm run check:deploy` |
-| Login “Credenciales inválidas” | BD sin seed | `pnpm run db:seed` contra Neon |
+| Login “Credenciales inválidas” | BD sin seed o contraseña incorrecta | `pnpm run db:seed` — admin: `admin@gmail.com` / `Admin123!` |
 | Error 500 al login | Falta `AUTH_SECRET` | Agregar en hosting + redeploy |
 | Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio del navegador |
 | Imágenes rotas | Faltan archivos en `public/uploads/site/` | Commitear imágenes iniciales o re-subir en Personalizar |

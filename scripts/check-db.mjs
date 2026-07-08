@@ -47,6 +47,21 @@ async function main() {
       const users = await prisma.user.count();
       const contents = await prisma.siteContent.count();
       console.log(`✓ ${users} usuarios, ${contents} registros de contenido CMS.`);
+
+      const admin = await prisma.user.findFirst({
+        where: { email: "admin@gmail.com" },
+        select: { passwordHash: true, emailVerified: true, role: true },
+      });
+      if (!admin?.passwordHash) {
+        console.log(
+          "\n⚠ No hay usuario admin con contraseña. Ejecutá: pnpm run db:seed",
+        );
+      } else {
+        console.log(
+          `✓ Admin listo (${admin.role}, email ${admin.emailVerified ? "verificado" : "sin verificar"}).`,
+        );
+        console.log("  Login demo: admin@gmail.com / Admin123!");
+      }
     }
   } catch (error) {
     console.error("\n✗ Error de conexión:\n");

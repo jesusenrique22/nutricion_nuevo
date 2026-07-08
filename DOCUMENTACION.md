@@ -310,7 +310,7 @@ Tras `pnpm run db:seed`:
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
-| Admin | `admin@gmail.com` | `Admin123` |
+| Admin | `admin@gmail.com` | `Admin123!` |
 
 Pacientes: registro en `/register`.
 
