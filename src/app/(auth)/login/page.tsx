@@ -51,7 +51,7 @@ function LoginForm() {
         );
         return;
       }
-      if (res.error === "Configuration") {
+      if (res.error === "Configuration" || res.error === "DATABASE_UNAVAILABLE") {
         setError(
           "No se pudo conectar con la base de datos. Revisá DATABASE_URL en el hosting.",
         );

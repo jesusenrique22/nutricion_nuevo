@@ -22,7 +22,7 @@ Configurá cada variable en su **propia fila** en el panel del hosting (no pegar
 
 | Variable | Descripción |
 |----------|-------------|
-| `DATABASE_URL` | Connection string de Neon (`?sslmode=require`) |
+| `DATABASE_URL` | Connection string **pooled** de Neon (`?sslmode=require`). **No uses** `channel_binding=require` — rompe el driver WebSocket en serverless. |
 | `AUTH_SECRET` | Secreto NextAuth (`openssl rand -base64 32`) |
 | `AUTH_URL` | `https://TU-DOMINIO-DEL-CLIENTE.com` (sin `/` final) |
 | `NEXTAUTH_URL` | Mismo valor que `AUTH_URL` |

@@ -41,6 +41,9 @@ export function normalizeDatabaseUrl(raw) {
     const url = new URL(input);
     if (!isNeonUrl(url.hostname)) return input;
 
+    // Incompatible con @neondatabase/serverless (WebSocket) en Vercel/serverless.
+    url.searchParams.delete("channel_binding");
+
     if (!url.searchParams.has("sslmode")) {
       url.searchParams.set("sslmode", "require");
     }
@@ -68,6 +71,7 @@ export function deriveNeonDirectUrl(pooledUrl) {
     url.hostname = url.hostname.replace("-pooler", "");
     url.searchParams.delete("pgbouncer");
     url.searchParams.delete("connection_limit");
+    url.searchParams.delete("channel_binding");
     if (!url.searchParams.has("sslmode")) {
       url.searchParams.set("sslmode", "require");
     }

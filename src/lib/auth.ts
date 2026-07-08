@@ -64,8 +64,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ) {
             throw err;
           }
+          const code =
+            err && typeof err === "object" && "code" in err
+              ? String((err as { code?: string }).code)
+              : "";
+          if (code.startsWith("P") || code === "ECONNREFUSED" || code === "ETIMEDOUT") {
+            console.error("[auth/credentials] Base de datos:", err);
+            throw new Error("DATABASE_UNAVAILABLE");
+          }
           console.error("[auth/credentials]", err);
-          throw err;
+          return null;
         }
       },
     }),
