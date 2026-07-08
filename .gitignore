@@ -32,12 +32,9 @@ next-env.d.ts
 .env.backup
 .env.*.backup
 
-# vercel (deploy de producción)
-.vercel
-
-# render — descartado; ignorar si queda algún archivo local
-render.yaml
-render.toml
+# hosting — carpeta local generada al vincular proyecto con CLI del proveedor
+.hosting-link/
+.vercel/
 
 # debug / logs
 npm-debug.log*

@@ -3,7 +3,7 @@ import { refreshExchangeRate } from "@/server/services/exchange-rate.service";
 
 /**
  * Cron diario: actualiza el dólar blue desde dolarapi.com.
- * Vercel: ver crons en vercel.json. Local: curl con CRON_SECRET.
+ * Crons: ver rutas y horarios en deploy.json. Local: curl con CRON_SECRET.
  */
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;

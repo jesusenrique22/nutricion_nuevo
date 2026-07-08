@@ -12,7 +12,7 @@ Guía de medidas implementadas y requisitos de despliegue.
 | Server Actions | Validación Zod en entradas; guards `requireSession` / `requireAdmin` / `requireSelfOrAdmin`. |
 | Rate limiting | Upstash Redis (recomendado) o fallback en memoria. Auth, citas, subidas, pagos. |
 | Headers HTTP | CSP, HSTS (prod), X-Frame-Options, CORP, COOP, nosniff, Referrer-Policy, Permissions-Policy. |
-| **WAF** | Reglas en `vercel.json` → bloqueo de scanners, path traversal y exploits comunes. Sin rate-limit en `/api/auth` (evita bloquear sesiones normales). |
+| **WAF** | Configurar en el panel del hosting (si el plan lo incluye). Sin rate-limit en `/api/auth` (evita bloquear sesiones normales). |
 | Secretos | Variables en `.env`; nunca en el repo. |
 | **HTTPS/SSL** | HSTS `max-age=63072000; includeSubDomains; preload` + redirect HTTP→HTTPS en `next.config.ts`. |
 
@@ -29,14 +29,16 @@ Guía de medidas implementadas y requisitos de despliegue.
 
 ## HTTPS / SSL
 
-- **Vercel** termina TLS automáticamente con certificados Let's Encrypt renovados.
+- El hosting/CDN termina TLS (certificados Let's Encrypt u equivalente).
 - `next.config.ts` añade header `Strict-Transport-Security` en producción (2 años, preload).
-- Redirect HTTP → HTTPS vía `redirects()` en `next.config.ts` para el dominio `anttova.com`.
-- El header HSTS también se define en `vercel.json` para que aplique a rutas estáticas servidas por el CDN.
+- Redirect HTTP → HTTPS vía `redirects()` en `next.config.ts` para el dominio del cliente.
+- El header HSTS también se define en `deploy.json` para replicar en el CDN si el proveedor lo soporta.
 
-## WAF — Firewall Vercel
+## WAF — Firewall del hosting
 
-Reglas definidas en `vercel.json` bajo `"firewall"` (requiere plan Pro/Enterprise de Vercel):
+Configurá reglas WAF en el panel del proveedor (si está disponible). Referencia de headers/crons en `deploy.json`.
+
+Reglas recomendadas (equivalentes a las que teníamos documentadas):
 
 | Regla | Acción | Descripción |
 |-------|--------|-------------|
@@ -83,7 +85,7 @@ Helpers reutilizables: `src/lib/security/auth-guards.ts`.
 
 **No afecta:** navegación normal, login con `signIn()`, consultas de sesión (`/api/auth/session`), dashboard, ni lectura de páginas.
 
-Con Upstash Redis el límite es compartido entre todas las instancias. Sin Upstash, el fallback en memoria solo funciona con una instancia (suficiente para Vercel Hobby/Pro con una región).
+Con Upstash Redis el límite es compartido entre todas las instancias. Sin Upstash, el fallback en memoria solo funciona con una instancia.
 
 Variables opcionales (recomendadas):
 
@@ -92,7 +94,7 @@ Variables opcionales (recomendadas):
 
 ## Headers HTTP
 
-Definidos en `next.config.ts` y `vercel.json` (duplicados para cobertura en CDN):
+Definidos en `next.config.ts` y `deploy.json` (duplicados para cobertura en CDN si el hosting lo importa):
 
 | Header | Valor |
 |--------|-------|
@@ -132,11 +134,11 @@ Contraseñas: mínimo 8, máximo 128 caracteres (límite bcrypt). Hash con bcryp
 - [ ] `pnpm run check:env` antes del deploy
 - [ ] Revisar que `.env` no esté en git
 - [ ] `node scripts/check-sql-safety.mjs` en CI
-- [ ] Verificar que el plan Vercel tenga WAF activado (Pro/Enterprise)
+- [ ] WAF del hosting activado (si el plan lo incluye)
 - [ ] Agregar dominio a [HSTS preload list](https://hstspreload.org/) una vez verificado en producción
 
 ## Próximas mejoras (opcional)
 
 - CSP con nonces (elimina `unsafe-inline` en scripts)
 - Auditoría de logs de acceso admin
-- Bot protection con Vercel Speed Insights / Turnstile
+- Bot protection (Turnstile / reCAPTCHA Enterprise)

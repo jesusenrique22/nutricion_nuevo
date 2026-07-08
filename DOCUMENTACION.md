@@ -40,7 +40,7 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 | Recursos digitales | ✅ ~85% | CRUD, tienda, librería; pagos manuales |
 | CMS / Personalizar | ✅ ~90% | Imágenes, precios, textos, formularios, plan semanal |
 | Pagos online | 🔴 ~10% | Modelo `Payment` + registro manual; sin Stripe |
-| Deploy / prod | 🟡 ~50% | Vercel + Neon; SMTP y Upstash configurables |
+| Deploy / prod | 🟡 ~50% | Hosting + Neon; SMTP y Upstash configurables |
 
 **Leyenda:** ✅ funcional · 🟡 parcial · 🔴 pendiente
 
@@ -93,7 +93,7 @@ Plataforma web para consultorio de nutrición (Lic. Ma Antonieta Lanza): agendam
 - Roles: `ADMIN` (nutricionista) · `PATIENT`.
 - Registro de pacientes con `PatientProfile` y verificación por email.
 - **Recuperar contraseña:** `/forgot-password` — código de 6 dígitos por correo (15 min) → nueva contraseña. Ver [§12 Email](#12-email-smtp).
-- Protección de rutas en `src/proxy.ts` (Edge). Ver **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)** (regla Edge).
+- Protección de rutas en `src/proxy.ts` (Edge). Ver **[docs/DEPLOY.md](./docs/DEPLOY.md)** (regla Edge).
 
 ### 3.2 Marketing
 
@@ -273,7 +273,7 @@ FormTemplate (code + fields JSON) — formularios editables
 | `CRON_SECRET` | Opcional | Recordatorios |
 | `RECAPTCHA_*` | Recomendado | Anti-spam al agendar |
 
-**Deploy:** variables en **[docs/DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md)**.
+**Deploy:** variables en **[docs/DEPLOY.md](./docs/DEPLOY.md)**.
 
 ---
 
@@ -324,7 +324,7 @@ Pacientes: registro en `/register`.
 
 | Tarea | Detalle |
 |-------|---------|
-| Deploy Vercel + dominio | Ver [DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md) |
+| Deploy + dominio del cliente | Ver [DEPLOY.md](./docs/DEPLOY.md) |
 | Upstash en producción | Obligatorio para rate limit de auth |
 | Migraciones formales | `pnpm run db:migrate` en prod |
 
@@ -394,9 +394,9 @@ pnpm run email:check   # Verificar conexión SMTP
 pnpm run dev           # Reiniciar tras cambiar .env
 ```
 
-### Vercel
+### Hosting (producción)
 
-Copiar las 6 variables SMTP en **Settings → Environment Variables** y redeploy. Ver [DEPLOY-VERCEL.md](./docs/DEPLOY-VERCEL.md).
+Copiar las 6 variables SMTP en **Settings → Environment Variables** y redeploy. Ver [DEPLOY.md](./docs/DEPLOY.md).
 
 ---
 
@@ -413,7 +413,7 @@ Las citas agendadas se sincronizan al **Google Calendar del admin** asignado. Re
 
 ```
 http://localhost:3000/api/google/calendar/callback
-https://TU-DOMINIO.vercel.app/api/google/calendar/callback
+https://TU-DOMINIO-DEL-CLIENTE.com/api/google/calendar/callback
 ```
 
 ### Variables
@@ -422,7 +422,7 @@ https://TU-DOMINIO.vercel.app/api/google/calendar/callback
 GOOGLE_CALENDAR_CLIENT_ID="....apps.googleusercontent.com"
 GOOGLE_CALENDAR_CLIENT_SECRET="GOCSPX-..."
 GOOGLE_CALENDAR_TIMEZONE="America/Argentina/Buenos_Aires"
-NEXTAUTH_URL="https://TU-DOMINIO.vercel.app"
+NEXTAUTH_URL="https://TU-DOMINIO-DEL-CLIENTE.com"
 ```
 
 `GOOGLE_CALENDAR_REDIRECT_URI` es opcional (se calcula desde `NEXTAUTH_URL`).

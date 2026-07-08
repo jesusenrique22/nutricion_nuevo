@@ -21,7 +21,7 @@ function printNeonHelp() {
 Pasos en console.neon.tech:
   1. Abre tu proyecto → debe estar "Active" (no suspendido).
   2. Dashboard → Connection details → copia la URL **Pooled** nueva.
-  3. Pégala en .env y en Vercel como DATABASE_URL (con ?sslmode=require).
+  3. Pégala en .env y en el panel de hosting como DATABASE_URL (con ?sslmode=require).
   4. Si sigue fallando: "Reset password" en Neon y vuelve a copiar la URL.
 
 Para compilar SIN migrar (mientras arreglas Neon):
@@ -39,7 +39,7 @@ async function migrateDeployWithRetry() {
   }
 
   if (!process.env.DATABASE_URL?.trim()) {
-    console.error("\n✗ Falta DATABASE_URL en .env o Vercel.\n");
+    console.error("\n✗ Falta DATABASE_URL en .env o en el hosting.\n");
     process.exit(1);
   }
 
