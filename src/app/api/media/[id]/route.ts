@@ -1,24 +1,36 @@
 import { auth } from "@/lib/auth";
+import { isPublicMediaFolder } from "@/lib/media-access-policy";
 import {
   gridFileMimeType,
+  findLocalUploadUrl,
   mongoStreamToWebResponse,
   openMongoFileStream,
 } from "@/server/services/mongo-storage";
 import { canAccessStoredMediaUrl, isPublicStoredMediaUrl } from "@/server/services/media-access.service";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+
+    const located = await findLocalUploadUrl(id);
+    if (located && isPublicMediaFolder(located.folder)) {
+      return Response.redirect(new URL(located.url, req.url), 307);
+    }
+
     const result = await openMongoFileStream(id);
     if (!result) {
       return new Response("No encontrado", { status: 404 });
     }
 
     const url = `/api/media/${id}`;
-    const allowed = await canAccessStoredMediaUrl(url);
+    const folderFromMeta = result.meta.metadata?.folder;
+    const allowed =
+      (typeof folderFromMeta === "string" &&
+        isPublicMediaFolder(folderFromMeta.trim())) ||
+      (await canAccessStoredMediaUrl(url));
     if (!allowed) {
       const session = await auth();
       return new Response(session?.user ? "No autorizado" : "Inicia sesión", {

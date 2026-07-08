@@ -36,6 +36,9 @@ next-env.d.ts
 .hosting-link/
 .vercel/
 
+# generado en postinstall del hosting (desde deploy.json; no commitear)
+vercel.json
+
 # debug / logs
 npm-debug.log*
 yarn-debug.log*

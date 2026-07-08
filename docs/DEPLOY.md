@@ -8,7 +8,9 @@ Guía operativa para publicar el sitio en el dominio del cliente. Arquitectura y
 2. Conectá el repositorio en tu proveedor de hosting (Next.js detectado automáticamente).
 3. **Build command:** `pnpm run build`
 4. **Install command:** `pnpm install`
-5. Referencia de headers y crons: ver `deploy.json` en la raíz (importá o replicá según lo que soporte tu hosting).
+5. Referencia de headers y crons: `deploy.json` (en build del hosting se aplica automáticamente; no va al repo como archivo del proveedor).
+
+**Build command en el panel del hosting:** `pnpm run build` (si el panel aún dice `pnpm run vercel-build`, también funciona — es un alias interno).
 
 **Imágenes iniciales del sitio:** deben estar en `public/uploads/site/` (versionadas en git). El resto de uploads se generan en runtime.
 

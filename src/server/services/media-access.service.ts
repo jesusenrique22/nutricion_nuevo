@@ -7,7 +7,7 @@ import {
 } from "@/lib/media-access-policy";
 import { isPublicSiteContentMedia } from "@/lib/public-site-media";
 import { isUploadsPath, parseMediaIdFromUrl } from "@/lib/stored-file";
-import { getMongoFileMeta } from "@/server/services/mongo-storage";
+import { getMongoFileMeta, findLocalUploadUrl } from "@/server/services/mongo-storage";
 import { prisma } from "@/server/db/prisma";
 
 function folderFromUploadPath(url: string): string | null {
@@ -38,6 +38,9 @@ async function resolveGridFolder(url: string): Promise<string | null> {
 
   if (asset?.folder) return asset.folder;
 
+  const located = await findLocalUploadUrl(mediaId);
+  if (located?.folder) return located.folder;
+
   const uploadMatch = url.match(/^\/uploads\/([^/]+)\//);
   return uploadMatch?.[1] ?? null;
 }
@@ -65,6 +68,12 @@ async function resourceGrantedForUser(
 }
 
 async function isPublicMediaUrl(url: string): Promise<boolean> {
+  const mediaId = parseMediaIdFromUrl(url);
+  if (mediaId) {
+    const located = await findLocalUploadUrl(mediaId);
+    if (located && isPublicMediaFolder(located.folder)) return true;
+  }
+
   if (await isPublishedResourceCover(url)) return true;
   if (await isPublicSiteContentMedia(url)) return true;
 
@@ -91,9 +100,28 @@ export async function canAccessStoredMediaUrl(url: string): Promise<boolean> {
 
   const mediaId = parseMediaIdFromUrl(url);
   if (mediaId) {
-    const folder = gridFolder ?? "";
+    const folder =
+      gridFolder ?? (await findLocalUploadUrl(mediaId))?.folder ?? "";
     const meta = await getMongoFileMeta(mediaId);
-    if (!meta) return false;
+    if (!meta) {
+      if (folder === "payment-proofs") {
+        const asset = await prisma.mediaAsset.findFirst({
+          where: {
+            OR: [
+              { fileId: mediaId },
+              { url: { contains: mediaId } },
+            ],
+          },
+          select: { ownerId: true },
+        });
+        return asset?.ownerId === session.user.id;
+      }
+      if (folder === "resources") {
+        return resourceGrantedForUser(session.user.id, url);
+      }
+      if (AUTHENTICATED_MEDIA_FOLDERS.has(folder)) return true;
+      return false;
+    }
     const metadata = meta.metadata as Record<string, unknown> | undefined;
     const ownerId = metadata?.ownerId as string | undefined;
 

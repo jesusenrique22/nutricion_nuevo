@@ -81,7 +81,7 @@ type MediaStreamResult = {
 
 const PUBLIC_UPLOAD_FOLDERS = ["site", "brand", "cv"] as const;
 
-async function findLocalUploadUrl(fileId: string): Promise<{
+export async function findLocalUploadUrl(fileId: string): Promise<{
   url: string;
   folder: string;
 } | null> {
@@ -92,7 +92,6 @@ async function findLocalUploadUrl(fileId: string): Promise<{
         { url: `/api/media/${fileId}` },
         { url: { contains: fileId } },
       ],
-      provider: "local",
     },
     select: { url: true, folder: true },
   });
