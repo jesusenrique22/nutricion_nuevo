@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPaymentCheckoutPolicy } from "@/lib/payment-checkout-policy";
+import { validateUploadFile } from "@/lib/upload-policy";
 import { storePublicFile } from "@/server/services/file-storage";
+import { limitUploadByKey } from "@/lib/ratelimit";
 
-const MAX_BYTES = 8 * 1024 * 1024;
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "PATIENT") {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    const rl = await limitUploadByKey(session.user.id);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Demasiadas subidas. Intentá en unos segundos." },
+        { status: 429 },
+      );
     }
 
     const policy = await getPaymentCheckoutPolicy();
@@ -21,18 +30,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
     }
 
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: "La imagen es demasiado grande (máx. 8 MB)." },
-        { status: 400 },
-      );
-    }
-
-    if (!ALLOWED.has(file.type)) {
-      return NextResponse.json(
-        { error: "Solo se permiten imágenes JPG, PNG o WebP." },
-        { status: 400 },
-      );
+    const validation = validateUploadFile(file, "proof");
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.message }, { status: 400 });
     }
 
     const stored = await storePublicFile(file, "payment-proofs", {

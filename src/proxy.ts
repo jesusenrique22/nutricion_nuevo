@@ -9,16 +9,20 @@ export default edgeAuth((req) => {
   const isDashboard = nextUrl.pathname.startsWith("/dashboard");
   const isAdminArea = nextUrl.pathname.startsWith("/dashboard/admin");
   const isAuthPage =
-    nextUrl.pathname === "/login" || nextUrl.pathname === "/register";
+    nextUrl.pathname === "/login" ||
+    nextUrl.pathname === "/register" ||
+    nextUrl.pathname === "/forgot-password";
 
   // Usuario logueado intentando entrar a login/register -> al dashboard
   if (isAuthPage && isLoggedIn) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // Zona protegida sin sesión -> login
+  // Zona protegida sin sesión -> login (con ruta de retorno)
   if (isDashboard && !isLoggedIn) {
-    return NextResponse.redirect(new URL("/login", nextUrl));
+    const loginUrl = new URL("/login", nextUrl);
+    loginUrl.searchParams.set("from", nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Zona admin para no-admin -> dashboard
@@ -41,6 +45,7 @@ export const config = {
     "/dashboard/:path*",
     "/login",
     "/register",
+    "/forgot-password",
     "/uploads/cv/:path*",
   ],
 };

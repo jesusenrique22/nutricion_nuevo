@@ -11,6 +11,7 @@ import {
   authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { PASSWORD_REQUIREMENTS_HINT } from "@/lib/validators/password";
 import { registerPatient } from "@/server/actions/auth.actions";
 
@@ -88,13 +89,14 @@ export default function RegisterPage() {
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
+          <LoadingButton
             type="submit"
-            disabled={loading}
+            loading={loading}
+            loadingLabel="Creando cuenta…"
             className={authButtonClass}
           >
-            {loading ? "Creando cuenta…" : "Registrarme"}
-          </button>
+            Registrarme
+          </LoadingButton>
         </form>
       </AuthFormCard>
 

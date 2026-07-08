@@ -7,14 +7,14 @@ import {
 /** Mensaje amigable cuando Prisma no puede conectar a PostgreSQL. */
 export function getDbErrorMessage(error: unknown): string | null {
   if (error instanceof Prisma.PrismaClientInitializationError) {
-    return "No se pudo conectar a la base de datos. Revisa DATABASE_URL en tu archivo .env (usuario y contraseña de PostgreSQL).";
+    return "No se pudo conectar a la base de datos. Revisá DATABASE_URL en .env (URL pooled de Neon con ?sslmode=require).";
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P1000") {
-      return "Credenciales de PostgreSQL inválidas. Actualiza DATABASE_URL en .env con tu usuario y contraseña reales.";
+      return "Credenciales de PostgreSQL inválidas. Actualizá DATABASE_URL en .env (Neon → Reset password si hace falta).";
     }
     if (error.code === "P1001") {
-      return "No se puede alcanzar el servidor PostgreSQL. Verifica que esté corriendo en localhost:5432.";
+      return "No se puede alcanzar Neon. Verificá que el proyecto esté activo en console.neon.tech y que DATABASE_URL sea la URL pooled (*.neon.tech).";
     }
     if (error.code === "P1003") {
       return 'La base de datos "nutricion" no existe. Créala en pgAdmin y ejecuta: npm run db:migrate';

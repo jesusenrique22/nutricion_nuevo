@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { isToday } from "date-fns";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 import { appointmentsOnDay } from "@/components/calendar/calendar-utils";
+import { CalendarIcon, SunIcon } from "@/components/ui/link-icons";
 import { AppointmentEventCard } from "@/components/calendar/appointment-event-card";
 
 export function CalendarDayView({
@@ -22,7 +23,11 @@ export function CalendarDayView({
     return (
       <div className="anttova-day">
         <div className="anttova-day__empty flex w-full flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-foreground/12 bg-surface/60 px-6 py-10 text-center sm:py-16">
-          <p className="text-4xl">{today ? "☀️" : "📅"}</p>
+          {today ? (
+            <SunIcon className="h-10 w-10 text-amber-500/70" />
+          ) : (
+            <CalendarIcon className="h-10 w-10 text-primary/35" />
+          )}
           <p className="mt-4 text-lg font-semibold text-foreground">
             {today ? "Sin citas para hoy" : "Día libre"}
           </p>

@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { isPublicMediaFolder } from "@/lib/media-access-policy";
+import { revalidatePublicSiteMediaCache } from "@/lib/public-site-media";
+import { validateUploadFile } from "@/lib/upload-policy";
 import { storePublicFile } from "@/server/services/file-storage";
 import { registerMediaAsset } from "@/server/services/media-library.service";
+import { limitUploadByKey } from "@/lib/ratelimit";
 
-const MAX_BYTES = 25 * 1024 * 1024;
-
-const ALLOWED = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-  "video/mp4",
-  "video/webm",
-]);
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,9 +16,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    const rl = await limitUploadByKey(`admin:${session.user.id}`);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Demasiadas subidas. Esperá unos segundos." },
+        { status: 429 },
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
     const folder = formData.get("folder");
+    const kindRaw = formData.get("kind");
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
@@ -35,18 +38,14 @@ export async function POST(req: NextRequest) {
         ? folder
         : "resources";
 
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: "Archivo demasiado grande (máx. 25 MB)" },
-        { status: 400 },
-      );
-    }
+    const kind =
+      kindRaw === "pdf" || kindRaw === "image" || kindRaw === "video"
+        ? kindRaw
+        : "any";
 
-    if (!ALLOWED.has(file.type)) {
-      return NextResponse.json(
-        { error: "Tipo de archivo no permitido" },
-        { status: 400 },
-      );
+    const validation = validateUploadFile(file, kind);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.message }, { status: 400 });
     }
 
     const stored = await storePublicFile(file, safeFolder, {
@@ -54,7 +53,7 @@ export async function POST(req: NextRequest) {
     });
 
     let assetId: string | undefined;
-    if (file.type.startsWith("image/")) {
+    if (validation.mime.startsWith("image/")) {
       try {
         const asset = await registerMediaAsset(stored, {
           folder: safeFolder,
@@ -63,8 +62,12 @@ export async function POST(req: NextRequest) {
         });
         assetId = asset.id;
       } catch (registerErr) {
-        console.warn("[resources/upload] No se pudo registrar en biblioteca:", registerErr);
+        console.warn("[resources/upload] biblioteca:", registerErr);
       }
+    }
+
+    if (isPublicMediaFolder(safeFolder)) {
+      revalidatePublicSiteMediaCache();
     }
 
     return NextResponse.json({

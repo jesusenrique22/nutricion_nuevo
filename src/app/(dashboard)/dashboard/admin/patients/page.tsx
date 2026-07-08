@@ -1,19 +1,34 @@
 import Link from "next/link";
 import { ContentLobbyShell } from "@/components/brand/content-lobby-shell";
 import { DeletePatientAccountButton } from "@/components/admin/delete-patient-account-button";
+import { PatientsListSearch } from "@/components/admin/patients-list-search";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getPatientsList } from "@/server/actions/patient.queries";
 
-export default async function PatientsPage() {
-  const patients = await getPatientsList();
+export default async function PatientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const sp = await searchParams;
+  const query = sp.q?.trim() ?? "";
+  const patients = await getPatientsList(query);
 
   return (
     <ContentLobbyShell
       title="Pacientes"
-      description="Expedientes y seguimientos. Eliminar cuenta oculta al paciente y conserva sus datos."
+      description="Expedientes y seguimientos. Buscá por nombre o email."
     >
+      <PatientsListSearch initialQuery={query} />
+
+      {query && patients.length === 0 && (
+        <p className="mb-4 rounded-2xl border border-dashed border-foreground/15 bg-white px-5 py-8 text-center text-sm text-foreground/50">
+          Ningún paciente coincide con «{query}».
+        </p>
+      )}
+
       <div className="space-y-3 md:hidden">
-        {patients.length === 0 && (
+        {patients.length === 0 && !query && (
           <p className="rounded-2xl border border-foreground/10 bg-white px-5 py-8 text-center text-sm text-foreground/50">
             Aún no hay pacientes registrados.
           </p>
@@ -71,7 +86,7 @@ export default async function PatientsPage() {
             </tr>
           </thead>
           <tbody>
-            {patients.length === 0 && (
+            {patients.length === 0 && !query && (
               <tr>
                 <td colSpan={FEATURE_FLAGS.FORMS_ENABLED ? 5 : 4} className="px-5 py-8 text-center text-foreground/50">
                   Aún no hay pacientes registrados.

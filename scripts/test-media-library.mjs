@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "./create-prisma-client.mjs";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 try {
   if (!prisma.mediaAsset) {
     throw new Error("Prisma client sin modelo mediaAsset — ejecuta pnpm prisma generate");

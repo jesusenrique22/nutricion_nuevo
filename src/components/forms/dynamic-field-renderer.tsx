@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { FormFieldDefinition } from "@/types/form-template";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import {
   Field,
   inputClass,
@@ -103,9 +105,7 @@ export function DynamicFieldRenderer({ field }: { field: FormFieldDefinition }) 
   }
 
   if (field.type === "number") {
-    return (
-      <input type="number" step="0.1" {...common} className={inputClass} />
-    );
+    return <DynamicNumberField field={field} />;
   }
 
   const inputType =
@@ -122,6 +122,24 @@ export function DynamicFieldRenderer({ field }: { field: FormFieldDefinition }) 
               : "text";
 
   return <input type={inputType} {...common} className={inputClass} />;
+}
+
+function DynamicNumberField({ field }: { field: FormFieldDefinition }) {
+  const [value, setValue] = useState(0);
+
+  return (
+    <DecimalInput
+      name={field.name}
+      required={field.required}
+      value={value}
+      onChange={setValue}
+      min={field.min}
+      max={field.max}
+      maxDecimals={1}
+      className={inputClass}
+      placeholder={field.placeholder ?? "Ej: 72,5"}
+    />
+  );
 }
 
 export function DynamicFieldBlock({

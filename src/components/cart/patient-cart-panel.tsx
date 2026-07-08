@@ -1,19 +1,46 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PaymentMethodsCard } from "@/components/cart/payment-methods-card";
-import { useDisplayPrice, DisplayPrice } from "@/components/currency/display-price";
 import {
-  removeCartItem,
-  submitCart,
-  type CartItemDTO,
-} from "@/server/actions/cart.actions";
-import { formatMoney } from "@/lib/currency/format";
-import type { SupportedCurrency } from "@/lib/currency/types";
+  CartLineItem,
+  cartItemsTotal,
+} from "@/components/cart/cart-line-item";
+import { PaymentMethodsCard } from "@/components/cart/payment-methods-card";
+import { useDisplayPrice } from "@/components/currency/display-price";
+import { submitCart, type CartItemDTO } from "@/server/actions/cart.actions";
 import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
 import type { PaymentMethodId } from "@/lib/payment-methods";
+
+function groupItems(items: CartItemDTO[]) {
+  const products = items.filter((i) => i.type === "PRODUCT");
+  const resources = items.filter((i) => i.type === "RESOURCE");
+  const appointments = items.filter((i) => i.type === "APPOINTMENT");
+  return { products, resources, appointments };
+}
+
+function CartSection({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: ReactNode;
+}) {
+  if (count === 0) return null;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-bold text-foreground">
+        {title}{" "}
+        <span className="font-normal text-foreground/45">({count})</span>
+      </h2>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
 
 export function PatientCartPanel({
   items,
@@ -36,25 +63,17 @@ export function PatientCartPanel({
   const [paymentNote, setPaymentNote] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const grouped = useMemo(() => groupItems(items), [items]);
+
   const hasPaidItems = useMemo(
     () => items.some((i) => i.price && Number(i.price) > 0),
     [items],
   );
 
-  const totalLabel = useMemo(() => {
-    let sum = 0;
-    let hasPriced = false;
-    for (const item of items) {
-      if (!item.price) continue;
-      const amount = Number(item.price);
-      if (amount > 0) hasPriced = true;
-      const base: SupportedCurrency =
-        item.currency === "USD" ? "USD" : "ARS";
-      sum += convert(item.price, base);
-    }
-    if (!hasPriced) return "Gratis";
-    return formatMoney(sum, displayCurrency);
-  }, [items, convert, displayCurrency]);
+  const totals = useMemo(
+    () => cartItemsTotal(items, convert, displayCurrency),
+    [items, convert, displayCurrency],
+  );
 
   const missingFields = useMemo(() => {
     if (!hasPaidItems) return [];
@@ -77,9 +96,28 @@ export function PatientCartPanel({
 
   if (items.length === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-foreground/15 px-6 py-12 text-center text-sm text-foreground/50">
-        Tu carrito está vacío. Agrega recursos o citas desde el panel.
-      </p>
+      <div className="rounded-2xl border border-dashed border-foreground/15 bg-muted/20 px-6 py-14 text-center">
+        <p className="text-base font-semibold text-foreground/70">
+          Tu carrito está vacío
+        </p>
+        <p className="mt-2 text-sm text-foreground/50">
+          Explorá productos, recursos o agendá una cita para empezar tu pedido.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/dashboard/patient/products"
+            className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Ver productos
+          </Link>
+          <Link
+            href="/dashboard/patient/appointments"
+            className="rounded-full border border-foreground/15 px-5 py-2 text-sm font-semibold hover:bg-muted/50"
+          >
+            Agendar cita
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -89,17 +127,6 @@ export function PatientCartPanel({
     setProofUrls([]);
     setPaymentNote("");
     setSubmitError(null);
-  }
-
-  function handleRemoveItem(itemId: string) {
-    startTransition(async () => {
-      await removeCartItem(itemId);
-      if (items.length <= 1) {
-        setCheckoutOpen(false);
-        resetCheckoutForm();
-      }
-      router.refresh();
-    });
   }
 
   function handleConfirmPurchase() {
@@ -135,152 +162,176 @@ export function PatientCartPanel({
   }
 
   return (
-    <div className="space-y-6">
-      {appointmentAdded && (
-        <p className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-foreground/75">
-          Cita agregada al carrito. Podés seguir comprando recursos o confirmar
-          el pedido cuando quieras.
-        </p>
-      )}
+    <div className="grid gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
+      <div className="space-y-8">
+        {appointmentAdded && (
+          <p className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-foreground/75">
+            Cita agregada al carrito. Podés seguir comprando o confirmar el
+            pedido cuando quieras.
+          </p>
+        )}
 
-      <div className="space-y-4">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-start justify-between gap-4 rounded-2xl border border-foreground/10 bg-white p-4"
-          >
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                {item.type === "RESOURCE" ? "Recurso" : "Cita"}
+        <CartSection
+          title="Productos"
+          count={grouped.products.reduce((s, i) => s + i.quantity, 0)}
+        >
+          {grouped.products.map((item) => (
+            <CartLineItem key={item.id} item={item} disabled={isPending} />
+          ))}
+        </CartSection>
+
+        <CartSection title="Recursos" count={grouped.resources.length}>
+          {grouped.resources.map((item) => (
+            <CartLineItem key={item.id} item={item} disabled={isPending} />
+          ))}
+        </CartSection>
+
+        <CartSection title="Citas" count={grouped.appointments.length}>
+          {grouped.appointments.map((item) => (
+            <CartLineItem key={item.id} item={item} disabled={isPending} />
+          ))}
+        </CartSection>
+
+        {!checkoutOpen ? (
+          <div className="flex flex-wrap gap-3 lg:hidden">
+            <Link
+              href="/dashboard/patient/products"
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              + Seguir comprando
+            </Link>
+            <Link
+              href="/dashboard/patient/appointments"
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              + Agregar cita
+            </Link>
+          </div>
+        ) : null}
+      </div>
+
+      <aside className="lg:sticky lg:top-6">
+        <div className="space-y-4 rounded-2xl border border-foreground/10 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-foreground">Resumen del pedido</h2>
+
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-foreground/55">
+                Productos (
+                {grouped.products.reduce((s, i) => s + i.quantity, 0)})
+              </dt>
+              <dd className="font-medium">{grouped.products.length} líneas</dd>
+            </div>
+            {grouped.resources.length > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-foreground/55">Recursos</dt>
+                <dd className="font-medium">{grouped.resources.length}</dd>
+              </div>
+            )}
+            {grouped.appointments.length > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-foreground/55">Citas</dt>
+                <dd className="font-medium">{grouped.appointments.length}</dd>
+              </div>
+            )}
+            <div className="flex justify-between gap-4 border-t border-foreground/10 pt-3">
+              <dt className="font-semibold text-foreground">Total</dt>
+              <dd className="text-2xl font-bold tabular-nums text-primary">
+                {totals.label}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="text-xs text-foreground/45">
+            {totals.units} {totals.units === 1 ? "unidad" : "unidades"} · en{" "}
+            {displayCurrency === "USD" ? "dólares" : "pesos"}
+          </p>
+
+          {!checkoutOpen ? (
+            <div className="space-y-3 pt-2">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setCheckoutOpen(true)}
+                className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Proceder al pago
+              </button>
+              <p className="text-center text-xs text-foreground/50">
+                Verás los métodos de pago antes de confirmar.
               </p>
-              <h3 className="font-semibold">{item.title}</h3>
-              <p className="mt-1 text-sm text-foreground/60">{item.subtitle}</p>
-              {item.price && (
-                <p className="mt-1 text-sm font-bold text-primary">
-                  <DisplayPrice
-                    amount={item.price}
-                    currency={item.currency === "USD" ? "USD" : "ARS"}
-                  />
+              <div className="hidden flex-col gap-2 border-t border-foreground/8 pt-3 lg:flex">
+                <Link
+                  href="/dashboard/patient/products"
+                  className="text-center text-sm font-semibold text-primary hover:underline"
+                >
+                  Seguir comprando productos
+                </Link>
+                <Link
+                  href="/dashboard/patient/appointments"
+                  className="text-center text-sm font-semibold text-primary hover:underline"
+                >
+                  Agregar otra cita
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <form
+              className="space-y-4 border-t border-foreground/10 pt-4"
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfirmPurchase();
+              }}
+            >
+              <PaymentMethodsCard
+                policy={checkoutPolicy}
+                selectedMethod={paymentMethod}
+                onSelectMethod={(id) => setPaymentMethod(id as PaymentMethodId)}
+                reference={paymentReference}
+                onReferenceChange={setPaymentReference}
+                proofUrls={proofUrls}
+                onProofUrlsChange={setProofUrls}
+                note={paymentNote}
+                onNoteChange={setPaymentNote}
+                totalLabel={totals.label}
+                requireAllFields={hasPaidItems}
+              />
+
+              <button
+                type="submit"
+                disabled={isPending}
+                className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {isPending ? "Confirmando…" : "Confirmar pedido"}
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  setCheckoutOpen(false);
+                  resetCheckoutForm();
+                }}
+                className="w-full rounded-full border border-foreground/15 py-2.5 text-sm font-semibold hover:bg-muted/50 disabled:opacity-50"
+              >
+                Volver
+              </button>
+
+              {hasPaidItems && !isCheckoutComplete && (
+                <p className="text-xs text-foreground/55">
+                  Para confirmar necesitás: {missingFields.join(", ")}.
                 </p>
               )}
-            </div>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => handleRemoveItem(item.id)}
-              className="shrink-0 text-sm font-semibold text-red-600 hover:underline disabled:opacity-50"
-            >
-              Quitar
-            </button>
-          </div>
-        ))}
-      </div>
 
-      <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 to-white p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-foreground/50">
-              Total del carrito
-            </p>
-            <p className="mt-1 text-sm text-foreground/55">
-              {items.length} {items.length === 1 ? "ítem" : "ítems"} · en{" "}
-              {displayCurrency === "USD" ? "dólares" : "pesos"}
-            </p>
-          </div>
-          <p className="text-3xl font-bold tabular-nums text-primary">
-            {totalLabel}
-          </p>
+              {submitError && (
+                <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {submitError}
+                </p>
+              )}
+            </form>
+          )}
         </div>
-      </div>
-
-      {!checkoutOpen ? (
-        <div className="space-y-3">
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => setCheckoutOpen(true)}
-            className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:w-auto sm:px-10"
-          >
-            Comprar
-          </button>
-          <p className="text-xs text-foreground/50">
-            Verás los métodos de pago de Anttova antes de confirmar tu pedido.
-          </p>
-          <Link
-            href="/dashboard/patient/appointments"
-            className="inline-block text-sm font-semibold text-primary hover:underline"
-          >
-            + Agregar otra cita
-          </Link>
-        </div>
-      ) : (
-        <form
-          className="space-y-4"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleConfirmPurchase();
-          }}
-        >
-          <PaymentMethodsCard
-            policy={checkoutPolicy}
-            selectedMethod={paymentMethod}
-            onSelectMethod={(id) => setPaymentMethod(id as PaymentMethodId)}
-            reference={paymentReference}
-            onReferenceChange={setPaymentReference}
-            proofUrls={proofUrls}
-            onProofUrlsChange={setProofUrls}
-            note={paymentNote}
-            onNoteChange={setPaymentNote}
-            totalLabel={totalLabel}
-            requireAllFields={hasPaidItems}
-          />
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? "Confirmando…" : "Confirmar pedido"}
-            </button>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                setCheckoutOpen(false);
-                resetCheckoutForm();
-              }}
-              className="rounded-full border border-foreground/15 px-6 py-3 text-sm font-semibold hover:bg-muted/50 disabled:opacity-50"
-            >
-              Volver
-            </button>
-          </div>
-
-          {hasPaidItems && !isCheckoutComplete && (
-            <p className="text-xs text-foreground/55">
-              Para confirmar necesitás: {missingFields.join(", ")}.
-            </p>
-          )}
-
-          {proofUrls.length > 0 && (
-            <p className="text-xs font-medium text-emerald-700">
-              Captura cargada correctamente.
-            </p>
-          )}
-
-          {submitError && (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-              {submitError}
-            </p>
-          )}
-
-          <p className="text-xs text-foreground/50">
-            Tras confirmar, la Lic. Ma Antonieta revisará tu referencia y
-            comprobante para aprobar el pago.
-          </p>
-        </form>
-      )}
+      </aside>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import { useCurrency } from "@/contexts/currency-context";
 import type { CurrencyPolicy } from "@/types/currency-policy";
 import type { ExchangeRateSnapshot } from "@/lib/currency/types";
+import { DecimalInput } from "@/components/ui/decimal-input";
 
 const inputClass =
   "mt-1.5 w-full rounded-xl border border-foreground/15 px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";
@@ -116,14 +117,15 @@ export function CurrencyPolicyEditor({
                 : "36"}
               .
             </p>
-            <input
-              type="number"
+            <DecimalInput
               min={0}
               max={100}
-              step={0.5}
+              maxDecimals={1}
               value={markupPercent}
-              onChange={(e) => handleMarkupChange(Number(e.target.value))}
+              onChange={handleMarkupChange}
+              emptyWhenZero={false}
               className={`${inputClass} mt-2 text-lg font-semibold`}
+              placeholder="0"
             />
           </label>
         </div>

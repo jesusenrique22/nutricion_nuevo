@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
+import { uploadFile, uploadHint } from "@/lib/client-upload";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { MediaLibraryPanel } from "@/components/cms/media-library-panel";
-import { parseUploadResponse } from "@/lib/upload-response";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -28,22 +28,14 @@ export function ImageUploadField({
   const [error, setError] = useState<string | null>(null);
   const [libraryRefresh, setLibraryRefresh] = useState(0);
 
+  const resolvedHint = hint ?? uploadHint("image");
+
   async function handleFile(file: File) {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", folder);
-      const res = await fetch("/api/resources/upload", {
-        method: "POST",
-        body: fd,
-      });
-      const json = await parseUploadResponse(res);
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? "Error al subir");
-      }
-      onChange(json.url);
+      const { url } = await uploadFile(file, { folder, kind: "image" });
+      onChange(url);
       setLibraryRefresh((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir");
@@ -56,11 +48,9 @@ export function ImageUploadField({
     <div className="rounded-xl border border-foreground/10 bg-muted/20 p-3">
       <label className="block text-sm">
         <span className="font-semibold">{label}</span>
-        {hint && (
-          <span className="mt-0.5 block text-xs font-normal text-foreground/55">
-            {hint}
-          </span>
-        )}
+        <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+          {resolvedHint}
+        </span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -106,7 +96,7 @@ export function ImageUploadField({
       <input
         ref={fileRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept="image/*,.heic,.heif"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

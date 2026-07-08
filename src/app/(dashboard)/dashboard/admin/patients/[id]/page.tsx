@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeletePatientAccountButton } from "@/components/admin/delete-patient-account-button";
+import { PatientAdminResourceEditor } from "@/components/admin/patient-admin-resource-editor";
 import { PatientFichaSections } from "@/components/admin/patient-ficha-sections";
 import { ProfileEmojiBanner } from "@/components/brand/profile-emoji-banner";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
@@ -8,12 +9,14 @@ import {
   formatPatientGender,
   formatPatientHeight,
 } from "@/lib/patient-ficha-format";
+import { getConsultationTypes } from "@/server/actions/booking.queries";
 import { getPatientPendingPayments } from "@/server/actions/payment-admin.queries";
 import {
   getPatientAppointmentsAdmin,
   getPatientDetail,
   getPatientPurchasesAdmin,
 } from "@/server/actions/patient.queries";
+import { getPublishedResourcesForPatientAdmin } from "@/server/actions/resource.queries";
 
 export default async function PatientDetailPage({
   params,
@@ -21,12 +24,14 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [patient, appointments, purchases, pendingPayments] =
+  const [patient, appointments, purchases, pendingPayments, consultationTypes, resourceCatalog] =
     await Promise.all([
       getPatientDetail(id),
       getPatientAppointmentsAdmin(id),
       getPatientPurchasesAdmin(id),
       getPatientPendingPayments(id),
+      getConsultationTypes(),
+      getPublishedResourcesForPatientAdmin(id),
     ]);
 
   if (!patient) notFound();
@@ -101,10 +106,19 @@ export default async function PatientDetailPage({
         </section>
       )}
 
+      <PatientAdminResourceEditor
+        patientId={patient.id}
+        initialUrl={patient.profile?.adminResourceUrl ?? null}
+        initialNote={patient.profile?.adminResourceNote ?? null}
+      />
+
       <PatientFichaSections
+        patientId={patient.id}
         appointments={appointments}
         purchases={purchases}
         pendingPayments={pendingPayments}
+        consultationTypes={consultationTypes}
+        resourceCatalog={resourceCatalog}
       />
     </div>
   );

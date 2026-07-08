@@ -20,24 +20,28 @@ export interface ConsultationTypeDTO {
 }
 
 export async function getConsultationTypes(): Promise<ConsultationTypeDTO[]> {
-  const types = await prisma.consultationType.findMany({
-    where: { isPublished: true },
-    orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-  });
-  return types.map((t) => ({
-    id: t.id,
-    code: t.code,
-    name: t.name,
-    description: t.description,
-    durationMinutes: t.durationMinutes,
-    price: t.price.toString(),
-    imageUrl: t.imageUrl,
-    allowsOnline: t.allowsOnline,
-    allowsPresencial: t.allowsPresencial,
-    morningOnly: t.morningOnly,
-    morningStart: t.morningStart,
-    morningEnd: t.morningEnd,
-  }));
+  try {
+    const types = await prisma.consultationType.findMany({
+      where: { isPublished: true },
+      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+    });
+    return types.map((t) => ({
+      id: t.id,
+      code: t.code,
+      name: t.name,
+      description: t.description,
+      durationMinutes: t.durationMinutes,
+      price: t.price.toString(),
+      imageUrl: t.imageUrl,
+      allowsOnline: t.allowsOnline,
+      allowsPresencial: t.allowsPresencial,
+      morningOnly: t.morningOnly,
+      morningStart: t.morningStart,
+      morningEnd: t.morningEnd,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export async function getSlotsForDay(
@@ -110,30 +114,34 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
 
-  const appts = await prisma.appointment.findMany({
-    where: {
-      patientId: session.user.id,
-      status: { not: "CANCELLED" },
-    },
-    include: { consultationType: true, payment: true },
-    orderBy: { startTime: "desc" },
-  });
+  try {
+    const appts = await prisma.appointment.findMany({
+      where: {
+        patientId: session.user.id,
+        status: { not: "CANCELLED" },
+      },
+      include: { consultationType: true, payment: true },
+      orderBy: { startTime: "desc" },
+    });
 
-  return appts.map((a) => ({
-    id: a.id,
-    start: a.startTime.toISOString(),
-    end: a.endTime.toISOString(),
-    title: a.consultationType.name,
-    status: a.status,
-    modality: a.modality,
-    flow: a.flow,
-    consultationCode: a.consultationType.code,
-    consultationName: a.consultationType.name,
-    price: a.consultationType.price.toString(),
-    paymentStatus: a.payment?.status ?? null,
-    paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
-    notes: a.notes,
-  }));
+    return appts.map((a) => ({
+      id: a.id,
+      start: a.startTime.toISOString(),
+      end: a.endTime.toISOString(),
+      title: a.consultationType.name,
+      status: a.status,
+      modality: a.modality,
+      flow: a.flow,
+      consultationCode: a.consultationType.code,
+      consultationName: a.consultationType.name,
+      price: a.consultationType.price.toString(),
+      paymentStatus: a.payment?.status ?? null,
+      paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
+      notes: a.notes,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /** Todas las citas (solo ADMIN) — para el calendario de la doctora. */

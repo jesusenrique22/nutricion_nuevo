@@ -9,6 +9,7 @@ import { DEFAULT_PAGE_SIZE, type ListPaginationMeta } from "@/lib/pagination";
 
 export type AdminPaymentKind =
   | "RESOURCE"
+  | "PRODUCT"
   | "APPOINTMENT_ADVANCE"
   | "APPOINTMENT_REMAINDER";
 
@@ -75,13 +76,21 @@ function matchesQuery(item: AdminPendingPaymentItem, query: string): boolean {
 }
 
 async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
-  const [resourceRows, appointmentRows] = await Promise.all([
+  const [resourceRows, productRows, appointmentRows] = await Promise.all([
     prisma.resourcePurchase.findMany({
       where: {
         status: "PENDING",
         inboxDismissedAt: null,
       },
       include: { user: true, resource: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.productPurchase.findMany({
+      where: {
+        status: "PENDING",
+        inboxDismissedAt: null,
+      },
+      include: { user: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.appointment.findMany({
@@ -123,6 +132,29 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
       createdAt: row.createdAt.toISOString(),
       trashedAt: row.inboxTrashedAt?.toISOString() ?? null,
       resourceId: row.resourceId,
+      purchaseId: row.id,
+      paymentMethod: mapPaymentMethod(row.patientPaymentMethod),
+      patientReference: row.patientPaymentReference,
+      patientNote: row.patientPaymentNote,
+      proofUrls: parseProofUrls(row.patientPaymentProofUrls),
+    });
+  }
+
+  for (const row of productRows) {
+    items.push({
+      id: `product-${row.id}`,
+      kind: "PRODUCT",
+      patientId: row.userId,
+      patientName: row.user.name,
+      patientEmail: row.user.email,
+      title: row.productName,
+      subtitle:
+        (row.quantity ?? 1) > 1
+          ? `Producto · ${row.quantity} uds.`
+          : "Producto",
+      amount: row.pricePaid.toString(),
+      createdAt: row.createdAt.toISOString(),
+      trashedAt: row.inboxTrashedAt?.toISOString() ?? null,
       purchaseId: row.id,
       paymentMethod: mapPaymentMethod(row.patientPaymentMethod),
       patientReference: row.patientPaymentReference,

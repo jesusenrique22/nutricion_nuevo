@@ -6,6 +6,8 @@ type BrandLogoProps = {
   size?: "sm" | "md" | "lg";
   tagline?: boolean;
   inverted?: boolean;
+  /** Marcar en logos above-the-fold (header, hero) para mejorar LCP. */
+  priority?: boolean;
 };
 
 const logoHeight = {
@@ -19,9 +21,11 @@ export function BrandLogo({
   size = "md",
   tagline = false,
   inverted = false,
+  priority,
 }: BrandLogoProps) {
   const height = logoHeight[size];
   const width = Math.round(height * (83 / 15));
+  const eager = priority ?? size === "lg";
 
   return (
     <span className={`inline-flex flex-col ${className}`}>
@@ -30,7 +34,8 @@ export function BrandLogo({
         alt="Anttova"
         width={width}
         height={height}
-        priority={size === "lg"}
+        priority={eager}
+        loading={eager ? "eager" : undefined}
         className="h-auto w-auto"
         style={{ height, width: "auto", maxWidth: width }}
       />

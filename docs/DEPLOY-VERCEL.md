@@ -101,7 +101,7 @@ Si ves `MongoServerSelectionError`:
 |---------------|--------|
 | Login, citas, formularios, admin, emails SMTP | ✅ |
 | Chat (mensajes al recargar) | ✅ con MongoDB |
-| Chat en tiempo real | ⚠️ Requiere `pnpm run socket` en Railway/Render |
+| Chat en tiempo real | ⚠️ Requiere `pnpm run socket` en Railway u otro host |
 | Archivos del chat en disco local | ⚠️ No persisten entre deploys (usar GridFS) |
 
 ## 8. Antes de cada push

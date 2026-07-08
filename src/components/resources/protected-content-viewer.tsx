@@ -5,6 +5,7 @@ import {
   resourceContentStreamUrl,
   resourceVideoStreamUrl,
 } from "@/lib/secure-media-url";
+import { ResourcePdfViewer } from "@/components/resources/resource-pdf-viewer";
 
 export function ProtectedContentViewer({
   resourceId,
@@ -21,6 +22,10 @@ export function ProtectedContentViewer({
 }) {
   const contentUrl = hasContent ? resourceContentStreamUrl(resourceId) : null;
   const videoUrl = hasVideo ? resourceVideoStreamUrl(resourceId) : null;
+  const showPdf =
+    hasContent &&
+    contentUrl &&
+    (contentKind === "pdf" || contentKind === "unknown");
 
   useEffect(() => {
     function blockSave(e: KeyboardEvent) {
@@ -64,31 +69,21 @@ export function ProtectedContentViewer({
         </div>
       )}
 
-      {hasContent && contentUrl && contentKind === "pdf" && (
-        <div className="overflow-hidden rounded-2xl ring-1 ring-foreground/10">
-          <iframe
-            src={`${contentUrl}#toolbar=0&navpanes=0`}
-            title={title}
-            className="h-[75vh] w-full bg-muted/20"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        </div>
-      )}
-
-      {hasContent && contentUrl && contentKind === "unknown" && (
-        <div className="overflow-hidden rounded-2xl ring-1 ring-foreground/10">
-          <iframe
-            src={contentUrl}
-            title={title}
-            className="h-[75vh] w-full bg-muted/20"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        </div>
+      {showPdf && (
+        <ResourcePdfViewer resourceId={resourceId} title={title} />
       )}
 
       {!hasVideo && !hasContent && (
         <p className="text-sm text-foreground/50">
-          Este recurso no tiene archivo adjunto configurado aún.
+          Este recurso no tiene archivo adjunto. Subí un PDF en{" "}
+          <strong>Archivo principal</strong> al editarlo en el panel de
+          recursos.
+        </p>
+      )}
+
+      {hasContent && !showPdf && contentKind === "video" && !hasVideo && (
+        <p className="text-sm text-foreground/50">
+          Configurá la URL de video o subí un archivo compatible.
         </p>
       )}
 

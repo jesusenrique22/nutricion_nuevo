@@ -15,7 +15,7 @@ async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
   } catch {
-    // MongoDB opcional: no bloquear flujo principal
+    // Notificaciones no deben bloquear el flujo principal
   }
 }
 

@@ -72,10 +72,10 @@ export function SiteContentEditor({
   return (
     <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-white">
       {/* Selector de bloque */}
-      <div className="flex gap-2 overflow-x-auto border-b border-foreground/8 p-4">
+      <div className="flex flex-wrap gap-2 border-b border-foreground/8 p-4">
         {localBlocks.map((b) => (
           <button key={b.slug} type="button" onClick={() => selectBlock(b.slug)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+            className={`max-w-full rounded-full px-3 py-1.5 text-xs font-semibold leading-snug transition sm:px-4 sm:py-2 sm:text-sm ${
               active === b.slug ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"
             }`}>
             {siteBlockLabel(b.slug, b.title)}

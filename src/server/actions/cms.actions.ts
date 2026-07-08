@@ -1,7 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { cache } from "react";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CMS_CACHE_TAG } from "@/server/queries/landing.queries";
 import { auth } from "@/lib/auth";
+import { revalidatePublicSiteMediaCache } from "@/lib/public-site-media";
 import { prisma } from "@/server/db/prisma";
 import { Prisma } from "@prisma/client";
 import {
@@ -243,7 +246,7 @@ export interface SiteContentDTO {
   data: Record<string, unknown>;
 }
 
-export async function getSiteContents(): Promise<SiteContentDTO[]> {
+export const getSiteContents = cache(async (): Promise<SiteContentDTO[]> => {
   const rows = await prisma.siteContent.findMany({ orderBy: { slug: "asc" } });
 
   if (rows.length === 0) {
@@ -259,25 +262,21 @@ export async function getSiteContents(): Promise<SiteContentDTO[]> {
     title: r.title,
     data: r.data as Record<string, unknown>,
   }));
-}
+});
 
-export async function getSiteContentBySlug(
+/** Una sola consulta por request: reutiliza getSiteContents en memoria. */
+export const getSiteContentBySlug = cache(async (
   slug: string,
-): Promise<SiteContentDTO | null> {
-  const row = await prisma.siteContent.findUnique({ where: { slug } });
-  if (row) {
-    return {
-      slug: row.slug,
-      title: row.title,
-      data: row.data as Record<string, unknown>,
-    };
-  }
+): Promise<SiteContentDTO | null> => {
+  const rows = await getSiteContents();
+  const row = rows.find((r) => r.slug === slug);
+  if (row) return row;
 
   const defaults = SITE_CONTENT_DEFAULTS[slug];
   if (!defaults) return null;
 
   return { slug, title: defaults.title, data: defaults.data };
-}
+});
 
 export async function updateSiteContent(
   formData: unknown,
@@ -306,6 +305,8 @@ export async function updateSiteContent(
 
   revalidatePath("/");
   revalidatePath("/dashboard/admin/personalizar");
+  revalidateTag(CMS_CACHE_TAG, "max");
+  revalidatePublicSiteMediaCache();
   return { ok: true };
 }
 
@@ -339,6 +340,7 @@ export async function updateNutricionistaPage(
   revalidatePath("/nutricionista");
   revalidatePath("/nutricionista/especialidad");
   revalidatePath("/dashboard/admin/personalizar");
+  revalidatePublicSiteMediaCache();
   return { ok: true };
 }
 

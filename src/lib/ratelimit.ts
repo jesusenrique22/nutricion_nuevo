@@ -1,3 +1,7 @@
+/**
+ * Rate limiting para citas y auth.
+ * Sin Upstash → límite en memoria (nunca bloquear todo el sitio en producción).
+ */
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
@@ -23,10 +27,14 @@ function createLimiter(prefix: string, limit: number, window: `${number} s`) {
     : null;
 }
 
-const APPOINTMENT_LIMIT = 5;
+const APPOINTMENT_LIMIT = 15;
 const APPOINTMENT_WINDOW = "60 s" as const;
-const AUTH_LIMIT = 10;
+const AUTH_LIMIT = 20;
 const AUTH_WINDOW = "60 s" as const;
+const UPLOAD_LIMIT = 20;
+const UPLOAD_WINDOW = "60 s" as const;
+const PAYMENT_LIMIT = 5;
+const PAYMENT_WINDOW = "60 s" as const;
 
 export const appointmentLimiter = createLimiter(
   "rl:appointment",
@@ -34,6 +42,8 @@ export const appointmentLimiter = createLimiter(
   APPOINTMENT_WINDOW,
 );
 export const authLimiter = createLimiter("rl:auth", AUTH_LIMIT, AUTH_WINDOW);
+export const uploadLimiter = createLimiter("rl:upload", UPLOAD_LIMIT, UPLOAD_WINDOW);
+export const paymentLimiter = createLimiter("rl:payment", PAYMENT_LIMIT, PAYMENT_WINDOW);
 
 type LimitResult = { success: boolean; remaining: number };
 
@@ -64,7 +74,7 @@ function pruneMemoryBuckets(now: number): void {
   }
 }
 
-/** Fallback cuando no hay Redis: suficiente para Render/Vercel con una instancia. */
+/** Fallback cuando no hay Redis: suficiente para Vercel con una instancia. */
 function memoryLimit(
   prefix: string,
   key: string,
@@ -99,13 +109,19 @@ async function runLimit(
   window: `${number} s`,
 ): Promise<LimitResult> {
   if (limiter) {
-    const { success, remaining } = await limiter.limit(key);
-    return { success, remaining };
+    try {
+      const { success, remaining } = await limiter.limit(key);
+      return { success, remaining };
+    } catch (err) {
+      // Fail-open: si Upstash falla, no bloquear usuarios legítimos.
+      console.warn("[ratelimit] Upstash no disponible, permitiendo solicitud:", err);
+      return { success: true, remaining: limit };
+    }
   }
   return memoryLimit(prefix, key, limit, parseWindowSeconds(window));
 }
 
-/** Citas públicas / reservas — 5 req / 60 s por clave (IP o userId). */
+/** Citas públicas / reservas — 15 req / 60 s por clave (IP o userId). */
 export async function limitByKey(key: string): Promise<LimitResult> {
   return runLimit(
     appointmentLimiter,
@@ -116,7 +132,17 @@ export async function limitByKey(key: string): Promise<LimitResult> {
   );
 }
 
-/** Registro, reset de contraseña, reenvío de verificación — 10 req / 60 s por IP. */
+/** Registro, reset de contraseña, reenvío de verificación — 20 req / 60 s por IP. */
 export async function limitAuthByIp(ip: string): Promise<LimitResult> {
   return runLimit(authLimiter, "rl:auth", ip, AUTH_LIMIT, AUTH_WINDOW);
+}
+
+/** Subida de archivos (pruebas de pago, imágenes, PDFs) — 20 req / 60 s por clave. */
+export async function limitUploadByKey(key: string): Promise<LimitResult> {
+  return runLimit(uploadLimiter, "rl:upload", key, UPLOAD_LIMIT, UPLOAD_WINDOW);
+}
+
+/** Confirmaciones de pago, checkout — 5 req / 60 s por clave. */
+export async function limitPaymentByKey(key: string): Promise<LimitResult> {
+  return runLimit(paymentLimiter, "rl:payment", key, PAYMENT_LIMIT, PAYMENT_WINDOW);
 }

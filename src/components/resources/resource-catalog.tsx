@@ -5,6 +5,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ResourceCoverImage } from "@/components/resources/resource-cover-image";
 import { DisplayPrice } from "@/components/currency/display-price";
+import { ArrowRightIcon } from "@/components/ui/link-icons";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { addResourceToCart } from "@/server/actions/cart.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
@@ -128,8 +129,9 @@ export function LibraryResourceList({
               {r.description}
             </p>
           )}
-          <span className="mt-3 inline-block text-xs font-semibold text-accent">
-            Ver recurso →
+          <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
+            Ver recurso
+            <ArrowRightIcon className="h-3 w-3" />
           </span>
         </Link>
       ))}

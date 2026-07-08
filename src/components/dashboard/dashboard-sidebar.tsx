@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CloseIcon } from "@/components/ui/link-icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
 import { SidebarCurrencyBlock } from "@/components/currency/sidebar-currency-block";
@@ -157,7 +158,7 @@ export function DashboardSidebar({
                 className="rounded-full px-3 py-1 text-sm font-semibold text-accent-soft hover:bg-white/10"
                 aria-label="Cerrar menú"
               >
-                ✕
+                <CloseIcon className="h-4 w-4" />
               </button>
             </div>
             <span className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-accent-soft">

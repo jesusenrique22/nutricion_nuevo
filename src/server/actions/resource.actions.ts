@@ -21,7 +21,7 @@ async function requireAdmin() {
   return session;
 }
 
-function revalidateResourcePaths() {
+function revalidateResourcePaths(patientId?: string) {
   revalidatePath("/");
   revalidatePath("/resources");
   revalidatePath("/dashboard/admin/resources");
@@ -29,6 +29,10 @@ function revalidateResourcePaths() {
   revalidatePath("/dashboard/patient/library");
   revalidatePath("/dashboard/admin/personalizar");
   revalidatePath("/dashboard/notifications");
+  revalidatePath("/dashboard/admin/patients");
+  if (patientId) {
+    revalidatePath(`/dashboard/admin/patients/${patientId}`);
+  }
 }
 
 export async function upsertResource(
@@ -213,13 +217,75 @@ export async function grantResourceAccess(
     });
 
     await syncUser(parsed.data.userId, "notifications", { action: "created" });
-    revalidateResourcePaths();
+    revalidateResourcePaths(parsed.data.userId);
     return { ok: true };
   } catch (err) {
     console.error("[grantResourceAccess]", err);
     return {
       ok: false,
       message: formatActionError(err, "No se pudo desbloquear el recurso."),
+    };
+  }
+}
+
+/** Admin revoca acceso a un recurso digital. */
+export async function revokeResourceAccess(
+  formData: unknown,
+): Promise<ResourceActionResult> {
+  if (!(await requireAdmin())) {
+    return { ok: false, message: "No autorizado." };
+  }
+
+  const parsed = grantResourceSchema.safeParse(formData);
+  if (!parsed.success) {
+    return { ok: false, message: "Datos inválidos." };
+  }
+
+  const purchase = await prisma.resourcePurchase.findUnique({
+    where: {
+      userId_resourceId: {
+        userId: parsed.data.userId,
+        resourceId: parsed.data.resourceId,
+      },
+    },
+    include: { resource: true },
+  });
+
+  if (!purchase || purchase.status !== "GRANTED") {
+    return {
+      ok: false,
+      message: "Este paciente no tiene acceso activo a ese recurso.",
+    };
+  }
+
+  try {
+    await prisma.resourcePurchase.update({
+      where: { id: purchase.id },
+      data: {
+        status: "REFUNDED",
+        adminNote: parsed.data.adminNote ?? purchase.adminNote,
+      },
+    });
+
+    await createNotification({
+      recipientId: parsed.data.userId,
+      type: "RESOURCE_UNLOCKED",
+      title: "Acceso a recurso retirado",
+      body: `Tu acceso a «${purchase.resource.title}» fue retirado por Anttova.`,
+      payload: {
+        resourceId: purchase.resourceId,
+        deepLink: "/dashboard/patient/library",
+      },
+    });
+
+    await syncUser(parsed.data.userId, "notifications", { action: "created" });
+    revalidateResourcePaths(parsed.data.userId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[revokeResourceAccess]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo revocar el acceso."),
     };
   }
 }

@@ -1,6 +1,10 @@
 import { GridFSBucket, ObjectId } from "mongodb";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import path from "node:path";
 import { Readable } from "node:stream";
-import { getMongoDb } from "@/server/db/mongo";
+import { tryGetMongoDb } from "@/server/db/mongo";
+import { prisma } from "@/server/db/prisma";
 
 const BUCKET = "media";
 
@@ -17,7 +21,10 @@ export async function uploadToMongo(
     ownerId?: string;
   },
 ): Promise<{ fileId: string; url: string }> {
-  const db = await getMongoDb();
+  const db = await tryGetMongoDb();
+  if (!db) {
+    throw new Error("MongoDB no disponible");
+  }
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
 
   const fileId = await new Promise<ObjectId>((resolve, reject) => {
@@ -39,7 +46,8 @@ export async function uploadToMongo(
 
 export async function getMongoFileMeta(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await getMongoDb();
+  const db = await tryGetMongoDb();
+  if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
     .find({ _id: new ObjectId(fileId) })
@@ -50,7 +58,12 @@ export async function getMongoFileMeta(fileId: string) {
 
 export async function openMongoFileStream(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await getMongoDb();
+
+  const local = await openLocalMediaStream(fileId);
+  if (local) return local;
+
+  const db = await tryGetMongoDb();
+  if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const meta = await getMongoFileMeta(fileId);
   if (!meta) return null;
@@ -58,9 +71,45 @@ export async function openMongoFileStream(fileId: string) {
   return { stream, meta };
 }
 
+type MediaStreamResult = {
+  stream: Readable;
+  meta: {
+    filename?: string;
+    metadata?: Record<string, unknown>;
+  };
+};
+
+async function openLocalMediaStream(fileId: string): Promise<MediaStreamResult | null> {
+  const asset = await prisma.mediaAsset.findFirst({
+    where: {
+      OR: [{ fileId }, { url: `/api/media/${fileId}` }],
+      provider: "local",
+    },
+    select: { url: true, mimeType: true, fileName: true },
+  });
+
+  if (!asset?.url.startsWith("/uploads/")) return null;
+
+  const abs = path.join(process.cwd(), "public", asset.url.replace(/^\//, ""));
+  try {
+    await stat(abs);
+  } catch {
+    return null;
+  }
+
+  return {
+    stream: createReadStream(abs),
+    meta: {
+      filename: asset.fileName ?? path.basename(abs),
+      metadata: { mimeType: asset.mimeType },
+    },
+  };
+}
+
 export async function deleteFromMongo(fileId: string): Promise<boolean> {
   if (!ObjectId.isValid(fileId)) return false;
-  const db = await getMongoDb();
+  const db = await tryGetMongoDb();
+  if (!db) return false;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
     .find({ _id: new ObjectId(fileId) })

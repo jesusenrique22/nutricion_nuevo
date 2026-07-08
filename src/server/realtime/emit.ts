@@ -1,6 +1,9 @@
+import { isSocketClientEnabled } from "@/lib/socket-config";
 import type { RealtimeScope } from "@/types/realtime";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? "";
+const SOCKET_URL = isSocketClientEnabled()
+  ? (process.env.NEXT_PUBLIC_SOCKET_URL?.trim() ?? "")
+  : "";
 const SOCKET_SECRET = process.env.SOCKET_INTERNAL_SECRET ?? "";
 
 async function postSocketEmit(body: {

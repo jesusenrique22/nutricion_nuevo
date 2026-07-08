@@ -15,6 +15,10 @@ const globalForMongo = globalThis as unknown as {
   _mongoClientPromise: Promise<MongoClient> | undefined;
 };
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Asegura parámetros recomendados para Atlas + serverless (Vercel). */
 function normalizeMongoUri(uri: string): string {
   const trimmed = uri.trim();
@@ -37,15 +41,14 @@ function getClientOptions() {
       strict: false,
       deprecationErrors: true,
     },
-    // Evita fallos SSL/TLS en Vercel (IPv6 auto-select)
     autoSelectFamily: false,
     family: 4,
     maxPoolSize: 10,
     minPoolSize: 0,
-    maxIdleTimeMS: 10_000,
-    serverSelectionTimeoutMS: 15_000,
-    connectTimeoutMS: 15_000,
-    socketTimeoutMS: 45_000,
+    maxIdleTimeMS: 30_000,
+    serverSelectionTimeoutMS: 20_000,
+    connectTimeoutMS: 20_000,
+    socketTimeoutMS: 60_000,
   } as const;
 }
 
@@ -55,6 +58,11 @@ function getMongoUri(): string {
     throw new Error("Falta la variable de entorno MONGODB_URI");
   }
   return normalizeMongoUri(uri);
+}
+
+function resetMongoConnection(): void {
+  globalForMongo._mongoClientPromise = undefined;
+  globalForMongo._mongoClient = undefined;
 }
 
 function getMongoClient(): MongoClient {
@@ -67,14 +75,12 @@ function getMongoClient(): MongoClient {
   return globalForMongo._mongoClient;
 }
 
-// Reutiliza la conexión entre invocaciones serverless (Vercel)
 function getClientPromise(): Promise<MongoClient> {
   if (!globalForMongo._mongoClientPromise) {
     globalForMongo._mongoClientPromise = getMongoClient()
       .connect()
       .catch((error) => {
-        globalForMongo._mongoClientPromise = undefined;
-        globalForMongo._mongoClient = undefined;
+        resetMongoConnection();
         throw error;
       });
   }
@@ -94,7 +100,6 @@ async function safeDropIndex(
   }
 }
 
-/** Crea un índice; si hay conflicto de spec (p. ej. unique distinto), lo reemplaza. */
 async function createIndexSafe(
   collection: Collection<Document>,
   spec: IndexSpecification,
@@ -156,6 +161,29 @@ export async function getMongoDb(): Promise<Db> {
   const db = connectedClient.db(dbName);
   await ensureIndexes(db);
   return db;
+}
+
+export function isMongoConfigured(): boolean {
+  return Boolean(process.env.MONGODB_URI?.trim());
+}
+
+/**
+ * Conexión tolerante a fallos. Intenta de verdad (sin caché que bloquee 45 s).
+ * Atlas a veces tarda o corta con ECONNRESET — reintenta antes de rendirse.
+ */
+export async function tryGetMongoDb(): Promise<Db | null> {
+  if (!isMongoConfigured()) return null;
+
+  const attempts = 3;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await getMongoDb();
+    } catch {
+      resetMongoConnection();
+      if (i < attempts) await sleep(2_000);
+    }
+  }
+  return null;
 }
 
 // Colecciones tipadas (helpers de acceso)

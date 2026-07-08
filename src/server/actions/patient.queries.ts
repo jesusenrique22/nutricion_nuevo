@@ -147,16 +147,32 @@ export interface PatientListItem {
 }
 
 /** Listado de pacientes (solo ADMIN). */
-export async function getPatientsList(): Promise<PatientListItem[]> {
+export async function getPatientsList(query?: string): Promise<PatientListItem[]> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
+
+  const q = query?.trim();
 
   const patients = await prisma.user.findMany({
     where: {
       role: "PATIENT",
-      OR: [
-        { patientProfile: { is: null } },
-        { patientProfile: { hiddenFromAdminList: false } },
+      AND: [
+        {
+          OR: [
+            { patientProfile: { is: null } },
+            { patientProfile: { hiddenFromAdminList: false } },
+          ],
+        },
+        ...(q
+          ? [
+              {
+                OR: [
+                  { name: { contains: q, mode: "insensitive" as const } },
+                  { email: { contains: q, mode: "insensitive" as const } },
+                ],
+              },
+            ]
+          : []),
       ],
     },
     include: {
@@ -184,7 +200,14 @@ export interface PatientDetailDTO {
     gender: string | null;
     height: number | null;
     hasCompletedIntake: boolean;
+    adminResourceUrl: string | null;
+    adminResourceNote: string | null;
   } | null;
+}
+
+export interface PatientAdminResourceDTO {
+  url: string;
+  note: string | null;
 }
 
 async function resolveFichaDemographics(
@@ -324,9 +347,34 @@ export async function getPatientDetail(
           gender: demographics.gender,
           height: demographics.height,
           hasCompletedIntake: profile.hasCompletedIntake,
+          adminResourceUrl: profile.adminResourceUrl,
+          adminResourceNote: profile.adminResourceNote,
         }
       : null,
   };
+}
+
+/** Material compartido por la doctora — vista del paciente autenticado. */
+export async function getMyAdminResource(): Promise<PatientAdminResourceDTO | null> {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+
+  try {
+    const profile = await prisma.patientProfile.findUnique({
+      where: { userId: session.user.id },
+      select: { adminResourceUrl: true, adminResourceNote: true },
+    });
+
+    const url = profile?.adminResourceUrl?.trim();
+    if (!url) return null;
+
+    return {
+      url,
+      note: profile?.adminResourceNote?.trim() || null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Consultas del paciente (solo ADMIN). */
@@ -366,7 +414,7 @@ export async function getPatientPurchasesAdmin(
   if (session?.user?.role !== "ADMIN") return [];
 
   const rows = await prisma.resourcePurchase.findMany({
-    where: { userId: patientId, status: "GRANTED" },
+    where: { userId: patientId },
     include: { resource: true },
     orderBy: { createdAt: "desc" },
   });

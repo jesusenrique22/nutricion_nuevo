@@ -1,24 +1,19 @@
 import Link from "next/link";
-import { getMyMeasurements } from "@/server/actions/patient.queries";
-import { getMyProgressPurchases } from "@/server/actions/patient-progress.queries";
+import { getMyAdminResource } from "@/server/actions/patient.queries";
+import { getMyAppointments } from "@/server/actions/booking.queries";
 import {
-  BrandDashboardHeader,
-  BrandDataTable,
-  BrandMetricCard,
-} from "@/components/brand/brand-dashboard-shell";
-import {
-  ProgressLineChart,
-  buildChartPoints,
-} from "@/components/measurements/progress-line-chart";
+  getMyPendingPayments,
+  getMyProgressPurchases,
+} from "@/server/actions/patient-progress.queries";
+import { isPendingProgressItem } from "@/lib/patient-progress";
+import { getMyLibraryResources } from "@/server/actions/resource.queries";
+import { BrandDashboardHeader } from "@/components/brand/brand-dashboard-shell";
+import { LibraryResourceList } from "@/components/resources/resource-catalog";
+import { PatientAdminResourceCard } from "@/components/patient/patient-admin-resource-card";
+import { PatientAppointmentsSummary } from "@/components/progress/patient-appointments-summary";
+import { PatientPendingPaymentsPanel } from "@/components/progress/patient-pending-payments-panel";
 import { PatientPurchasesPanel } from "@/components/progress/patient-purchases-panel";
-
-function fmt(iso: string) {
-  return new Date(iso).toLocaleDateString("es", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { ArrowRightIcon } from "@/components/ui/link-icons";
 
 export default async function PatientProgressPage({
   searchParams,
@@ -26,40 +21,23 @@ export default async function PatientProgressPage({
   searchParams: Promise<{ pedido?: string }>;
 }) {
   const params = await searchParams;
-  const [purchases, measurements] = await Promise.all([
-    getMyProgressPurchases(),
-    getMyMeasurements(),
-  ]);
-  const latest = measurements[0];
+  const [pendingPayments, purchases, resources, adminResource, appointments] =
+    await Promise.all([
+      getMyPendingPayments(),
+      getMyProgressPurchases(),
+      getMyLibraryResources(),
+      getMyAdminResource(),
+      getMyAppointments(),
+    ]);
 
-  const weightChart = buildChartPoints(
-    measurements.map((m) => ({ measuredAt: m.measuredAt, value: m.weight })),
-  );
-  const fatChart = buildChartPoints(
-    measurements.map((m) => ({
-      measuredAt: m.measuredAt,
-      value: m.bodyFatPct,
-    })),
-  );
-  const waistChart = buildChartPoints(
-    measurements.map((m) => ({ measuredAt: m.measuredAt, value: m.waist })),
-  );
-
-  const tableRows = measurements.map((m) => ({
-    date: fmt(m.measuredAt),
-    weight: m.weight != null ? `${m.weight} kg` : "—",
-    fat: m.bodyFatPct != null ? `${m.bodyFatPct}%` : "—",
-    muscle: m.muscleMass != null ? `${m.muscleMass} kg` : "—",
-    waist: m.waist != null ? `${m.waist} cm` : "—",
-    hip: m.hip != null ? `${m.hip} cm` : "—",
-  }));
+  const purchaseHistory = purchases.filter((item) => !isPendingProgressItem(item));
 
   return (
     <div className="mx-auto max-w-5xl space-y-10">
       <BrandDashboardHeader
         eyebrow="Panel paciente"
         title="Mi progreso"
-        description="Seguí tus compras, citas y mediciones en un solo lugar."
+        description="Historial de tu cuenta: pagos, recursos, citas y material compartido por tu nutricionista."
         action={{
           href: "/dashboard/patient/cart",
           label: "Ir al carrito",
@@ -68,21 +46,44 @@ export default async function PatientProgressPage({
 
       {params.pedido === "ok" && (
         <p className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-foreground/75">
-          Pedido confirmado. Tu pago está en revisión y aparece abajo en tu
-          progreso.
+          Pedido confirmado. Tu pago está en revisión y aparece en pagos
+          pendientes.
         </p>
       )}
 
       <section>
         <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
-          Mis compras y citas
+          Pagos pendientes
         </h2>
         <p className="mt-2 text-sm text-foreground/60">
-          Acá ves lo que agendaste o compraste. Podés solicitar reembolso cuando
-          lo necesites.
+          Comprobantes enviados que Anttova aún está verificando.
         </p>
         <div className="mt-4">
-          <PatientPurchasesPanel items={purchases} />
+          <PatientPendingPaymentsPanel items={pendingPayments} />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
+          Material de tu nutricionista
+        </h2>
+        <p className="mt-2 text-sm text-foreground/60">
+          Enlaces o archivos que la Lic. Ma Antonieta Lanza compartió con vos.
+        </p>
+        <div className="mt-4">
+          {adminResource ? (
+            <PatientAdminResourceCard
+              url={adminResource.url}
+              note={adminResource.note}
+            />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-foreground/15 bg-white/60 px-6 py-10 text-center">
+              <p className="text-sm text-foreground/60">
+                Cuando tu nutricionista comparta material personalizado, va a
+                aparecer acá.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -90,103 +91,52 @@ export default async function PatientProgressPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
-              Mediciones antropométricas
+              Mis recursos
             </h2>
             <p className="mt-2 text-sm text-foreground/60">
-              Evolución registrada en consultas ISAK.
+              Contenido digital con acceso activo en tu biblioteca.
             </p>
           </div>
           <Link
-            href="/dashboard/patient/appointments"
-            className="text-sm font-semibold text-primary hover:underline"
+            href="/dashboard/patient/library"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
           >
-            Agendar medición
+            Ver biblioteca
+            <ArrowRightIcon className="h-3.5 w-3.5" />
           </Link>
         </div>
+        <div className="mt-4">
+          <LibraryResourceList resources={resources} />
+        </div>
+      </section>
 
-        {measurements.length === 0 ? (
-          <div className="mt-4 rounded-3xl bg-gradient-to-br from-accent-soft/30 to-muted/20 px-6 py-14 text-center ring-1 ring-primary/10 sm:px-10">
-            <p className="text-lg font-extralight uppercase text-primary">
-              Sin mediciones aún
-            </p>
-            <p className="mx-auto mt-3 max-w-md text-sm text-foreground/65">
-              Las mediciones se registran después de consultas de antropometría.
+      <section>
+        <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
+          Historial de pagos y compras
+        </h2>
+        <p className="mt-2 text-sm text-foreground/60">
+          Citas y recursos confirmados. Podés solicitar reembolso cuando lo
+          necesites.
+        </p>
+        <div className="mt-4">
+          <PatientPurchasesPanel items={purchaseHistory} />
+        </div>
+      </section>
+
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
+              Mis citas
+            </h2>
+            <p className="mt-2 text-sm text-foreground/60">
+              Consultas agendadas y su estado de pago.
             </p>
           </div>
-        ) : (
-          <div className="mt-4 space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {latest?.weight != null && (
-                <BrandMetricCard
-                  label="Último peso"
-                  value={latest.weight}
-                  unit="kg"
-                  date={fmt(latest.measuredAt)}
-                />
-              )}
-              {latest?.bodyFatPct != null && (
-                <BrandMetricCard
-                  label="% Grasa corporal"
-                  value={latest.bodyFatPct}
-                  unit="%"
-                />
-              )}
-              {latest?.waist != null && (
-                <BrandMetricCard
-                  label="Cintura"
-                  value={latest.waist}
-                  unit="cm"
-                />
-              )}
-              {latest?.muscleMass != null && (
-                <BrandMetricCard
-                  label="Masa muscular"
-                  value={latest.muscleMass}
-                  unit="kg"
-                />
-              )}
-            </div>
-
-            <div className="grid gap-4 lg:grid-cols-3">
-              {weightChart.length > 0 && (
-                <ProgressLineChart
-                  title="Peso"
-                  unit="kg"
-                  data={weightChart}
-                  color="#741e31"
-                />
-              )}
-              {fatChart.length > 0 && (
-                <ProgressLineChart
-                  title="% Grasa corporal"
-                  unit="%"
-                  data={fatChart}
-                  color="#5a1728"
-                />
-              )}
-              {waistChart.length > 0 && (
-                <ProgressLineChart
-                  title="Cintura"
-                  unit="cm"
-                  data={waistChart}
-                  color="#e8b4c8"
-                />
-              )}
-            </div>
-
-            <BrandDataTable
-              columns={[
-                { key: "date", label: "Fecha" },
-                { key: "weight", label: "Peso" },
-                { key: "fat", label: "% Grasa" },
-                { key: "muscle", label: "Músculo" },
-                { key: "waist", label: "Cintura" },
-                { key: "hip", label: "Cadera" },
-              ]}
-              rows={tableRows}
-            />
-          </div>
-        )}
+        </div>
+        <div className="mt-4">
+          <PatientAppointmentsSummary appointments={appointments} />
+        </div>
       </section>
     </div>
   );

@@ -11,7 +11,9 @@ import {
 } from "@/server/actions/resource.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
-import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadFile as uploadPublicFile } from "@/lib/client-upload";
+import { DecimalInput } from "@/components/ui/decimal-input";
+import { CurrencyFieldSelect } from "@/components/currency/currency-field-select";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -87,17 +89,21 @@ export function AdminResourceManager({
     setUploading(true);
     setMessage(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "resources");
-      const res = await fetch("/api/resources/upload", {
-        method: "POST",
-        body: fd,
+      const kind =
+        target === "coverUrl"
+          ? "image"
+          : file.type.startsWith("video/")
+            ? "video"
+            : file.type === "application/pdf" ||
+                file.name.toLowerCase().endsWith(".pdf")
+              ? "pdf"
+              : "any";
+      const { url } = await uploadPublicFile(file, {
+        folder: "resources",
+        kind,
       });
-      const json = await parseUploadResponse(res);
-      if (!res.ok || !json.url) throw new Error(json.error ?? "Error al subir");
 
-      const nextForm = { ...form, [target]: json.url as string };
+      const nextForm = { ...form, [target]: url };
       setForm(nextForm);
 
       if (target === "coverUrl" && editing && editing !== "new") {
@@ -172,7 +178,11 @@ export function AdminResourceManager({
               />
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-semibold">Descripción</span>
+              <span className="font-semibold">Descripción (catálogo)</span>
+              <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+                Texto breve que ven los pacientes en la tienda antes de comprar.
+                No es el PDF ni el contenido del documento.
+              </span>
               <textarea
                 value={form.description}
                 onChange={(e) =>
@@ -180,6 +190,7 @@ export function AdminResourceManager({
                 }
                 rows={3}
                 className={inputClass}
+                placeholder="Ej.: Guía de alimentación post-consulta, 12 páginas."
               />
             </label>
             <label className="block text-sm">
@@ -217,21 +228,22 @@ export function AdminResourceManager({
             </label>
             <label className="block text-sm">
               <span className="font-semibold">Precio</span>
-              <input
-                type="number"
-                min={0}
+              <DecimalInput
                 required
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                value={Number(form.price) || 0}
+                onChange={(price) =>
+                  setForm({ ...form, price: String(price) })
+                }
                 className={inputClass}
+                placeholder="Ej: 15000 o 15,50"
               />
             </label>
             <label className="block text-sm">
               <span className="font-semibold">Moneda</span>
-              <input
+              <CurrencyFieldSelect
                 value={form.currency}
-                onChange={(e) =>
-                  setForm({ ...form, currency: e.target.value })
+                onChange={(currency) =>
+                  setForm({ ...form, currency })
                 }
                 className={inputClass}
               />
@@ -303,14 +315,19 @@ export function AdminResourceManager({
                 </div>
               )}
             </label>
-            <label className="block text-sm">
-              <span className="font-semibold">Archivo (PDF/URL)</span>
+            <label className="block text-sm sm:col-span-2">
+              <span className="font-semibold">Archivo principal (PDF)</span>
+              <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+                Documento que el paciente lee al desbloquear el recurso. Subí
+                el PDF aquí; es obligatorio para e-books.
+              </span>
               <input
                 value={form.contentUrl}
                 onChange={(e) =>
                   setForm({ ...form, contentUrl: e.target.value })
                 }
                 className={inputClass}
+                placeholder="/api/media/… o URL del archivo"
               />
               <button
                 type="button"
@@ -320,16 +337,21 @@ export function AdminResourceManager({
                   fileRef.current?.click();
                 }}
               >
-                Subir archivo
+                Subir PDF
               </button>
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-semibold">Contenido / información</span>
+              <span className="font-semibold">Texto al abrir el recurso</span>
+              <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+                Opcional. Instrucciones o notas que aparecen arriba del PDF al
+                abrirlo. No reemplaza el archivo subido.
+              </span>
               <textarea
                 value={form.body}
                 onChange={(e) => setForm({ ...form, body: e.target.value })}
                 rows={4}
                 className={inputClass}
+                placeholder="Ej.: Leé primero la introducción y luego la tabla de porciones."
               />
             </label>
             <label className="flex items-center gap-2 text-sm">

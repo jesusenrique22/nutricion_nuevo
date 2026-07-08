@@ -10,11 +10,318 @@ import Image from "next/image";
 import type { SiteContentDTO } from "@/server/actions/cms.actions";
 import { siteFieldLabel } from "@/lib/cms-labels";
 import type { LandingImagesData } from "@/types/landing-images";
+import type {
+  BannerBlock,
+  CarouselBlock,
+  LandingBlocksData,
+} from "@/types/landing-blocks";
+import type { NavMenuData } from "@/types/nav-menu";
+import { NAV_ITEM_TYPE_LABELS } from "@/types/nav-menu";
+import type { ProductsData } from "@/types/products";
 import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
+import { getProductPrimaryImage } from "@/lib/product-images";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
+
+// ─── Blocks (Secciones) preview ────────────────────────────────────────────
+
+const PLACEMENT_SHORT: Record<string, string> = {
+  after_hero: "Tras el carrusel principal",
+  after_services: "Tras servicios",
+  after_packages: "Tras paquetes",
+  before_footer: "Antes del pie",
+};
+
+function BlockCarouselPreview({ block }: { block: CarouselBlock }) {
+  const sizeClass: Record<string, string> = {
+    sm: "h-12 w-16",
+    md: "h-16 w-24",
+    lg: "h-20 w-28",
+  };
+  return (
+    <div className="rounded-xl bg-primary p-3">
+      {block.title ? (
+        <p className="mb-2 text-center text-[9px] font-semibold uppercase tracking-[0.24em] text-white/60">
+          {block.title}
+        </p>
+      ) : null}
+      <div className="flex gap-1.5 overflow-hidden">
+        {block.items.slice(0, 5).map((item, i) => (
+          <div
+            key={i}
+            className={`relative shrink-0 overflow-hidden rounded-md ${sizeClass[block.size] ?? sizeClass.md}`}
+          >
+            {item.src ? (
+              <Image
+                src={item.src}
+                alt={item.alt}
+                width={120}
+                height={120}
+                className="h-full w-full object-cover"
+                unoptimized={item.src.startsWith("/uploads/")}
+              />
+            ) : (
+              <div className="h-full w-full bg-white/10" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlockBannerPreview({ block }: { block: BannerBlock }) {
+  if (block.layout === "image-background") {
+    return (
+      <div
+        className="relative overflow-hidden rounded-xl"
+        style={{ aspectRatio: "16/9" }}
+      >
+        {block.imageSrc ? (
+          <Image
+            src={block.imageSrc}
+            alt={block.imageAlt || block.title}
+            fill
+            className="object-cover"
+            sizes="360px"
+            unoptimized={shouldUnoptimizeImage(block.imageSrc)}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-primary" />
+        )}
+        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center text-white">
+          {block.eyebrow ? (
+            <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-accent-soft">
+              {block.eyebrow}
+            </p>
+          ) : null}
+          <p className="text-xs font-bold">{block.title}</p>
+          {block.ctaLabel ? (
+            <span className="mt-2 rounded-full bg-white px-2 py-0.5 text-[8px] font-semibold text-primary">
+              {block.ctaLabel}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  const imageFirst = block.layout === "image-left";
+  const imageEl = (
+    <div className="relative aspect-[4/3] flex-1 overflow-hidden rounded-lg bg-muted/40">
+      {block.imageSrc ? (
+        <Image
+          src={block.imageSrc}
+          alt={block.imageAlt || block.title}
+          fill
+          className="object-cover"
+          sizes="180px"
+          unoptimized={shouldUnoptimizeImage(block.imageSrc)}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-primary/10" />
+      )}
+    </div>
+  );
+  const textEl = (
+    <div className="flex-1">
+      {block.eyebrow ? (
+        <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-primary">
+          {block.eyebrow}
+        </p>
+      ) : null}
+      <p className="text-xs font-bold text-foreground">{block.title}</p>
+      {block.text ? (
+        <p className="mt-1 line-clamp-3 text-[9px] leading-snug text-foreground/60">
+          {block.text}
+        </p>
+      ) : null}
+      {block.ctaLabel ? (
+        <span className="mt-2 inline-block rounded-full bg-primary px-2 py-0.5 text-[8px] font-semibold text-primary-foreground">
+          {block.ctaLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-foreground/10 bg-white p-3">
+      {imageFirst ? (
+        <>
+          {imageEl}
+          {textEl}
+        </>
+      ) : (
+        <>
+          {textEl}
+          {imageEl}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BlocksPreview({ data }: { data: LandingBlocksData }) {
+  const blocks = (data?.blocks ?? []).filter((b) => b.enabled);
+  if (blocks.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-foreground/20 bg-muted/20 p-6 text-center text-[10px] text-foreground/50">
+        No hay secciones visibles. Agregá un bloque para verlo aquí.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2.5">
+      {blocks.map((block) => (
+        <div key={block.id}>
+          <p className="mb-1 text-[8px] font-semibold uppercase tracking-wide text-foreground/40">
+            {PLACEMENT_SHORT[block.placement] ?? block.placement}
+          </p>
+          {block.kind === "carousel" ? (
+            <BlockCarouselPreview block={block} />
+          ) : (
+            <BlockBannerPreview block={block} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Productos preview ──────────────────────────────────────────────────────
+
+function ProductsPreview({ data }: { data: ProductsData }) {
+  const items = (data?.items ?? []).filter((it) => it.enabled);
+  const catLabel = new Map(data?.categories?.map((c) => [c.id, c.label]) ?? []);
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-bold text-foreground">
+          {data?.heading || "Productos"}
+        </p>
+        {data?.subheading ? (
+          <p className="text-[10px] text-foreground/55">{data.subheading}</p>
+        ) : null}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-foreground/20 bg-muted/20 p-6 text-center text-[10px] text-foreground/50">
+          Sin productos visibles. Agregá uno para verlo aquí.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {items.slice(0, 6).map((item) => {
+            const primary = getProductPrimaryImage(item);
+            return (
+            <div
+              key={item.id}
+              className="overflow-hidden rounded-lg border border-foreground/10 bg-white"
+            >
+              <div className="relative aspect-square bg-muted/40 p-1">
+                {primary ? (
+                  <Image
+                    src={primary.src}
+                    alt={primary.alt || item.name}
+                    fill
+                    className="object-contain p-0.5"
+                    sizes="160px"
+                    unoptimized={shouldUnoptimizeImage(primary.src)}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[8px] text-foreground/35">
+                    Sin imagen
+                  </div>
+                )}
+                {catLabel.get(item.categoryId) ? (
+                  <span className="absolute left-1 top-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[7px] font-semibold text-primary">
+                    {catLabel.get(item.categoryId)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="p-1.5">
+                <p className="line-clamp-2 text-[9px] font-bold leading-tight text-foreground">
+                  {item.name}
+                </p>
+                <div className="mt-0.5 flex items-center justify-between gap-1">
+                  {item.price > 0 ? (
+                    <span className="text-[9px] font-bold text-primary">
+                      {item.currency === "USD" ? "USD " : "$"}
+                      {item.price}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-primary">Gratis</span>
+                  )}
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[7px] font-semibold text-primary-foreground">
+                    Ver
+                  </span>
+                </div>
+              </div>
+            </div>
+          );})}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Menú del lobby preview ─────────────────────────────────────────────────
+
+function NavMenuPreview({ data }: { data: NavMenuData }) {
+  const items = (data?.items ?? []).filter(
+    (it) => it.enabled && it.label.trim(),
+  );
+  return (
+    <div className="space-y-3">
+      {/* Simulación de la barra superior */}
+      <div className="rounded-xl border border-foreground/10 bg-white p-2.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+            Anttova
+          </span>
+          {items.length === 0 ? (
+            <span className="text-[9px] text-foreground/40">
+              Sin opciones visibles
+            </span>
+          ) : (
+            items.map((it) => (
+              <span
+                key={it.id}
+                className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-semibold text-foreground/70"
+              >
+                {it.label}
+              </span>
+            ))
+          )}
+          <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-[9px] font-semibold text-primary-foreground">
+            Iniciar sesión
+          </span>
+        </div>
+      </div>
+
+      {/* Detalle de a dónde lleva cada opción */}
+      <div className="space-y-1.5">
+        {items.map((it) => (
+          <div
+            key={it.id}
+            className="flex items-center justify-between gap-2 rounded-lg border border-foreground/8 bg-white px-2.5 py-1.5"
+          >
+            <span className="text-[10px] font-semibold text-foreground">
+              {it.label}
+            </span>
+            <span className="text-right text-[8px] text-foreground/45">
+              {NAV_ITEM_TYPE_LABELS[it.type]}
+              <span className="block font-mono text-foreground/60">
+                {it.type === "section" ? `#${it.target}` : it.target}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ─── Hero preview ─────────────────────────────────────────────────────────
 
@@ -491,26 +798,41 @@ function CheckoutPreview({ policy }: { policy: PaymentCheckoutPolicy }) {
 
 // ─── Panel principal de previsualización ─────────────────────────────────
 
-type PreviewTab = "imagenes" | "web" | "conocerme" | "pagos" | "recursos";
+type PreviewTab =
+  | "imagenes"
+  | "otros"
+  | "web"
+  | "conocerme"
+  | "pagos"
+  | "recursos";
 type ImageSection = "hero" | "gallery" | "plans" | "services" | "other";
 
 export function PageSectionPreview({
   tab,
+  otrosSection,
   imageSection,
   images,
+  blocks,
+  navMenu,
+  products,
   textBlocks,
   nutricionista,
   paymentPolicy,
 }: {
   tab: PreviewTab;
+  otrosSection?: "secciones" | "productos" | "menu";
   imageSection?: ImageSection;
   images: LandingImagesData;
+  blocks: LandingBlocksData;
+  navMenu: NavMenuData;
+  products: ProductsData;
   textBlocks: SiteContentDTO[];
   nutricionista: NutricionistaPageData;
   paymentPolicy: PaymentCheckoutPolicy;
 }) {
   const pageLabels: Record<PreviewTab, string> = {
     imagenes: "anttova.com",
+    otros: "anttova.com",
     web: "anttova.com",
     conocerme: "anttova.com/nutricionista",
     pagos: "carrito del paciente",
@@ -532,6 +854,11 @@ export function PageSectionPreview({
           default:
             return <HeroPreview images={images} />;
         }
+      case "otros":
+        if (otrosSection === "menu") return <NavMenuPreview data={navMenu} />;
+        if (otrosSection === "productos")
+          return <ProductsPreview data={products} />;
+        return <BlocksPreview data={blocks} />;
       case "web":
         return <TextsPreview blocks={textBlocks} />;
       case "conocerme":

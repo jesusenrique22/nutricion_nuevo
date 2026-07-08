@@ -3,7 +3,9 @@ import type {
   ConsultationType,
   Resource,
 } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
+import type { ProductItem } from "@/types/products";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
 import { buildPaymentCreateData } from "@/lib/payment-split";
 import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
@@ -34,6 +36,12 @@ type CartAppointmentItem = {
 type CartResourceItem = {
   resourceId: string;
   resource: Resource;
+};
+
+type CartProductItem = {
+  productId: string;
+  product: ProductItem;
+  quantity: number;
 };
 
 /** Cita PENDING del mismo slot aún sin confirmar por admin (reintento tras checkout parcial). */
@@ -161,6 +169,7 @@ export async function fulfillCartCheckout(params: {
   patientName: string;
   appointmentItems: CartAppointmentItem[];
   resourceItems: CartResourceItem[];
+  productItems: CartProductItem[];
   paymentPayload: CartPaymentPayload | null;
 }): Promise<
   | { ok: true; newAppointmentIds: string[] }
@@ -242,6 +251,57 @@ export async function fulfillCartCheckout(params: {
         update: {
           status: isFree ? "GRANTED" : "PENDING",
           ...(isFree ? {} : paidPayload),
+        },
+      });
+    }
+
+    for (const item of params.productItems) {
+      const qty = Math.max(1, item.quantity ?? 1);
+      const unitPrice = item.product.price;
+      const lineTotal = unitPrice * qty;
+      const isFree = lineTotal <= 0;
+      const paidPayload =
+        !isFree && params.paymentPayload
+          ? {
+              patientPaymentMethod: params.paymentPayload.patientPaymentMethod,
+              patientPaymentReference:
+                params.paymentPayload.patientPaymentReference,
+              patientPaymentNote: params.paymentPayload.patientPaymentNote,
+              patientPaymentProofUrls:
+                params.paymentPayload.patientPaymentProofUrls,
+            }
+          : {
+              patientPaymentMethod: null,
+              patientPaymentReference: null,
+              patientPaymentNote: null,
+              patientPaymentProofUrls: [] as string[],
+            };
+
+      await tx.productPurchase.upsert({
+        where: {
+          userId_productId: {
+            userId: params.patientId,
+            productId: item.productId,
+          },
+        },
+        create: {
+          userId: params.patientId,
+          productId: item.productId,
+          productName: item.product.name,
+          quantity: qty,
+          pricePaid: new Prisma.Decimal(lineTotal),
+          currency: item.product.currency,
+          status: isFree ? "GRANTED" : "PENDING",
+          grantedAt: isFree ? new Date() : null,
+          ...paidPayload,
+        },
+        update: {
+          productName: item.product.name,
+          quantity: qty,
+          pricePaid: new Prisma.Decimal(lineTotal),
+          currency: item.product.currency,
+          status: isFree ? "GRANTED" : "PENDING",
+          ...(isFree ? { grantedAt: new Date() } : paidPayload),
         },
       });
     }

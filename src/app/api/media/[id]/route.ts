@@ -4,7 +4,7 @@ import {
   mongoStreamToWebResponse,
   openMongoFileStream,
 } from "@/server/services/mongo-storage";
-import { canAccessStoredMediaUrl } from "@/server/services/media-access.service";
+import { canAccessStoredMediaUrl, isPublicStoredMediaUrl } from "@/server/services/media-access.service";
 
 export async function GET(
   _req: Request,
@@ -30,8 +30,12 @@ export async function GET(
       result.meta.metadata as Record<string, unknown> | undefined,
     );
 
+    const isPublic = await isPublicStoredMediaUrl(url);
+
     return mongoStreamToWebResponse(result.stream, mimeType, {
-      cacheControl: "private, no-store",
+      cacheControl: isPublic
+        ? "public, max-age=86400, stale-while-revalidate=604800"
+        : "private, no-store",
       disposition: "inline",
     });
   } catch (err) {

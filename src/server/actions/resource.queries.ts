@@ -62,37 +62,45 @@ function mapResource(
 }
 
 export async function getPublishedResourcePackages(): Promise<ResourceDTO[]> {
-  const resources = await prisma.resource.findMany({
-    where: { isPublished: true, type: "PACKAGE" },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-  });
-  return resources.map((r) => mapResource(r));
+  try {
+    const resources = await prisma.resource.findMany({
+      where: { isPublished: true, type: "PACKAGE" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+    return resources.map((r) => mapResource(r));
+  } catch {
+    return [];
+  }
 }
 
 export async function getPublishedResources(): Promise<ResourceDTO[]> {
   const session = await auth();
-  const resources = await prisma.resource.findMany({
-    where: { isPublished: true },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-  });
-
-  if (!session?.user?.id) {
-    return resources.map((r) => mapResource(r));
-  }
-
-  const purchases = await prisma.resourcePurchase.findMany({
-    where: { userId: session.user.id },
-    select: { resourceId: true, status: true },
-  });
-  const purchaseMap = new Map(purchases.map((p) => [p.resourceId, p.status]));
-
-  return resources.map((r) => {
-    const status = purchaseMap.get(r.id);
-    return mapResource(r, {
-      owned: status === "GRANTED",
-      accessStatus: status ?? null,
+  try {
+    const resources = await prisma.resource.findMany({
+      where: { isPublished: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
-  });
+
+    if (!session?.user?.id) {
+      return resources.map((r) => mapResource(r));
+    }
+
+    const purchases = await prisma.resourcePurchase.findMany({
+      where: { userId: session.user.id },
+      select: { resourceId: true, status: true },
+    });
+    const purchaseMap = new Map(purchases.map((p) => [p.resourceId, p.status]));
+
+    return resources.map((r) => {
+      const status = purchaseMap.get(r.id);
+      return mapResource(r, {
+        owned: status === "GRANTED",
+        accessStatus: status ?? null,
+      });
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function getAllResourcesAdmin(): Promise<ResourceDTO[]> {
@@ -208,4 +216,31 @@ export async function getPendingResourceRequests(): Promise<
     pricePaid: r.pricePaid.toString(),
     createdAt: r.createdAt.toISOString(),
   }));
+}
+
+/** Catálogo publicado con estado de acceso de un paciente (solo ADMIN). */
+export async function getPublishedResourcesForPatientAdmin(
+  patientId: string,
+): Promise<ResourceDTO[]> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return [];
+
+  const [catalog, purchases] = await Promise.all([
+    prisma.resource.findMany({
+      where: { isPublished: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
+    prisma.resourcePurchase.findMany({
+      where: { userId: patientId },
+      select: { resourceId: true, status: true },
+    }),
+  ]);
+
+  const statusByResource = new Map(
+    purchases.map((p) => [p.resourceId, p.status]),
+  );
+
+  return catalog.map((r) =>
+    mapResource(r, { accessStatus: statusByResource.get(r.id) ?? null }),
+  );
 }

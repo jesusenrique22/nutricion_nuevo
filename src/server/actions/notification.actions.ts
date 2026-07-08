@@ -1,15 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ObjectId } from "mongodb";
 import { z } from "zod";
+import type { NotificationType as PrismaNotificationType } from "@prisma/client";
 import { auth } from "@/lib/auth";
-import { getMongoDb, Collections } from "@/server/db/mongo";
+import { prisma } from "@/server/db/prisma";
 import { syncUser } from "@/server/realtime/sync";
-import type { NotificationDoc, NotificationType } from "@/types/chat";
+import type { NotificationType } from "@/types/chat";
 import { VISIBLE_NOTIFICATION_TYPES } from "@/types/chat";
 
-const notificationIdSchema = z.string().regex(/^[a-f0-9]{24}$/i);
+const notificationIdSchema = z.string().min(1);
+
+const visibleTypes = VISIBLE_NOTIFICATION_TYPES as PrismaNotificationType[];
+
+function toDto(n: {
+  id: string;
+  type: PrismaNotificationType;
+  title: string;
+  body: string;
+  payload: unknown;
+  isRead: boolean;
+  createdAt: Date;
+}): NotificationDTO {
+  return {
+    id: n.id,
+    type: n.type as NotificationType,
+    title: n.title,
+    body: n.body,
+    payload:
+      n.payload && typeof n.payload === "object" && !Array.isArray(n.payload)
+        ? (n.payload as Record<string, unknown>)
+        : undefined,
+    isRead: n.isRead,
+    createdAt: n.createdAt.toISOString(),
+  };
+}
 
 export interface NotificationDTO {
   id: string;
@@ -25,44 +50,29 @@ export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
 
-  const db = await getMongoDb();
-  const docs = await db
-    .collection<NotificationDoc>(Collections.notifications)
-    .find({
+  const docs = await prisma.notification.findMany({
+    where: {
       recipientId: session.user.id,
-      type: { $in: VISIBLE_NOTIFICATION_TYPES },
-    })
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .toArray();
+      type: { in: visibleTypes },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
 
-  return docs.map((n) => ({
-    id: n._id!.toString(),
-    type: n.type,
-    title: n.title,
-    body: n.body,
-    payload: n.payload,
-    isRead: n.isRead,
-    createdAt: n.createdAt.toISOString(),
-  }));
+  return docs.map(toDto);
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
   const session = await auth();
   if (!session?.user?.id) return 0;
 
-  try {
-    const db = await getMongoDb();
-    return await db
-      .collection<NotificationDoc>(Collections.notifications)
-      .countDocuments({
-        recipientId: session.user.id,
-        isRead: false,
-        type: { $in: VISIBLE_NOTIFICATION_TYPES },
-      });
-  } catch {
-    return 0;
-  }
+  return prisma.notification.count({
+    where: {
+      recipientId: session.user.id,
+      isRead: false,
+      type: { in: visibleTypes },
+    },
+  });
 }
 
 export async function markNotificationRead(
@@ -74,16 +84,16 @@ export async function markNotificationRead(
   const idParsed = notificationIdSchema.safeParse(notificationId);
   if (!idParsed.success) return { ok: false };
 
-  const db = await getMongoDb();
-  const res = await db
-    .collection<NotificationDoc>(Collections.notifications)
-    .updateOne(
-      {
-        _id: new ObjectId(idParsed.data),
-        recipientId: session.user.id,
-      },
-      { $set: { isRead: true } },
-    );
+  const res = await prisma.notification.updateMany({
+    where: {
+      id: idParsed.data,
+      recipientId: session.user.id,
+      isRead: false,
+    },
+    data: { isRead: true },
+  });
+
+  if (res.count === 0) return { ok: false };
 
   revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard", "layout");
@@ -91,20 +101,18 @@ export async function markNotificationRead(
     action: "read",
     delta: -1,
   });
-  return { ok: res.modifiedCount > 0 };
+  return { ok: true };
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) return;
 
-  const db = await getMongoDb();
-  await db
-    .collection<NotificationDoc>(Collections.notifications)
-    .updateMany(
-      { recipientId: session.user.id, isRead: false },
-      { $set: { isRead: true } },
-    );
+  await prisma.notification.updateMany({
+    where: { recipientId: session.user.id, isRead: false },
+    data: { isRead: true },
+  });
+
   revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard", "layout");
   await syncUser(session.user.id, "notifications", { action: "read_all" });

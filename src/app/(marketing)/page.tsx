@@ -1,44 +1,53 @@
-import { BrandGalleryStrip } from "@/components/marketing/brand-gallery-strip";
 import { BrandPillarsShowcase } from "@/components/marketing/brand-pillars-showcase";
 import { BrandSocialFooter } from "@/components/marketing/brand-social-footer";
 import { FlyerHero } from "@/components/marketing/flyer-hero";
+import { LandingBlocksRegion } from "@/components/marketing/landing-blocks-region";
 import { LandingCtaSection } from "@/components/marketing/landing-cta-section";
 import { LandingLobbyShell } from "@/components/marketing/landing-lobby-shell";
 import { LandingPackagesSection } from "@/components/marketing/landing-packages-section";
 import { getConsultationTypes } from "@/server/actions/booking.queries";
-import { getLandingImages } from "@/server/queries/landing.queries";
+import {
+  getLandingBlocks,
+  getLandingImages,
+} from "@/server/queries/landing.queries";
+import type { LandingBlockPlacement } from "@/types/landing-blocks";
 
 export const revalidate = 60;
 
 export default async function LandingPage() {
-  const [images, consultations] = await Promise.all([
+  const [images, consultations, blocksData] = await Promise.all([
     getLandingImages(),
     getConsultationTypes(),
+    getLandingBlocks(),
   ]);
+
+  const enabledBlocks = blocksData.blocks.filter((block) => block.enabled);
+  const blocksAt = (placement: LandingBlockPlacement) =>
+    enabledBlocks.filter((block) => block.placement === placement);
 
   return (
     <LandingLobbyShell>
       <FlyerHero slides={images.heroSlides} />
 
-      <BrandGalleryStrip items={images.gallery} />
+      <LandingBlocksRegion blocks={blocksAt("after_hero")} />
 
       <BrandPillarsShowcase
         services={images.services}
         plans={images.plans}
       />
 
+      <LandingBlocksRegion blocks={blocksAt("after_services")} />
+
       <LandingPackagesSection
         consultations={consultations}
         planImages={images.plans}
       />
 
+      <LandingBlocksRegion blocks={blocksAt("after_packages")} />
+
       <LandingCtaSection backgroundSrc={images.ctaBackground} />
 
-      <BrandGalleryStrip
-        items={images.gallery}
-        title="Comunidad · Constancia · Evolución"
-        reverse
-      />
+      <LandingBlocksRegion blocks={blocksAt("before_footer")} />
 
       <BrandSocialFooter />
     </LandingLobbyShell>

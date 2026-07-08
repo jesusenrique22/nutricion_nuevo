@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Verifica la conexión a PostgreSQL usando DATABASE_URL del .env
- * Uso: npm run db:check
+ * Verifica la conexión a PostgreSQL (Neon) usando DATABASE_URL del .env
+ * Uso: pnpm run db:check
  */
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "./create-prisma-client.mjs";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log("Comprobando conexión a PostgreSQL…\n");
@@ -13,6 +13,18 @@ async function main() {
   const url = process.env.DATABASE_URL ?? "";
   const masked = url.replace(/:([^:@/]+)@/, ":****@");
   console.log("DATABASE_URL:", masked || "(no definida)");
+  console.log(
+    "Driver:",
+    url.includes("neon.tech") ? "Neon WebSocket (adapter)" : "TCP estándar",
+  );
+
+  const direct = process.env.DIRECT_DATABASE_URL ?? "";
+  if (direct && direct !== url) {
+    console.log(
+      "DIRECT_DATABASE_URL:",
+      direct.replace(/:([^:@/]+)@/, ":****@"),
+    );
+  }
 
   try {
     await prisma.$connect();
@@ -27,10 +39,14 @@ async function main() {
     const count = Number(tables[0]?.count ?? 0);
     if (count === 0) {
       console.log("\n⚠ La base de datos está vacía. Ejecuta:");
-      console.log("   npm run db:migrate");
-      console.log("   npm run db:seed");
+      console.log("   pnpm run db:migrate");
+      console.log("   pnpm run db:seed");
     } else {
       console.log(`\n✓ ${count} tablas encontradas en el esquema public.`);
+
+      const users = await prisma.user.count();
+      const contents = await prisma.siteContent.count();
+      console.log(`✓ ${users} usuarios, ${contents} registros de contenido CMS.`);
     }
   } catch (error) {
     console.error("\n✗ Error de conexión:\n");
@@ -38,15 +54,13 @@ async function main() {
       console.error(error.message);
     }
     console.error(`
-Solución:
-1. Abre pgAdmin → servidor "PostgreSQL 18" (localhost:5432)
-2. Usa la contraseña que definiste al instalar PostgreSQL 18
-3. Crea la base de datos "nutricion" (clic derecho → Create → Database)
-4. Edita .env con tu contraseña real:
+Solución (Neon):
+1. Abrí console.neon.tech → tu proyecto debe estar "Active".
+2. Connection details → copiá la URL **Pooled** en DATABASE_URL.
+3. Si falta DIRECT_DATABASE_URL, el script la deriva automáticamente al arrancar.
+4. Si sigue fallando: "Reset password" en Neon y volvé a copiar la URL.
 
-   DATABASE_URL="postgresql://postgres:TU_PASSWORD@localhost:5432/nutricion?schema=public"
-
-5. Ejecuta: npm run db:migrate && npm run db:seed
+Luego: pnpm run db:migrate && pnpm run db:seed
 `);
     process.exit(1);
   } finally {

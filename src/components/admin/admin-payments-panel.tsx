@@ -17,9 +17,11 @@ import {
   approveAppointmentAdvance,
   approveAppointmentRemainder,
   approveResourcePayment,
+  approveProductPayment,
   permanentlyDeletePaymentInboxItem,
   rejectAppointmentPayment,
   rejectResourcePayment,
+  rejectProductPayment,
   restorePaymentInboxItem,
   trashPaymentInboxItem,
 } from "@/server/actions/payment-admin.actions";
@@ -28,6 +30,7 @@ const BASE_PATH = "/dashboard/admin/payments";
 
 const kindLabels: Record<AdminPendingPaymentItem["kind"], string> = {
   RESOURCE: "Recurso",
+  PRODUCT: "Producto",
   APPOINTMENT_ADVANCE: "Adelanto cita",
   APPOINTMENT_REMAINDER: "Saldo cita",
 };
@@ -291,6 +294,13 @@ export function AdminPaymentsPanel({
                               adminNote: note,
                             }),
                           );
+                        } else if (item.kind === "PRODUCT" && item.purchaseId) {
+                          runAction(() =>
+                            approveProductPayment({
+                              purchaseId: item.purchaseId!,
+                              adminNote: note,
+                            }),
+                          );
                         } else if (
                           item.kind === "APPOINTMENT_ADVANCE" &&
                           item.appointmentId
@@ -331,6 +341,10 @@ export function AdminPaymentsPanel({
                         if (item.kind === "RESOURCE" && item.purchaseId) {
                           runAction(() =>
                             rejectResourcePayment(item.purchaseId!),
+                          );
+                        } else if (item.kind === "PRODUCT" && item.purchaseId) {
+                          runAction(() =>
+                            rejectProductPayment(item.purchaseId!),
                           );
                         } else if (item.appointmentId) {
                           runAction(() =>

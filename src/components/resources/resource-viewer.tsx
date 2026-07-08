@@ -1,18 +1,32 @@
 import type { ResourceDTO } from "@/server/actions/resource.queries";
-import { guessContentKindFromUrl } from "@/lib/stored-file";
+import { guessContentKindFromStoredUrl } from "@/lib/stored-file";
 import { ProtectedContentViewer } from "@/components/resources/protected-content-viewer";
 
-export function ResourceViewer({ resource }: { resource: ResourceDTO }) {
-  const contentKind = guessContentKindFromUrl(
+export async function ResourceViewer({
+  resource,
+}: {
+  resource: ResourceDTO;
+}) {
+  const contentKind = await guessContentKindFromStoredUrl(
     resource.contentUrl,
     resource.type,
   );
+  const hasContent = Boolean(resource.contentUrl);
 
   return (
     <div className="space-y-6">
+      {resource.description && (
+        <p className="text-sm leading-relaxed text-foreground/65">
+          {resource.description}
+        </p>
+      )}
+
       {resource.body && (
         <div className="rounded-3xl border border-foreground/10 bg-white p-6">
-          <div className="prose prose-sm max-w-none text-foreground/80">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-foreground/45">
+            Información del recurso
+          </p>
+          <div className="prose prose-sm mt-3 max-w-none text-foreground/80">
             <p className="whitespace-pre-wrap">{resource.body}</p>
           </div>
         </div>
@@ -23,10 +37,7 @@ export function ResourceViewer({ resource }: { resource: ResourceDTO }) {
         title={resource.title}
         contentKind={contentKind}
         hasVideo={Boolean(resource.type === "VIDEO" && resource.videoUrl)}
-        hasContent={Boolean(
-          (resource.type === "EBOOK" || resource.contentUrl) &&
-            resource.contentUrl,
-        )}
+        hasContent={hasContent}
       />
 
       {resource.type === "LINK" && resource.linkUrl && (

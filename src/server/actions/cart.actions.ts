@@ -5,6 +5,9 @@ import { auth } from "@/lib/auth";
 import { assertBookingRequestAllowed } from "@/lib/booking-guard";
 import { prisma } from "@/server/db/prisma";
 import { getPaymentCheckoutPolicy } from "@/lib/payment-checkout-policy";
+import { findProductById } from "@/lib/products-parse";
+import { getProductPrimaryImage } from "@/lib/product-images";
+import { getProducts } from "@/server/queries/landing.queries";
 import { createNotification } from "@/server/services/notification.service";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { fulfillCartCheckout, findReusableCartAppointment } from "@/server/services/cart-checkout.service";
@@ -17,12 +20,16 @@ export type CartActionResult =
 
 export interface CartItemDTO {
   id: string;
-  type: "RESOURCE" | "APPOINTMENT";
+  type: "RESOURCE" | "APPOINTMENT" | "PRODUCT";
   title: string;
   subtitle: string;
+  /** Precio unitario */
   price: string | null;
   currency?: string;
+  quantity: number;
+  imageUrl?: string | null;
   resourceId?: string;
+  productId?: string;
   consultationTypeId?: string;
   appointmentStart?: string;
   modality?: string;
@@ -63,35 +70,69 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
       orderBy: { createdAt: "asc" },
     });
 
-    return items.map((item) => {
+    const productsCatalog =
+      items.some((item) => item.type === "PRODUCT")
+        ? await getProducts()
+        : null;
+
+    const result: CartItemDTO[] = [];
+    for (const item of items) {
       if (item.type === "RESOURCE" && item.resource) {
-        return {
+        result.push({
           id: item.id,
-          type: "RESOURCE" as const,
+          type: "RESOURCE",
           title: item.resource.title,
           subtitle: item.resource.type,
           price: item.resource.price.toString(),
           currency: item.resource.currency,
+          quantity: item.quantity ?? 1,
+          imageUrl: item.resource.coverUrl,
           resourceId: item.resourceId ?? undefined,
-        };
+        });
+        continue;
       }
-      return {
-        id: item.id,
-        type: "APPOINTMENT" as const,
-        title: item.consultationType?.name ?? "Consulta",
-        subtitle: item.appointmentStart
-          ? formatAppointmentSubtitle(
-              item.appointmentStart,
-              item.modality,
-            )
-          : "",
-        price: item.consultationType?.price.toString() ?? null,
-        currency: "ARS",
-        consultationTypeId: item.consultationTypeId ?? undefined,
-        appointmentStart: item.appointmentStart?.toISOString(),
-        modality: item.modality ?? undefined,
-      };
-    });
+      if (item.type === "PRODUCT" && item.productId && productsCatalog) {
+        const product = findProductById(productsCatalog, item.productId);
+        if (!product) continue;
+        const category = productsCatalog.categories.find(
+          (c) => c.id === product.categoryId,
+        );
+        const primary = getProductPrimaryImage(product);
+        result.push({
+          id: item.id,
+          type: "PRODUCT",
+          title: product.name,
+          subtitle: category?.label ?? "Producto",
+          price: product.price.toString(),
+          currency: product.currency,
+          quantity: item.quantity ?? 1,
+          imageUrl: primary?.src ?? null,
+          productId: item.productId,
+        });
+        continue;
+      }
+      if (item.type === "APPOINTMENT") {
+        result.push({
+          id: item.id,
+          type: "APPOINTMENT",
+          title: item.consultationType?.name ?? "Consulta",
+          subtitle: item.appointmentStart
+            ? formatAppointmentSubtitle(
+                item.appointmentStart,
+                item.modality,
+              )
+            : "",
+          price: item.consultationType?.price.toString() ?? null,
+          currency: "ARS",
+          quantity: 1,
+          imageUrl: item.consultationType?.imageUrl ?? null,
+          consultationTypeId: item.consultationTypeId ?? undefined,
+          appointmentStart: item.appointmentStart?.toISOString(),
+          modality: item.modality ?? undefined,
+        });
+      }
+    }
+    return result;
   } catch {
     return [];
   }
@@ -103,7 +144,11 @@ export async function getCartCount(): Promise<number> {
     if (!session) return 0;
 
     if ("cartItem" in prisma && prisma.cartItem) {
-      return await prisma.cartItem.count({ where: { userId: session.user.id } });
+      const items = await prisma.cartItem.findMany({
+        where: { userId: session.user.id },
+        select: { quantity: true },
+      });
+      return items.reduce((sum, row) => sum + (row.quantity ?? 1), 0);
     }
 
     const rows = await prisma.$queryRaw<{ count: bigint }[]>`
@@ -148,6 +193,70 @@ export async function addResourceToCart(
   revalidatePath("/dashboard/patient/cart");
   revalidatePath("/dashboard/patient/library");
   return { ok: true };
+}
+
+export async function addProductToCart(
+  productId: string,
+): Promise<CartActionResult> {
+  const session = await requirePatient();
+  if (!session) return { ok: false, message: "Debes iniciar sesión." };
+
+  const catalog = await getProducts();
+  const product = findProductById(catalog, productId);
+  if (!product) return { ok: false, message: "Producto no disponible." };
+
+  const existing = await prisma.productPurchase.findUnique({
+    where: {
+      userId_productId: { userId: session.user.id, productId },
+    },
+  });
+  if (existing?.status === "GRANTED") {
+    return { ok: false, message: "Ya compraste este producto." };
+  }
+  if (existing?.status === "PENDING") {
+    return {
+      ok: false,
+      message: "Ya tenés una solicitud de compra pendiente para este producto.",
+    };
+  }
+
+  await prisma.cartItem.upsert({
+    where: {
+      userId_productId: { userId: session.user.id, productId },
+    },
+    create: {
+      userId: session.user.id,
+      type: "PRODUCT",
+      productId,
+      quantity: 1,
+    },
+    update: { quantity: { increment: 1 } },
+  });
+
+  revalidatePath("/dashboard/patient/cart");
+  revalidatePath("/dashboard/patient/products");
+  revalidatePath("/productos");
+  return { ok: true };
+}
+
+export async function getMyProductPurchaseStatuses(): Promise<
+  Record<string, "PENDING" | "GRANTED">
+> {
+  const session = await requirePatient();
+  if (!session) return {};
+
+  const rows = await prisma.productPurchase.findMany({
+    where: { userId: session.user.id },
+    select: { productId: true, status: true },
+  });
+
+  const map: Record<string, "PENDING" | "GRANTED"> = {};
+  for (const row of rows) {
+    if (row.status === "PENDING" || row.status === "GRANTED") {
+      map[row.productId] = row.status;
+    }
+  }
+  return map;
 }
 
 export async function addAppointmentToCart(params: {
@@ -209,6 +318,37 @@ export async function addAppointmentToCart(params: {
   return { ok: true };
 }
 
+export async function updateCartItemQuantity(
+  itemId: string,
+  quantity: number,
+): Promise<CartActionResult> {
+  const session = await requirePatient();
+  if (!session) return { ok: false, message: "No autorizado." };
+
+  const item = await prisma.cartItem.findFirst({
+    where: { id: itemId, userId: session.user.id },
+  });
+  if (!item) return { ok: false, message: "Ítem no encontrado." };
+  if (item.type !== "PRODUCT") {
+    return { ok: false, message: "Solo los productos admiten cantidad." };
+  }
+
+  const nextQty = Math.floor(quantity);
+  if (nextQty < 1) {
+    await prisma.cartItem.delete({ where: { id: itemId } });
+  } else if (nextQty > 99) {
+    return { ok: false, message: "Máximo 99 unidades por producto." };
+  } else {
+    await prisma.cartItem.update({
+      where: { id: itemId },
+      data: { quantity: nextQty },
+    });
+  }
+
+  revalidatePath("/dashboard/patient/cart");
+  return { ok: true };
+}
+
 export async function removeCartItem(itemId: string): Promise<CartActionResult> {
   const session = await requirePatient();
   if (!session) return { ok: false, message: "No autorizado." };
@@ -239,15 +379,39 @@ export async function submitCart(options?: {
       return { ok: false, message: "Tu carrito está vacío." };
     }
 
-    const hasPaidItems = items.some(
-      (i) =>
-        (i.type === "RESOURCE" && i.resource && i.resource.price.toNumber() > 0) ||
-        (i.type === "APPOINTMENT" &&
-          i.consultationType &&
-          i.consultationType.price.toNumber() > 0),
-    );
+    const productsCatalog = items.some((i) => i.type === "PRODUCT")
+      ? await getProducts()
+      : null;
 
-    if (hasPaidItems) {
+    const productItems = items
+      .filter(
+        (item): item is typeof item & { productId: string } =>
+          item.type === "PRODUCT" && !!item.productId,
+      )
+      .map((item) => {
+        const product = productsCatalog
+          ? findProductById(productsCatalog, item.productId)
+          : null;
+        if (!product) {
+          throw new Error("PRODUCT_UNAVAILABLE");
+        }
+        return {
+          productId: item.productId,
+          product,
+          quantity: item.quantity ?? 1,
+        };
+      });
+
+    const requiresPayment =
+      items.some(
+        (i) =>
+          (i.type === "RESOURCE" && i.resource && i.resource.price.toNumber() > 0) ||
+          (i.type === "APPOINTMENT" &&
+            i.consultationType &&
+            i.consultationType.price.toNumber() > 0),
+      ) || productItems.some((item) => item.product.price * (item.quantity ?? 1) > 0);
+
+    if (requiresPayment) {
       const policy = await getPaymentCheckoutPolicy();
       if (!options?.paymentMethod) {
         return { ok: false, message: "Selecciona un modo de pago." };
@@ -273,7 +437,7 @@ export async function submitCart(options?: {
       }
     }
 
-    const paymentPayload = hasPaidItems
+    const paymentPayload = requiresPayment
       ? {
           patientPaymentMethod: options!.paymentMethod!,
           patientPaymentReference: options!.paymentReference?.trim() ?? null,
@@ -339,6 +503,7 @@ export async function submitCart(options?: {
         resourceId: item.resourceId,
         resource: item.resource,
       })),
+      productItems,
       paymentPayload,
     });
 
@@ -368,11 +533,18 @@ export async function submitCart(options?: {
     revalidatePath("/dashboard/patient/cart");
     revalidatePath("/dashboard/patient/appointments");
     revalidatePath("/dashboard/patient/library");
+    revalidatePath("/dashboard/patient/products");
     revalidatePath("/dashboard/patient/progress");
     revalidatePath("/dashboard/notifications");
     revalidatePath("/dashboard/admin/payments");
     return { ok: true };
   } catch (err) {
+    if (err instanceof Error && err.message === "PRODUCT_UNAVAILABLE") {
+      return {
+        ok: false,
+        message: "Uno de los productos ya no está disponible. Actualizá el carrito.",
+      };
+    }
     console.error("[submitCart]", err);
     return {
       ok: false,

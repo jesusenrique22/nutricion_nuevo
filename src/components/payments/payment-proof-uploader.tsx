@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadFile } from "@/lib/client-upload";
 
 export function PaymentProofUploader({
   maxFiles = 1,
@@ -35,17 +35,11 @@ export function PaymentProofUploader({
     setUploading(true);
 
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const res = await fetch("/api/payments/upload-proof", {
-        method: "POST",
-        body: fd,
+      const { url } = await uploadFile(file, {
+        kind: "proof",
+        endpoint: "/api/payments/upload-proof",
       });
-      const data = await parseUploadResponse(res);
-      if (!data.url) {
-        throw new Error(data.error ?? "No se pudo subir la captura.");
-      }
-      onChange(singleFile ? [data.url] : [...urls, data.url]);
+      onChange(singleFile ? [url] : [...urls, url]);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al subir la captura.",
@@ -94,7 +88,7 @@ export function PaymentProofUploader({
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
             disabled={uploading}
             className="hidden"
             onChange={(e) => void handleFiles(e.target.files)}

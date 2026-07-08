@@ -17,6 +17,7 @@ import {
   authInputClass,
   authLabelClass,
 } from "@/components/auth/auth-shell";
+import { LoadingButton } from "@/components/ui/loading-button";
 
 type Step = "email" | "code" | "password";
 
@@ -144,9 +145,14 @@ function ForgotPasswordFlow() {
             Te enviaremos un código de 6 dígitos a tu correo. Válido por 15 minutos.
           </p>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={isPending} className={authButtonClass}>
-            {isPending ? "Enviando…" : "Enviar código"}
-          </button>
+          <LoadingButton
+            type="submit"
+            loading={isPending}
+            loadingLabel="Enviando…"
+            className={authButtonClass}
+          >
+            Enviar código
+          </LoadingButton>
           {devLink && (
             <p className="break-all rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Dev (sin SMTP): código visible en la URL:{" "}
@@ -181,9 +187,14 @@ function ForgotPasswordFlow() {
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={isPending} className={authButtonClass}>
-            {isPending ? "Verificando…" : "Verificar código"}
-          </button>
+          <LoadingButton
+            type="submit"
+            loading={isPending}
+            loadingLabel="Verificando…"
+            className={authButtonClass}
+          >
+            Verificar código
+          </LoadingButton>
           <button
             type="button"
             disabled={isPending}
@@ -213,9 +224,14 @@ function ForgotPasswordFlow() {
           />
           <p className="text-xs text-foreground/55">{PASSWORD_REQUIREMENTS_HINT}</p>
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="submit" disabled={isPending} className={authButtonClass}>
-            {isPending ? "Guardando…" : "Guardar nueva contraseña"}
-          </button>
+          <LoadingButton
+            type="submit"
+            loading={isPending}
+            loadingLabel="Guardando…"
+            className={authButtonClass}
+          >
+            Guardar nueva contraseña
+          </LoadingButton>
         </form>
       )}
     </AuthFormCard>

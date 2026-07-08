@@ -4,6 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import {
   gridFileMimeType,
+  getMongoFileMeta,
   openMongoFileStream,
 } from "@/server/services/mongo-storage";
 
@@ -46,7 +47,30 @@ export function guessContentKindFromUrl(
   const lower = url.toLowerCase();
   if (/\.(jpe?g|png|webp|gif)(\?|$)/.test(lower)) return "image";
   if (/\.(mp4|webm)(\?|$)/.test(lower)) return "video";
-  if (/\.pdf(\?|$)/.test(lower) || resourceType === "EBOOK") return "pdf";
+  if (/\.pdf(\?|$)/.test(lower)) return "pdf";
+  if (resourceType === "EBOOK" || resourceType === "PACKAGE") return "pdf";
+  return "unknown";
+}
+
+export async function guessContentKindFromStoredUrl(
+  url: string | null | undefined,
+  resourceType?: string,
+): Promise<"pdf" | "image" | "video" | "unknown"> {
+  const fromUrl = guessContentKindFromUrl(url, resourceType);
+  if (fromUrl !== "unknown") return fromUrl;
+
+  const mediaId = parseMediaIdFromUrl(url ?? "");
+  if (!mediaId) return "unknown";
+
+  const meta = await getMongoFileMeta(mediaId);
+  if (!meta) return "unknown";
+
+  const mime = gridFileMimeType(
+    meta.metadata as Record<string, unknown> | undefined,
+  );
+  if (mime === "application/pdf") return "pdf";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
   return "unknown";
 }
 

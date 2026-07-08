@@ -1,13 +1,39 @@
 import { auth } from "@/lib/auth";
+import {
+  AUTHENTICATED_MEDIA_FOLDERS,
+  isPublicMediaFolder,
+  isPublicUploadsFolder,
+  PUBLIC_MEDIA_FOLDERS,
+} from "@/lib/media-access-policy";
+import { isPublicSiteContentMedia } from "@/lib/public-site-media";
 import { isUploadsPath, parseMediaIdFromUrl } from "@/lib/stored-file";
 import { getMongoFileMeta } from "@/server/services/mongo-storage";
 import { prisma } from "@/server/db/prisma";
 
-type MediaFolder = "payment-proofs" | "resources" | string;
-
 function folderFromUploadPath(url: string): string | null {
   const match = url.match(/^\/uploads\/([^/]+)\//);
   return match?.[1] ?? null;
+}
+
+async function resolveGridFolder(url: string): Promise<string | null> {
+  const mediaId = parseMediaIdFromUrl(url);
+  if (!mediaId) return null;
+
+  const meta = await getMongoFileMeta(mediaId);
+  const metadata = meta?.metadata as Record<string, unknown> | undefined;
+  const fromMeta = metadata?.folder;
+  if (typeof fromMeta === "string" && fromMeta.trim()) {
+    return fromMeta.trim();
+  }
+
+  const asset = await prisma.mediaAsset.findFirst({
+    where: {
+      OR: [{ url }, { fileId: mediaId }],
+    },
+    select: { folder: true },
+  });
+
+  return asset?.folder ?? null;
 }
 
 async function isPublishedResourceCover(url: string): Promise<boolean> {
@@ -32,38 +58,37 @@ async function resourceGrantedForUser(
   return Boolean(purchase);
 }
 
-async function resourceGrantedForVideo(
-  userId: string,
-  videoUrl: string,
-): Promise<boolean> {
-  const purchase = await prisma.resourcePurchase.findFirst({
-    where: {
-      userId,
-      status: "GRANTED",
-      resource: { videoUrl },
-    },
-    select: { id: true },
-  });
-  return Boolean(purchase);
+async function isPublicMediaUrl(url: string): Promise<boolean> {
+  if (await isPublishedResourceCover(url)) return true;
+  if (await isPublicSiteContentMedia(url)) return true;
+
+  const gridFolder = await resolveGridFolder(url);
+  if (isPublicMediaFolder(gridFolder)) return true;
+
+  const uploadFolder = isUploadsPath(url) ? folderFromUploadPath(url) : null;
+  return isPublicUploadsFolder(uploadFolder);
 }
 
 /** Acceso a archivos en GridFS o /uploads según carpeta y rol. */
 export async function canAccessStoredMediaUrl(url: string): Promise<boolean> {
-  if (await isPublishedResourceCover(url)) return true;
+  if (await isPublicMediaUrl(url)) return true;
+
+  const gridFolder = await resolveGridFolder(url);
 
   const session = await auth();
-
   if (!session?.user?.id) return false;
 
   const isAdmin = session.user.role === "ADMIN";
   if (isAdmin) return true;
 
+  if (gridFolder && AUTHENTICATED_MEDIA_FOLDERS.has(gridFolder)) return true;
+
   const mediaId = parseMediaIdFromUrl(url);
   if (mediaId) {
+    const folder = gridFolder ?? "";
     const meta = await getMongoFileMeta(mediaId);
     if (!meta) return false;
     const metadata = meta.metadata as Record<string, unknown> | undefined;
-    const folder = (metadata?.folder as MediaFolder | undefined) ?? "";
     const ownerId = metadata?.ownerId as string | undefined;
 
     if (folder === "payment-proofs") {
@@ -86,6 +111,10 @@ export async function canAccessStoredMediaUrl(url: string): Promise<boolean> {
   }
 
   return false;
+}
+
+export async function isPublicStoredMediaUrl(url: string): Promise<boolean> {
+  return isPublicMediaUrl(url);
 }
 
 export async function canAccessResourceContent(
@@ -124,3 +153,6 @@ export async function canAccessResourceVideo(
 
   return canAccessResourceContent(resourceId);
 }
+
+// Re-export for tests / policy introspection
+export { PUBLIC_MEDIA_FOLDERS };

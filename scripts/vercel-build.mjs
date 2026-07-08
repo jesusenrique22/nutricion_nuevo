@@ -3,30 +3,7 @@
  * Build de producción: generate → migrate deploy (opcional) → next build.
  */
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-function loadEnvFile() {
-  const path = resolve(process.cwd(), ".env");
-  if (!existsSync(path)) return;
-
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    if (process.env[key] !== undefined) continue;
-    let val = trimmed.slice(eq + 1).trim();
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
-      val = val.slice(1, -1);
-    }
-    process.env[key] = val;
-  }
-}
+import { ensureDatabaseEnv } from "./ensure-database-env.mjs";
 
 function run(cmd) {
   console.log(`\n> ${cmd}\n`);
@@ -71,7 +48,7 @@ async function migrateDeployWithRetry() {
 
   for (let i = 1; i <= attempts; i++) {
     try {
-      run("pnpm exec prisma migrate deploy");
+      run("node scripts/prisma-cli.mjs migrate deploy");
       return;
     } catch {
       if (i < attempts) {
@@ -83,14 +60,23 @@ async function migrateDeployWithRetry() {
     }
   }
 
-  printNeonHelp();
-  process.exit(1);
+  console.warn(
+    "[migrate] TCP a Neon falló (P1001). Usando fallback WebSocket…",
+  );
+  try {
+    run("node scripts/migrate-deploy-ws.mjs");
+    return;
+  } catch {
+    printNeonHelp();
+    process.exit(1);
+  }
 }
 
 async function main() {
-  loadEnvFile();
+  ensureDatabaseEnv();
   run("node scripts/check-edge-boundaries.mjs");
-  run("pnpm exec prisma generate");
+  run("pnpm exec tsx scripts/check-production-env.ts");
+  run("node scripts/prisma-cli.mjs generate");
   await migrateDeployWithRetry();
   run("node scripts/check-db-schema.mjs");
   run("pnpm exec next build");

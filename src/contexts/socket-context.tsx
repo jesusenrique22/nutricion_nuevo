@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { io, type Socket } from "socket.io-client";
+import { getSocketClientUrl } from "@/lib/socket-config";
 
 const SocketContext = createContext<Socket | null>(null);
 
@@ -23,17 +24,7 @@ export function SocketProvider({
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const configured = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
-    const isBrowser = typeof window !== "undefined";
-    const onProdHost =
-      isBrowser && !/localhost|127\.0\.0\.1/.test(window.location.hostname);
-    const url =
-      configured && !(onProdHost && /localhost|127\.0\.0\.1/.test(configured))
-        ? configured
-        : onProdHost
-          ? null
-          : (configured ?? "http://localhost:3001");
-
+    const url = getSocketClientUrl();
     if (!url) return;
 
     const instance = io(url, {

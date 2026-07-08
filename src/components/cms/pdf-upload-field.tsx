@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadFile, uploadHint } from "@/lib/client-upload";
+import { DocumentIcon, ExternalLinkIcon } from "@/components/ui/link-icons";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -23,27 +24,14 @@ export function PdfUploadField({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleFile(file: File) {
-    if (file.type !== "application/pdf") {
-      setError("Solo se permiten archivos PDF.");
-      return;
-    }
+  const resolvedHint = hint ?? uploadHint("pdf");
 
+  async function handleFile(file: File) {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", folder);
-      const res = await fetch("/api/resources/upload", {
-        method: "POST",
-        body: fd,
-      });
-      const json = await parseUploadResponse(res);
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? "Error al subir");
-      }
-      onChange(json.url);
+      const { url } = await uploadFile(file, { folder, kind: "pdf" });
+      onChange(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir");
     } finally {
@@ -55,11 +43,9 @@ export function PdfUploadField({
     <div className="rounded-xl border border-foreground/10 bg-muted/20 p-3">
       <label className="block text-sm">
         <span className="font-semibold">{label}</span>
-        {hint && (
-          <span className="mt-0.5 block text-xs font-normal text-foreground/55">
-            {hint}
-          </span>
-        )}
+        <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+          {resolvedHint}
+        </span>
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -70,9 +56,7 @@ export function PdfUploadField({
 
       {value && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-white px-3 py-2.5 text-sm">
-          <span aria-hidden className="text-lg">
-            📄
-          </span>
+          <DocumentIcon className="h-5 w-5 shrink-0 text-primary/50" />
           <span className="min-w-0 flex-1 truncate text-foreground/70">
             {value.split("/").pop()}
           </span>
@@ -80,9 +64,10 @@ export function PdfUploadField({
             href={value}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 text-xs font-semibold text-primary hover:underline"
+            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
           >
-            Ver PDF ↗
+            Ver PDF
+            <ExternalLinkIcon className="h-3 w-3" />
           </a>
         </div>
       )}
@@ -110,7 +95,7 @@ export function PdfUploadField({
       <input
         ref={fileRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,.pdf"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

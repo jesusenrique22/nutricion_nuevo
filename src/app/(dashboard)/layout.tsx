@@ -5,6 +5,7 @@ import { BackgroundCharacters } from "@/components/brand/background-characters";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { RealtimeSync } from "@/components/realtime/realtime-sync";
 import { SocketProvider } from "@/contexts/socket-context";
+import { isSocketClientEnabled } from "@/lib/socket-config";
 import { getSession } from "@/server/queries/cached-dashboard";
 import { isPatientDeactivated } from "@/server/queries/patient-profile";
 import { getCartCount } from "@/server/actions/cart.actions";
@@ -36,6 +37,7 @@ export default async function DashboardLayout({
     { href: "/dashboard/patient/progress", label: "Mi progreso" },
     { href: "/dashboard/patient/appointments", label: "Mis citas" },
     { href: "/dashboard/patient/library", label: "Recursos" },
+    { href: "/dashboard/patient/products", label: "Productos" },
     { href: "/dashboard/patient/cart", label: "Carrito" },
   ];
   const links = isAdmin ? adminLinks : patientLinks;
@@ -49,21 +51,35 @@ export default async function DashboardLayout({
     </form>
   );
 
+  const socketEnabled = isSocketClientEnabled();
+
+  const dashboard = (
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden md:flex-row">
+      <DashboardSidebar
+        isAdmin={isAdmin}
+        links={links}
+        footer={signOutButton}
+        cartCount={cartCount}
+      />
+      <main className="scrollbar-stable relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background">
+        <BackgroundCharacters />
+        <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
+          <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-1 flex-col px-4 pt-4 pb-10 sm:px-6 sm:pt-6 sm:pb-12 md:px-8 md:pt-8 md:pb-14">
+            {children}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+
+  if (!socketEnabled) {
+    return dashboard;
+  }
+
   return (
     <SocketProvider userId={session.user.id} role={session.user.role}>
       <RealtimeSync />
-      <div className="flex h-dvh max-h-dvh flex-col overflow-hidden md:flex-row">
-        <DashboardSidebar
-          isAdmin={isAdmin}
-          links={links}
-          footer={signOutButton}
-          cartCount={cartCount}
-        />
-        <main className="scrollbar-stable relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-background px-4 pt-4 pb-10 sm:px-6 sm:pt-6 sm:pb-12 md:px-8 md:pt-8 md:pb-14">
-          <BackgroundCharacters />
-          <div className="relative z-10 min-h-0 w-full min-w-0 flex-1">{children}</div>
-        </main>
-      </div>
+      {dashboard}
     </SocketProvider>
   );
 }

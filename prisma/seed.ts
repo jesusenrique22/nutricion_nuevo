@@ -1,8 +1,7 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { prisma } from "../src/server/db/prisma";
 import { DEFAULT_FORM_TEMPLATES, SITE_CONTENT_DEFAULTS } from "./seed-data";
-
-const prisma = new PrismaClient();
 
 type ConsultationSeed = {
   code: string;

@@ -29,12 +29,24 @@ async function main() {
     const db = client.db(dbName);
     await db.command({ ping: 1 });
     const collections = await db.listCollections().toArray();
+
+    let gridCount = 0;
+    const hasMedia = collections.some((c) => c.name === "media.files");
+    if (hasMedia) {
+      const { GridFSBucket } = await import("mongodb");
+      const bucket = new GridFSBucket(db, { bucketName: "media" });
+      gridCount = await bucket.find({}).toArray().then((f) => f.length);
+    }
+
     console.log("\n✓ Conexión exitosa.");
     console.log(
       collections.length
         ? `✓ ${collections.length} colección(es): ${collections.map((c) => c.name).join(", ")}`
         : "✓ Base de datos vacía (normal en primera ejecución).",
     );
+    if (hasMedia) {
+      console.log(`✓ GridFS "media": ${gridCount} archivo(s)`);
+    }
   } catch (error) {
     console.error("\n✗ Error de conexión:\n");
     if (error instanceof Error) {

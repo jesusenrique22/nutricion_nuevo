@@ -8,4 +8,11 @@ export const createAppointmentSchema = z.object({
   recaptchaToken: z.string().min(1).optional(),
 });
 
+export const adminCreateAppointmentSchema = z.object({
+  patientId: z.string().min(1),
+  consultationTypeId: z.string().min(1, "Tipo de consulta requerido"),
+  startTime: z.string().datetime(),
+  modality: z.enum(["ONLINE", "PRESENCIAL"]),
+});
+
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;

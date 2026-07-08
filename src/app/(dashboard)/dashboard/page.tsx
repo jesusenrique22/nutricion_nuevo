@@ -1,7 +1,12 @@
 import { AdminDashboardCards } from "@/components/dashboard/admin-dashboard-cards";
+import { AdminDashboardOverviewPanel } from "@/components/dashboard/admin-dashboard-overview";
 import { PatientDashboardHome } from "@/components/dashboard/patient-dashboard-home";
-import { getAdminTodayDashboard } from "@/server/actions/dashboard.queries";
+import {
+  getAdminDashboardOverview,
+  getAdminTodayDashboard,
+} from "@/server/actions/dashboard.queries";
 import { getMyAppointments } from "@/server/actions/booking.queries";
+import { getMyAdminResource } from "@/server/actions/patient.queries";
 import { getCartCount } from "@/server/actions/cart.actions";
 import {
   getCachedUnreadNotificationCount,
@@ -15,11 +20,14 @@ export default async function DashboardHome() {
   const name = session?.user?.name ?? "";
   const isPatient = session?.user?.role === "PATIENT";
 
-  const [unreadNotifs, appointments, adminToday, cartCount] = await Promise.all([
+  const [unreadNotifs, appointments, adminToday, adminOverview, cartCount, adminResource] =
+    await Promise.all([
     getCachedUnreadNotificationCount(),
     isPatient ? getMyAppointments() : Promise.resolve([]),
     isPatient ? Promise.resolve(null) : getAdminTodayDashboard(),
+    isPatient ? Promise.resolve(null) : getAdminDashboardOverview(),
     isPatient ? getCartCount() : Promise.resolve(0),
+    isPatient ? getMyAdminResource() : Promise.resolve(null),
   ]);
 
   const upcomingCount = appointments.filter(
@@ -30,13 +38,13 @@ export default async function DashboardHome() {
 
   if (!isPatient && adminToday) {
     return (
-      <div className="flex min-h-[calc(100dvh-5.5rem)] flex-col sm:min-h-[calc(100dvh-7rem)]">
-        <div className="shrink-0">
-          <h1 className="text-2xl font-bold sm:text-3xl">Hola, {name} 👋</h1>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-accent">
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-xl font-bold sm:text-2xl">Hola, {name}</h1>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
             anttova
           </p>
-          <p className="mt-2 text-foreground/60">
+          <p className="mt-1.5 text-sm text-foreground/60">
             Este es tu panel. Usa el menú lateral para navegar.
           </p>
         </div>
@@ -45,6 +53,10 @@ export default async function DashboardHome() {
           data={adminToday}
           unreadNotifications={unreadNotifs}
         />
+
+        {adminOverview && (
+          <AdminDashboardOverviewPanel overview={adminOverview} />
+        )}
       </div>
     );
   }
@@ -55,6 +67,7 @@ export default async function DashboardHome() {
       upcomingAppointments={upcomingCount}
       unreadNotifications={unreadNotifs}
       cartCount={cartCount}
+      adminResource={adminResource}
     />
   );
 }

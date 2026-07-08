@@ -12,11 +12,10 @@ import { LANDING_IMAGES_SLUG, MAX_HERO_SLIDES } from "@/types/landing-images";
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
 
-type SectionId = "hero" | "gallery" | "plans" | "services" | "other";
+type SectionId = "hero" | "plans" | "services" | "other";
 
 const sections: { id: SectionId; label: string; hint: string }[] = [
   { id: "hero", label: LANDING_IMAGE_SECTION_LABELS.hero, hint: "Imágenes grandes que rotan en la portada." },
-  { id: "gallery", label: LANDING_IMAGE_SECTION_LABELS.gallery, hint: "Franja de fotos que aparece en la landing." },
   { id: "plans", label: LANDING_IMAGE_SECTION_LABELS.plans, hint: "Una imagen por tipo de consulta." },
   { id: "services", label: LANDING_IMAGE_SECTION_LABELS.services, hint: "Imágenes de cada servicio." },
   { id: "other", label: LANDING_IMAGE_SECTION_LABELS.other, hint: "Imagen de filosofía, marca y CTA final." },
@@ -190,38 +189,6 @@ export function LandingImagesEditor({
         )}
 
         {/* ── Gallery ── */}
-        {section === "gallery" && (
-          <div className="space-y-4">
-            {data.gallery.map((item, i) => (
-              <div key={i} className="flex gap-3 rounded-xl border border-foreground/10 p-3">
-                {item.src ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.src} alt={item.alt} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
-                ) : (
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-foreground/40">Foto {i + 1}</div>
-                )}
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold">Foto {i + 1}</span>
-                    <button type="button" onClick={() => update({ ...data, gallery: data.gallery.filter((_, idx) => idx !== i) })}
-                      className="text-xs font-semibold text-red-600 hover:underline">Eliminar</button>
-                  </div>
-                  <ImageUploadField label="" value={item.src}
-                    onChange={(src) => { const next = [...data.gallery]; next[i] = { ...item, src }; update({ ...data, gallery: next }); }} />
-                  <input value={item.alt} placeholder="Descripción de la foto"
-                    onChange={(e) => { const next = [...data.gallery]; next[i] = { ...item, alt: e.target.value }; update({ ...data, gallery: next }); }}
-                    className={inputClass} />
-                </div>
-              </div>
-            ))}
-            <button type="button"
-              onClick={() => update({ ...data, gallery: [...data.gallery, { src: "", alt: "Nueva imagen Anttova" }] })}
-              className="rounded-full border border-dashed border-foreground/25 px-4 py-2 text-sm font-semibold hover:border-primary hover:text-primary">
-              + Agregar foto
-            </button>
-          </div>
-        )}
-
         {/* ── Plans ── */}
         {section === "plans" && (
           <div className="space-y-4">

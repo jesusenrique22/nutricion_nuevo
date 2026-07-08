@@ -2,30 +2,49 @@ import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
 
-const contentSecurityPolicy = [
+// ── Content Security Policy ───────────────────────────────────────────────────
+// unsafe-eval es requerido por next-auth/jwt en dev; en prod se puede quitar
+// si no usás `eval` directamente.
+const cspDirectives = [
   "default-src 'self'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self'",
   "object-src 'none'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://www.recaptcha.net",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://res.cloudinary.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://*.upstash.io wss: https://www.google.com",
-  "frame-src 'self' https://www.google.com",
-].join("; ");
+  "connect-src 'self' https://*.upstash.io wss: https://www.google.com https://www.recaptcha.net",
+  "frame-src 'self' https://www.google.com https://www.recaptcha.net",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "media-src 'self' blob:",
+];
 
+const contentSecurityPolicy = cspDirectives.join("; ");
+
+// ── Security headers ──────────────────────────────────────────────────────────
 const securityHeaders = [
+  // Evita MIME-type sniffing
   { key: "X-Content-Type-Options", value: "nosniff" },
+  // Bloquea iframes desde otros orígenes
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  // Legado anti-XSS (cubierto por CSP, mantenemos por compat)
   { key: "X-XSS-Protection", value: "1; mode=block" },
+  // Controla referrer en cross-origin
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  {
-    key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
-  },
+  // Permisos de APIs del browser
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  // Política de apertura entre orígenes (protege contra Spectre/XS-Leaks)
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Política de embeddings (requerido para COEP isolation)
+  { key: "Cross-Origin-Embedder-Policy", value: "unsafe-none" },
+  // Solo permite recursos del mismo origen salvo explicit allow
+  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
+  // CSP
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  // HSTS solo en producción — fuerza HTTPS por 2 años + subdomains
   ...(isProduction
     ? [
         {
@@ -42,16 +61,46 @@ const useRecaptchaEnterprise = Boolean(
 );
 
 const nextConfig: NextConfig = {
+  // No enviar el header "X-Powered-By: Next.js" en producción
+  poweredByHeader: false,
+
   env: {
     NEXT_PUBLIC_RECAPTCHA_ENTERPRISE: useRecaptchaEnterprise ? "true" : "false",
   },
 
-  serverExternalPackages: ["@prisma/client", "prisma", "pdfjs-dist", "@napi-rs/canvas"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+    // Tiempo de caché para rutas prefetchadas (client-side navigation)
+    // static: páginas estáticas en el router cache  (default 5 min)
+    // dynamic: páginas dinámicas en el router cache (default 0 — desactivado)
+    // 30 s en dinámicas reduce round-trips al servidor sin stale-data notable.
+    staleTimes: {
+      dynamic: 30,
+      static: 300,
+    },
+  },
+
+  serverExternalPackages: [
+    "@prisma/client",
+    "prisma",
+    "pdfjs-dist",
+    "@napi-rs/canvas",
+    "@prisma/adapter-neon",
+    "@neondatabase/serverless",
+    "ws",
+  ],
 
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },
     ],
+    // Formatos modernos primero — reduce tamaño de imágenes ~30-50 %
+    formats: ["image/avif", "image/webp"],
+    // Dispositivos comunes: móvil, tablet, escritorio
+    deviceSizes: [390, 768, 1024, 1280, 1920],
+    imageSizes: [16, 32, 64, 128, 256],
   },
 
   async headers() {
@@ -59,6 +108,29 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      // Cache-Control agresivo para assets estáticos de Next.js
+      {
+        source: "/_next/static/(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
+
+  // Redirigir HTTP → HTTPS en producción (Vercel ya lo hace, pero doble protección)
+  async redirects() {
+    if (!isProduction) return [];
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "header", key: "x-forwarded-proto", value: "http" }],
+        destination: "https://anttova.com/:path*",
+        permanent: true,
       },
     ];
   },

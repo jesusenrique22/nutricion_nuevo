@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadFile, uploadHint } from "@/lib/client-upload";
+import { DocumentIcon, ExternalLinkIcon } from "@/components/ui/link-icons";
 
 function fileLabel(url: string) {
   return decodeURIComponent(url.split("/").pop() ?? "documento.pdf");
@@ -24,27 +25,14 @@ export function PdfListUploadField({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleFile(file: File) {
-    if (file.type !== "application/pdf") {
-      setError("Solo se permiten archivos PDF.");
-      return;
-    }
+  const resolvedHint = hint ?? uploadHint("pdf");
 
+  async function handleFile(file: File) {
     setUploading(true);
     setError(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", folder);
-      const res = await fetch("/api/resources/upload", {
-        method: "POST",
-        body: fd,
-      });
-      const json = await parseUploadResponse(res);
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? "Error al subir");
-      }
-      onChange([...values, json.url]);
+      const { url } = await uploadFile(file, { folder, kind: "pdf" });
+      onChange([...values, url]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir");
     } finally {
@@ -68,11 +56,9 @@ export function PdfListUploadField({
     <div className="rounded-xl border border-foreground/10 bg-muted/20 p-3">
       <div className="text-sm">
         <span className="font-semibold">{label}</span>
-        {hint && (
-          <span className="mt-0.5 block text-xs font-normal text-foreground/55">
-            {hint}
-          </span>
-        )}
+        <span className="mt-0.5 block text-xs font-normal text-foreground/55">
+          {resolvedHint}
+        </span>
       </div>
 
       {values.length > 0 ? (
@@ -82,9 +68,7 @@ export function PdfListUploadField({
               key={`${url}-${index}`}
               className="flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-white px-3 py-2.5 text-sm"
             >
-              <span aria-hidden className="text-lg">
-                📄
-              </span>
+              <DocumentIcon className="h-5 w-5 shrink-0 text-primary/50" />
               <span className="min-w-0 flex-1">
                 <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-foreground/45">
                   Parte {index + 1}
@@ -116,9 +100,10 @@ export function PdfListUploadField({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg border border-primary/20 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5"
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5"
                 >
-                  Ver ↗
+                  Ver
+                  <ExternalLinkIcon className="h-3 w-3" />
                 </a>
                 <button
                   type="button"
@@ -151,7 +136,7 @@ export function PdfListUploadField({
       <input
         ref={fileRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,.pdf"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];

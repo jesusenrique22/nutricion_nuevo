@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { paymentMethodLabel, type PaymentMethodId } from "@/lib/payment-methods";
+import { parseProofUrls } from "@/lib/payment-checkout-policy";
 import { prisma } from "@/server/db/prisma";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 
@@ -143,6 +145,144 @@ export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
   items.sort(
     (a, b) =>
       new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime(),
+  );
+
+  return items;
+}
+
+export type PatientPendingPaymentKind =
+  | "RESOURCE"
+  | "APPOINTMENT_ADVANCE"
+  | "APPOINTMENT_REMAINDER";
+
+export interface PatientPendingPaymentItem {
+  id: string;
+  kind: PatientPendingPaymentKind;
+  title: string;
+  subtitle: string;
+  amount: string;
+  createdAt: string;
+  paymentMethod: string | null;
+  patientReference: string | null;
+  patientNote: string | null;
+  proofUrls: string[];
+}
+
+function mapPaymentMethod(method: string | null | undefined): string | null {
+  if (!method) return null;
+  if (method === "zelle" || method === "mercado_pago") {
+    return paymentMethodLabel(method as PaymentMethodId);
+  }
+  return method;
+}
+
+/** Pagos en revisión del paciente autenticado. */
+export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const patientId = session.user.id;
+
+  const [resourceRows, appointmentRows] = await Promise.all([
+    prisma.resourcePurchase.findMany({
+      where: {
+        userId: patientId,
+        status: "PENDING",
+        inboxDismissedAt: null,
+      },
+      include: { resource: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.appointment.findMany({
+      where: {
+        patientId,
+        payment: {
+          OR: [
+            {
+              advanceStatus: "PENDING",
+              advanceInboxDismissedAt: null,
+            },
+            {
+              remainderStatus: "PENDING",
+              remainderInboxDismissedAt: null,
+            },
+          ],
+        },
+      },
+      include: { consultationType: true, payment: true },
+      orderBy: { startTime: "desc" },
+    }),
+  ]);
+
+  const items: PatientPendingPaymentItem[] = [];
+
+  for (const row of resourceRows) {
+    items.push({
+      id: `resource-${row.id}`,
+      kind: "RESOURCE",
+      title: row.resource.title,
+      subtitle: `Recurso · ${row.resource.type}`,
+      amount: row.pricePaid.toString(),
+      createdAt: row.createdAt.toISOString(),
+      paymentMethod: mapPaymentMethod(row.patientPaymentMethod),
+      patientReference: row.patientPaymentReference,
+      patientNote: row.patientPaymentNote,
+      proofUrls: parseProofUrls(row.patientPaymentProofUrls),
+    });
+  }
+
+  for (const appt of appointmentRows) {
+    if (!appt.payment) continue;
+    const payment = appt.payment;
+    const phases = toPaymentPhaseView(payment);
+    const dateLabel = new Date(appt.startTime).toLocaleString("es", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    if (
+      phases.advanceStatus === "PENDING" &&
+      Number(phases.advanceAmount) > 0 &&
+      !payment.advanceInboxDismissedAt
+    ) {
+      items.push({
+        id: `appt-advance-${appt.id}`,
+        kind: "APPOINTMENT_ADVANCE",
+        title: appt.consultationType.name,
+        subtitle: `Adelanto · Cita ${dateLabel}`,
+        amount: phases.advanceAmount,
+        createdAt: appt.createdAt.toISOString(),
+        paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),
+        patientReference: payment.patientPaymentReference,
+        patientNote: payment.patientPaymentNote,
+        proofUrls: parseProofUrls(payment.patientPaymentProofUrls),
+      });
+    }
+
+    if (
+      phases.remainderStatus === "PENDING" &&
+      Number(phases.remainderAmount) > 0 &&
+      !payment.remainderInboxDismissedAt
+    ) {
+      items.push({
+        id: `appt-remainder-${appt.id}`,
+        kind: "APPOINTMENT_REMAINDER",
+        title: appt.consultationType.name,
+        subtitle: `Saldo final · Cita ${dateLabel}`,
+        amount: phases.remainderAmount,
+        createdAt: appt.createdAt.toISOString(),
+        paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),
+        patientReference: payment.patientPaymentReference,
+        patientNote: payment.patientPaymentNote,
+        proofUrls: parseProofUrls(payment.patientPaymentProofUrls),
+      });
+    }
+  }
+
+  items.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   return items;

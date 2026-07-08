@@ -1,37 +1,59 @@
 import { ContentLobbyShell } from "@/components/brand/content-lobby-shell";
+import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { PersonalizarTabs } from "@/components/cms/personalizar-tabs";
 import {
   getPaymentCheckoutPolicyAdmin,
   getSiteContents,
 } from "@/server/actions/cms.actions";
 import { getAllResourcesAdmin } from "@/server/actions/resource.queries";
-import { getLandingImages } from "@/server/queries/landing.queries";
+import {
+  getLandingBlocks,
+  getLandingImages,
+  getNavMenu,
+  getProducts,
+} from "@/server/queries/landing.queries";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function PersonalizarPage() {
-  const [siteBlocks, resources, landingImages, nutricionistaPage, paymentCheckoutPolicy] =
-    await Promise.all([
-      getSiteContents(),
-      getAllResourcesAdmin(),
-      getLandingImages(),
-      getNutricionistaPage(),
-      getPaymentCheckoutPolicyAdmin(),
-    ]);
+  const [
+    siteBlocks,
+    resources,
+    landingImages,
+    landingBlocks,
+    navMenu,
+    products,
+    nutricionistaPage,
+    paymentCheckoutPolicy,
+  ] = await Promise.all([
+    getSiteContents(),
+    getAllResourcesAdmin(),
+    getLandingImages(),
+    getLandingBlocks(),
+    getNavMenu(),
+    getProducts(),
+    getNutricionistaPage(),
+    getPaymentCheckoutPolicyAdmin(),
+  ]);
 
   return (
-    <ContentLobbyShell
-      title="Personalizar sitio"
-      description="Edita imágenes, contenido de la página, CV y recursos digitales."
-    >
-      <PersonalizarTabs
+    <DashboardPage width="wide">
+      <ContentLobbyShell
+        title="Personalizar sitio"
+        description="Edita imágenes, contenido de la página, CV y recursos digitales."
+      >
+        <PersonalizarTabs
         siteBlocks={siteBlocks}
         resourceCount={resources.length}
         landingImages={landingImages}
+        landingBlocks={landingBlocks}
+        navMenu={navMenu}
+        products={products}
         nutricionistaPage={nutricionistaPage}
         paymentCheckoutPolicy={paymentCheckoutPolicy}
       />
-    </ContentLobbyShell>
+      </ContentLobbyShell>
+    </DashboardPage>
   );
 }

@@ -49,7 +49,12 @@ const REQUIRED_COLUMNS = {
     "patientPaymentNote",
     "patientPaymentProofUrls",
   ],
-  ConsultationType: ["isPublished", "sortOrder", "imageUrl"],
+  ProductPurchase: [
+    "productId",
+    "productName",
+    "inboxDismissedAt",
+    "inboxTrashedAt",
+  ],
 };
 
 async function main() {
@@ -66,15 +71,15 @@ async function main() {
     return;
   }
 
-  const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient();
+  const { createPrismaClient } = await import("./create-prisma-client.mjs");
+  const prisma = createPrismaClient();
 
   try {
     const missing = [];
 
     for (const [table, columns] of Object.entries(REQUIRED_COLUMNS)) {
       const rows = await prisma.$queryRawUnsafe(
-        `SELECT column_name
+        `SELECT column_name::text AS column_name
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = $1`,

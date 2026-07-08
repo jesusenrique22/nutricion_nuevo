@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useTransition } from "react";
 import { verifyEmail } from "@/server/actions/auth.actions";
+import { LoadingInline } from "@/components/ui/loading-indicator";
 
 function VerifyContent() {
   const params = useSearchParams();
@@ -32,7 +33,11 @@ function VerifyContent() {
   }, [token, email]);
 
   if (status === "loading") {
-    return <p className="mt-6 text-sm text-foreground/60">Verificando…</p>;
+    return (
+      <div className="mt-6">
+        <LoadingInline label="Verificando tu cuenta…" />
+      </div>
+    );
   }
 
   if (status === "error") {

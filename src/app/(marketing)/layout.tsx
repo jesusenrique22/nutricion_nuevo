@@ -1,13 +1,16 @@
 import { MarketingHeader } from "@/components/marketing/marketing-header";
+import { getNavMenu } from "@/server/queries/landing.queries";
 
-export default function MarketingLayout({
+export default async function MarketingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const navMenu = await getNavMenu();
+
   return (
     <div className="flex min-h-screen flex-col">
-      <MarketingHeader />
+      <MarketingHeader items={navMenu.items} />
 
       <main className="flex-1">{children}</main>
 

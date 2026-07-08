@@ -36,18 +36,29 @@ function GoogleCalendarConnectInner({
   const router = useRouter();
   const params = useSearchParams();
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">(
+    "info",
+  );
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     const gcal = params.get("gcal");
     const detail = params.get("gcal_detail");
     if (gcal && statusMessages[gcal]) {
+      setMessageTone(gcal === "connected" ? "success" : gcal === "error" ? "error" : "info");
       setMessage(
         detail ? `${statusMessages[gcal]} (${detail})` : statusMessages[gcal],
       );
       router.replace("/dashboard/admin/calendar", { scroll: false });
     }
   }, [params, router]);
+
+  const messageClassName =
+    messageTone === "success"
+      ? "mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900"
+      : messageTone === "error"
+        ? "mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-900"
+        : "mt-3 rounded-lg bg-muted px-3 py-2 text-xs";
 
   if (!configured) {
     return (
@@ -102,9 +113,11 @@ function GoogleCalendarConnectInner({
                     startTransition(async () => {
                       const result = await setDefaultCalendarAdminAction();
                       if (result.ok) {
+                        setMessageTone("success");
                         setMessage("Este calendario recibirá las nuevas citas.");
                         router.refresh();
                       } else {
+                        setMessageTone("error");
                         setMessage(result.message);
                       }
                     });
@@ -121,15 +134,30 @@ function GoogleCalendarConnectInner({
                   startTransition(async () => {
                     const result = await syncExistingAppointmentsAction();
                     if (result.ok) {
-                      setMessage(
-                        result.synced > 0
-                          ? `Sincronizadas ${result.synced} cita(s) con Google Calendar.`
-                          : result.failed > 0
-                            ? "No se pudieron sincronizar las citas. Revisá los logs en Vercel."
-                            : "No hay citas pendientes de sincronizar (desde hoy en adelante, no canceladas).",
-                      );
+                      if (result.synced > 0) {
+                        setMessageTone("success");
+                        setMessage(
+                          `Sincronizadas ${result.synced} cita(s) con Google Calendar.`,
+                        );
+                      } else if (result.failed > 0) {
+                        setMessageTone("error");
+                        setMessage(
+                          `No se pudieron sincronizar ${result.failed} cita(s). Revisá los logs del servidor.`,
+                        );
+                      } else if (result.alreadySynced > 0) {
+                        setMessageTone("success");
+                        setMessage(
+                          `Todo al día: ${result.alreadySynced} cita(s) futura(s) ya están en Google Calendar. Las nuevas se sincronizan solas al crearlas.`,
+                        );
+                      } else {
+                        setMessageTone("info");
+                        setMessage(
+                          "No hay citas programadas (desde hoy en adelante) para sincronizar.",
+                        );
+                      }
                       router.refresh();
                     } else {
+                      setMessageTone("error");
                       setMessage(result.message);
                     }
                   });
@@ -147,6 +175,7 @@ function GoogleCalendarConnectInner({
                       method: "POST",
                     });
                     router.refresh();
+                    setMessageTone("info");
                     setMessage("Google Calendar desconectado.");
                   });
                 }}
@@ -165,9 +194,7 @@ function GoogleCalendarConnectInner({
           )}
         </div>
       </div>
-      {message && (
-        <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs">{message}</p>
-      )}
+      {message && <p className={messageClassName}>{message}</p>}
     </div>
   );
 }

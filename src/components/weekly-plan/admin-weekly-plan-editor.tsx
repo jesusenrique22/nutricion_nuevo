@@ -11,7 +11,7 @@ import {
   type WeeklyPlanData,
 } from "@/types/weekly-plan";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
-import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadFile } from "@/lib/client-upload";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -43,16 +43,11 @@ export function AdminWeeklyPlanEditor({
     setUploading(true);
     setMessage(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "weekly-plans");
-      const res = await fetch("/api/resources/upload", {
-        method: "POST",
-        body: fd,
+      const { url } = await uploadFile(file, {
+        folder: "weekly-plans",
+        kind: "image",
       });
-      const json = await parseUploadResponse(res);
-      if (!res.ok || !json.url) throw new Error(json.error ?? "Error al subir");
-      setImageUrl(json.url);
+      setImageUrl(url);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Error al subir");
     } finally {

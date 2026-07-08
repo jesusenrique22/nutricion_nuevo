@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
 import { CurrencySelector } from "@/components/currency/currency-selector";
 import { showsPublicCurrencySelector } from "@/lib/currency/visibility";
+import { DEFAULT_NAV_MENU } from "@/lib/nav-menu-parse";
+import type { NavMenuItem } from "@/types/nav-menu";
 import {
   isLobbySectionId,
   scrollToLobbySection,
@@ -14,28 +16,54 @@ import {
 
 export type { LobbySectionId };
 
-const NAV: {
-  id: LobbySectionId | null;
-  href: string;
+/** Enlace ya resuelto para renderizar en el header. */
+type ResolvedNavItem = {
+  key: string;
   label: string;
-  matchPath?: string;
-}[] = [
-  { id: "inicio", href: "/#inicio", label: "Inicio" },
-  {
-    id: null,
-    href: "/nutricionista",
-    label: "Sobre mí",
-    matchPath: "/nutricionista",
-  },
-  { id: "paquetes", href: "/#paquetes", label: "Paquetes" },
-  {
-    id: null,
-    href: "/resources",
-    label: "Recursos",
-    matchPath: "/resources",
-  },
-  { id: "contacto", href: "/#contacto", label: "Contáctame" },
-];
+  href: string;
+  /** id de sección si el enlace hace scroll suave en la portada. */
+  sectionId: LobbySectionId | null;
+  /** ruta que marca el enlace como activo. */
+  matchPath: string | null;
+  external: boolean;
+};
+
+function resolveItems(items: NavMenuItem[]): ResolvedNavItem[] {
+  return items
+    .filter((item) => item.enabled && item.label.trim() && item.target.trim())
+    .map((item, index) => {
+      if (item.type === "external") {
+        return {
+          key: `${item.id}-${index}`,
+          label: item.label,
+          href: item.target,
+          sectionId: null,
+          matchPath: null,
+          external: true,
+        };
+      }
+      if (item.type === "page") {
+        return {
+          key: `${item.id}-${index}`,
+          label: item.label,
+          href: item.target.startsWith("/") ? item.target : `/${item.target}`,
+          sectionId: null,
+          matchPath: item.target.startsWith("/") ? item.target : `/${item.target}`,
+          external: false,
+        };
+      }
+      // section
+      const sectionId = isLobbySectionId(item.target) ? item.target : null;
+      return {
+        key: `${item.id}-${index}`,
+        label: item.label,
+        href: `/#${item.target}`,
+        sectionId,
+        matchPath: null,
+        external: false,
+      };
+    });
+}
 
 function navLinkClass(active: boolean) {
   return `rounded-full px-4 py-2 transition ${
@@ -45,10 +73,11 @@ function navLinkClass(active: boolean) {
   }`;
 }
 
-export function MarketingHeader() {
+export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const showCurrency = showsPublicCurrencySelector(pathname);
+  const navItems = resolveItems(items ?? DEFAULT_NAV_MENU.items);
 
   useEffect(() => {
     if (!isHome || typeof window === "undefined") return;
@@ -77,22 +106,32 @@ export function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-foreground/5 bg-surface/90 backdrop-blur-md">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
-        <BrandLogoLink href="/#inicio" />
+        <BrandLogoLink href="/#inicio" priority />
 
         <div className="hidden items-center gap-1 text-sm font-semibold md:flex">
-          {NAV.map((item) => {
-            const active = item.matchPath
-              ? item.matchPath === "/nutricionista"
-                ? pathname === "/nutricionista"
-                : pathname === item.matchPath
-              : false;
+          {navItems.map((item) => {
+            const active = item.matchPath ? pathname === item.matchPath : false;
 
-            if (item.id) {
+            if (item.external) {
+              return (
+                <a
+                  key={item.key}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={navLinkClass(false)}
+                >
+                  {item.label}
+                </a>
+              );
+            }
+
+            if (item.sectionId) {
               return (
                 <Link
-                  key={item.href}
+                  key={item.key}
                   href={item.href}
-                  onClick={(e) => handleSectionNav(e, item.id!)}
+                  onClick={(e) => handleSectionNav(e, item.sectionId!)}
                   className={navLinkClass(active)}
                 >
                   {item.label}
@@ -102,7 +141,7 @@ export function MarketingHeader() {
 
             return (
               <Link
-                key={item.href}
+                key={item.key}
                 href={item.href}
                 className={navLinkClass(active)}
               >
@@ -120,6 +159,7 @@ export function MarketingHeader() {
         </div>
 
         <MobileNav
+          items={navItems}
           isHome={isHome}
           pathname={pathname}
           showCurrency={showCurrency}
@@ -131,11 +171,13 @@ export function MarketingHeader() {
 }
 
 function MobileNav({
+  items,
   isHome,
   pathname,
   showCurrency,
   onSectionNav,
 }: {
+  items: ResolvedNavItem[];
   isHome: boolean;
   pathname: string;
   showCurrency: boolean;
@@ -183,20 +225,31 @@ function MobileNav({
               </button>
             </div>
             <div className="mt-6 flex flex-col gap-2 text-sm font-semibold">
-              {NAV.map((item) => {
-                const active = item.matchPath
-                  ? item.matchPath === "/nutricionista"
-                    ? pathname === "/nutricionista"
-                    : pathname === item.matchPath
-                  : false;
+              {items.map((item) => {
+                const active = item.matchPath ? pathname === item.matchPath : false;
 
-                if (item.id) {
+                if (item.external) {
+                  return (
+                    <a
+                      key={item.key}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={close}
+                      className="rounded-xl px-3 py-2.5 text-foreground/80 hover:bg-muted"
+                    >
+                      {item.label}
+                    </a>
+                  );
+                }
+
+                if (item.sectionId) {
                   return (
                     <Link
-                      key={item.href}
+                      key={item.key}
                       href={item.href}
                       onClick={(e) => {
-                        if (isHome) onSectionNav(e, item.id!);
+                        if (isHome) onSectionNav(e, item.sectionId!);
                         close();
                       }}
                       className={`rounded-xl px-3 py-2.5 ${active ? "bg-primary/10 text-primary" : "text-foreground/80 hover:bg-muted"}`}
@@ -208,7 +261,7 @@ function MobileNav({
 
                 return (
                   <Link
-                    key={item.href}
+                    key={item.key}
                     href={item.href}
                     onClick={close}
                     className={`rounded-xl px-3 py-2.5 ${active ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}

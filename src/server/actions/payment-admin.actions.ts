@@ -22,6 +22,7 @@ function revalidateAll(patientId?: string) {
   revalidatePath("/dashboard/admin/resources");
   revalidatePath("/dashboard/admin/calendar");
   revalidatePath("/dashboard/patient/library");
+  revalidatePath("/dashboard/patient/products");
   revalidatePath("/dashboard/patient/appointments");
   revalidatePath("/dashboard/patient/progress");
   if (patientId) {
@@ -113,6 +114,76 @@ export async function rejectResourcePayment(
       return { ok: true };
     },
     "No se pudo rechazar el pago del recurso.",
+  );
+}
+
+export async function approveProductPayment(params: {
+  purchaseId: string;
+  adminNote?: string;
+}): Promise<PaymentAdminActionResult> {
+  return runPaymentAdminAction(
+    "approveProductPayment",
+    async () => {
+      if (!(await requireAdmin())) {
+        return { ok: false, message: "No autorizado." };
+      }
+
+      const purchase = await prisma.productPurchase.findUnique({
+        where: { id: params.purchaseId },
+        select: { userId: true, status: true },
+      });
+      if (!purchase || purchase.status !== "PENDING") {
+        return { ok: false, message: "Solicitud no encontrada o ya procesada." };
+      }
+
+      await prisma.productPurchase.update({
+        where: { id: params.purchaseId },
+        data: {
+          status: "GRANTED",
+          grantedAt: new Date(),
+          adminNote: params.adminNote ?? null,
+        },
+      });
+
+      revalidateAll(purchase.userId);
+      return { ok: true };
+    },
+    "No se pudo aprobar el pago del producto.",
+  );
+}
+
+export async function rejectProductPayment(
+  purchaseId: string,
+): Promise<PaymentAdminActionResult> {
+  return runPaymentAdminAction(
+    "rejectProductPayment",
+    async () => {
+      if (!(await requireAdmin())) {
+        return { ok: false, message: "No autorizado." };
+      }
+
+      const purchase = await prisma.productPurchase.findUnique({
+        where: { id: purchaseId },
+        select: { userId: true, productId: true, status: true },
+      });
+      if (!purchase || purchase.status !== "PENDING") {
+        return { ok: false, message: "Solicitud no encontrada." };
+      }
+
+      await prisma.$transaction([
+        prisma.cartItem.deleteMany({
+          where: {
+            userId: purchase.userId,
+            productId: purchase.productId,
+          },
+        }),
+        prisma.productPurchase.delete({ where: { id: purchaseId } }),
+      ]);
+
+      revalidateAll(purchase.userId);
+      return { ok: true };
+    },
+    "No se pudo rechazar el pago del producto.",
   );
 }
 
@@ -231,6 +302,26 @@ export async function trashPaymentInboxItem(
         return { ok: true };
       }
 
+      if (parsed.kind === "PRODUCT") {
+        const purchase = await prisma.productPurchase.findUnique({
+          where: { id: parsed.purchaseId },
+          select: { userId: true, status: true, inboxDismissedAt: true },
+        });
+        if (
+          !purchase ||
+          purchase.status !== "PENDING" ||
+          purchase.inboxDismissedAt
+        ) {
+          return { ok: false, message: "Solicitud no encontrada." };
+        }
+        await prisma.productPurchase.update({
+          where: { id: parsed.purchaseId },
+          data: { inboxTrashedAt: now },
+        });
+        revalidateAll(purchase.userId);
+        return { ok: true };
+      }
+
       const payment = await prisma.payment.findUnique({
         where: { appointmentId: parsed.appointmentId },
         select: { appointment: { select: { patientId: true } } },
@@ -278,6 +369,22 @@ export async function restorePaymentInboxItem(
           return { ok: false, message: "Solicitud no encontrada." };
         }
         await prisma.resourcePurchase.update({
+          where: { id: parsed.purchaseId },
+          data: { inboxTrashedAt: null },
+        });
+        revalidateAll(purchase.userId);
+        return { ok: true };
+      }
+
+      if (parsed.kind === "PRODUCT") {
+        const purchase = await prisma.productPurchase.findUnique({
+          where: { id: parsed.purchaseId },
+          select: { userId: true, status: true },
+        });
+        if (!purchase || purchase.status !== "PENDING") {
+          return { ok: false, message: "Solicitud no encontrada." };
+        }
+        await prisma.productPurchase.update({
           where: { id: parsed.purchaseId },
           data: { inboxTrashedAt: null },
         });
@@ -341,6 +448,29 @@ export async function permanentlyDeletePaymentInboxItem(
           };
         }
         await prisma.resourcePurchase.update({
+          where: { id: parsed.purchaseId },
+          data: { inboxDismissedAt: now, inboxTrashedAt: null },
+        });
+        revalidateAll(purchase.userId);
+        return { ok: true };
+      }
+
+      if (parsed.kind === "PRODUCT") {
+        const purchase = await prisma.productPurchase.findUnique({
+          where: { id: parsed.purchaseId },
+          select: { userId: true, status: true, inboxTrashedAt: true },
+        });
+        if (
+          !purchase ||
+          purchase.status !== "PENDING" ||
+          !purchase.inboxTrashedAt
+        ) {
+          return {
+            ok: false,
+            message: "Solo podés eliminar ítems en la papelera.",
+          };
+        }
+        await prisma.productPurchase.update({
           where: { id: parsed.purchaseId },
           data: { inboxDismissedAt: now, inboxTrashedAt: null },
         });

@@ -15,6 +15,7 @@ import type {
   PaymentSplitMode,
   SinglePaymentTiming,
 } from "@/types/payment-chat-policy";
+import { IntegerInput } from "@/components/ui/integer-input";
 
 type ConsultationCode = ConsultationPaymentRule["consultationCode"];
 
@@ -176,17 +177,16 @@ export function PaymentChatPolicyEditor({
                     ) : (
                       <label className="block text-sm">
                         <span className="font-semibold">Adelanto (%)</span>
-                        <input
-                          type="number"
+                        <IntegerInput
                           min={1}
                           max={99}
+                          emptyWhenZero={false}
                           value={rule.advancePercent}
-                          onChange={(e) =>
-                            patchRule(code, {
-                              advancePercent: Number(e.target.value),
-                            })
+                          onChange={(advancePercent) =>
+                            patchRule(code, { advancePercent })
                           }
                           className={inputClass}
+                          placeholder="50"
                         />
                         <span className="mt-1 block text-xs text-foreground/50">
                           Saldo: {100 - rule.advancePercent}%

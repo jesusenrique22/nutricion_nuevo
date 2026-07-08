@@ -32,8 +32,12 @@ next-env.d.ts
 .env.backup
 .env.*.backup
 
-# vercel
+# vercel (deploy de producción)
 .vercel
+
+# render — descartado; ignorar si queda algún archivo local
+render.yaml
+render.toml
 
 # debug / logs
 npm-debug.log*
@@ -60,6 +64,7 @@ _tmp_*
 .vscode/
 .idea/
 .cursor/
+.cursor/plans/
 
 # handoff / notas locales de sesión
 HANDOFF-CONTEXTO-CHAT.txt
@@ -78,8 +83,10 @@ Anttova _ Brandbook/
 /public/pdf/
 
 # uploads generados en runtime
-/public/uploads/
+/public/uploads/*
 /uploads/
+!/public/uploads/site/
+!/public/uploads/site/**
 
 # prisma — bases locales de desarrollo
 *.db

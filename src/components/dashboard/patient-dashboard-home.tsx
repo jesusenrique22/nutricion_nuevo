@@ -1,17 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { PatientAdminResourceCard } from "@/components/patient/patient-admin-resource-card";
+import { ArrowRightIcon } from "@/components/ui/link-icons";
+import type { PatientAdminResourceDTO } from "@/server/actions/patient.queries";
 
 export function PatientDashboardHome({
   userName,
   upcomingAppointments,
   unreadNotifications,
   cartCount,
+  adminResource,
 }: {
   userName: string;
   upcomingAppointments: number;
   unreadNotifications: number;
   cartCount: number;
+  adminResource: PatientAdminResourceDTO | null;
 }) {
   const firstName = userName.split(" ")[0] ?? userName;
 
@@ -37,7 +42,7 @@ export function PatientDashboardHome({
   ];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10 pb-2">
+    <div className="space-y-10 pb-2">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/50">
           Anttova — tu proceso empieza aquí
@@ -49,12 +54,20 @@ export function PatientDashboardHome({
         {unreadNotifications > 0 && (
           <Link
             href="/dashboard/notifications"
-            className="mt-4 inline-block text-sm font-semibold text-accent"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-accent"
           >
-            {unreadNotifications} notificaciones sin leer →
+            {unreadNotifications} notificaciones sin leer
+            <ArrowRightIcon className="h-3.5 w-3.5" />
           </Link>
         )}
       </div>
+
+      {adminResource && (
+        <PatientAdminResourceCard
+          url={adminResource.url}
+          note={adminResource.note}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-foreground/10 bg-white p-5">

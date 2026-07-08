@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ──────────────────────────────────────────────
@@ -51,6 +52,7 @@ enum ResourceAccessStatus {
 enum CartItemType {
   RESOURCE
   APPOINTMENT
+  PRODUCT
 }
 
 enum PaymentStatus {
@@ -66,6 +68,15 @@ enum RefundStatus {
   REQUESTED
   APPROVED
   DENIED
+}
+
+enum NotificationType {
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_CANCELLED
+  RESOURCE_UNLOCKED
+  REFUND_REQUESTED
+  REFUND_RESOLVED
 }
 
 // ──────────────────────────────────────────────
@@ -88,8 +99,10 @@ model User {
   patientProfile PatientProfile?
   appointments   Appointment[]      @relation("PatientAppointments")
   purchases ResourcePurchase[]
+  productPurchases ProductPurchase[]
   cartItems   CartItem[]
   weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
+  notifications  Notification[]
 
   accounts Account[]
   sessions Session[]
@@ -115,6 +128,10 @@ model PatientProfile {
   // Flag clave para decidir Intake vs Follow-up (Módulo 1)
   hasCompletedIntake Boolean @default(false)
   hiddenFromAdminList Boolean @default(false)
+
+  /** Enlace externo (Drive, etc.) que la doctora asigna al paciente. */
+  adminResourceUrl  String?
+  adminResourceNote String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -512,6 +529,30 @@ model ResourcePurchase {
   @@index([status])
 }
 
+model ProductPurchase {
+  id                      String               @id @default(cuid())
+  userId                  String
+  user                    User                 @relation(fields: [userId], references: [id])
+  productId               String
+  productName             String
+  quantity                Int                  @default(1)
+  pricePaid               Decimal              @db.Decimal(10, 2)
+  currency                String               @default("ARS")
+  status                  ResourceAccessStatus @default(PENDING)
+  adminNote               String?
+  patientPaymentMethod    String?
+  patientPaymentReference String?
+  patientPaymentNote      String?
+  patientPaymentProofUrls Json?
+  grantedAt               DateTime?
+  inboxTrashedAt          DateTime?
+  inboxDismissedAt        DateTime?
+  createdAt               DateTime             @default(now())
+
+  @@unique([userId, productId])
+  @@index([status])
+}
+
 model CartItem {
   id                 String                @id @default(cuid())
   userId             String
@@ -521,11 +562,14 @@ model CartItem {
   resource           Resource?             @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   consultationTypeId String?
   consultationType   ConsultationType?     @relation(fields: [consultationTypeId], references: [id])
+  productId          String?
+  quantity           Int                   @default(1)
   appointmentStart   DateTime?
   modality           ConsultationModality?
   createdAt          DateTime              @default(now())
 
   @@unique([userId, resourceId])
+  @@unique([userId, productId])
   @@index([userId])
 }
 
@@ -579,4 +623,23 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// ──────────────────────────────────────────────
+// Notificaciones in-app (panel)
+// ──────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  recipient   User             @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  body        String           @db.Text
+  payload     Json?
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  @@index([recipientId, isRead, createdAt(sort: Desc)])
+  @@index([recipientId, createdAt(sort: Desc)])
 }

@@ -143,13 +143,21 @@ export async function syncAppointmentToGoogleCalendar(
 /** Sincroniza citas existentes que aún no tienen evento en Google Calendar. */
 export async function syncUnsyncedAppointmentsForAdmin(
   adminUserId: string,
-): Promise<{ synced: number; failed: number }> {
+): Promise<{ synced: number; failed: number; alreadySynced: number }> {
   const hasConnection = await adminHasGoogleConnection(adminUserId);
   if (!hasConnection) {
-    return { synced: 0, failed: 0 };
+    return { synced: 0, failed: 0, alreadySynced: 0 };
   }
 
   const since = getCalendarSyncFromDate();
+
+  const alreadySynced = await prisma.appointment.count({
+    where: {
+      status: { not: "CANCELLED" },
+      googleEventId: { not: null },
+      startTime: { gte: since },
+    },
+  });
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -157,20 +165,24 @@ export async function syncUnsyncedAppointmentsForAdmin(
       googleEventId: null,
       startTime: { gte: since },
     },
-    select: { id: true },
+    select: { id: true, startTime: true },
     orderBy: { startTime: "asc" },
   });
 
   let synced = 0;
   let failed = 0;
 
-  for (const { id } of appointments) {
-    const ok = await syncAppointmentToGoogleCalendar(id);
+  for (const appt of appointments) {
+    if (!isAppointmentEligibleForGoogleSync(appt.startTime)) {
+      continue;
+    }
+
+    const ok = await syncAppointmentToGoogleCalendar(appt.id);
     if (ok) synced++;
     else failed++;
   }
 
-  return { synced, failed };
+  return { synced, failed, alreadySynced };
 }
 
 /** Elimina el evento de Google al cancelar. */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { signIn } from "next-auth/react";
 import {
@@ -13,10 +13,13 @@ import {
   authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
-import { safeRouterPush } from "@/lib/safe-router";
+import { LoadingButton } from "@/components/ui/loading-button";
+
+function redirectAfterLogin() {
+  window.location.assign(`${window.location.origin}/dashboard`);
+}
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const resetOk = params.get("reset") === "1";
   const registered = params.get("registered") === "1";
@@ -34,8 +37,8 @@ function LoginForm() {
       password: form.get("password"),
       redirect: false,
     });
-    setLoading(false);
     if (res?.error) {
+      setLoading(false);
       if (res.error === "EMAIL_NOT_VERIFIED") {
         setError(
           "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
@@ -51,8 +54,7 @@ function LoginForm() {
       setError("Credenciales inválidas.");
       return;
     }
-    router.refresh();
-    safeRouterPush(router, "/dashboard");
+    redirectAfterLogin();
   }
 
   return (
@@ -117,13 +119,14 @@ function LoginForm() {
             )}
           </div>
         )}
-        <button
+        <LoadingButton
           type="submit"
-          disabled={loading}
+          loading={loading}
+          loadingLabel="Ingresando…"
           className={authButtonClass}
         >
-          {loading ? "Ingresando…" : "Iniciar sesión"}
-        </button>
+          Iniciar sesión
+        </LoadingButton>
       </form>
     </AuthFormCard>
   );

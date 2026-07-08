@@ -9,6 +9,8 @@ import {
 } from "@/server/actions/cms.actions";
 import type { ConsultationAdminDTO } from "@/server/actions/cms.actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DecimalInput } from "@/components/ui/decimal-input";
+import { IntegerInput } from "@/components/ui/integer-input";
 
 const inputClass =
   "mt-1.5 w-full rounded-xl border border-foreground/15 px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";
@@ -34,6 +36,21 @@ export function ConsultationPricesEditor({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [newPrice, setNewPrice] = useState(0);
+  const [newDuration, setNewDuration] = useState(60);
+  const [editPrice, setEditPrice] = useState(0);
+  const [editDuration, setEditDuration] = useState(60);
+  const [editSortOrder, setEditSortOrder] = useState(0);
+
+  const active = types.find((t) => t.id === activeId);
+
+  useEffect(() => {
+    if (active) {
+      setEditPrice(Number(active.price) || 0);
+      setEditDuration(active.durationMinutes);
+      setEditSortOrder(active.sortOrder);
+    }
+  }, [active?.id, active?.price, active?.durationMinutes, active?.sortOrder]);
 
   useEffect(() => {
     if (types.length === 0) {
@@ -44,8 +61,6 @@ export function ConsultationPricesEditor({
       setActiveId(types[0].id);
     }
   }, [types, activeId]);
-
-  const active = types.find((t) => t.id === activeId);
 
   if (!active && !showCreate) {
     return (
@@ -78,6 +93,10 @@ export function ConsultationPricesEditor({
           onClick={() => {
             setShowCreate((v) => !v);
             setMessage(null);
+            if (!showCreate) {
+              setNewPrice(0);
+              setNewDuration(60);
+            }
           }}
           className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
         >
@@ -138,25 +157,27 @@ export function ConsultationPricesEditor({
             </label>
             <label className="block text-sm">
               <span className="font-semibold">Precio ($)</span>
-              <input
+              <DecimalInput
                 name="price"
-                type="number"
-                min={0}
-                step="0.01"
                 required
+                value={newPrice}
+                onChange={setNewPrice}
                 className={inputClass}
+                placeholder="Ej: 45000 o 45,50"
               />
             </label>
             <label className="block text-sm">
               <span className="font-semibold">Duración (min)</span>
-              <input
+              <IntegerInput
                 name="durationMinutes"
-                type="number"
+                required
                 min={15}
                 max={240}
-                defaultValue={60}
-                required
+                value={newDuration}
+                onChange={setNewDuration}
+                emptyWhenZero={false}
                 className={inputClass}
+                placeholder="60"
               />
             </label>
             <label className="block text-sm sm:col-span-2">
@@ -284,35 +305,35 @@ export function ConsultationPricesEditor({
               </label>
               <label className="block text-sm">
                 <span className="font-semibold">Precio ($)</span>
-                <input
+                <DecimalInput
                   name="price"
-                  type="number"
-                  min={0}
-                  step="0.01"
                   required
-                  defaultValue={active.price}
+                  value={editPrice}
+                  onChange={setEditPrice}
                   className={inputClass}
+                  placeholder="Ej: 45000 o 45,50"
                 />
               </label>
               <label className="block text-sm">
                 <span className="font-semibold">Duración (minutos)</span>
-                <input
+                <IntegerInput
                   name="durationMinutes"
-                  type="number"
+                  required
                   min={15}
                   max={240}
-                  required
-                  defaultValue={active.durationMinutes}
+                  value={editDuration}
+                  onChange={setEditDuration}
+                  emptyWhenZero={false}
                   className={inputClass}
                 />
               </label>
               <label className="block text-sm">
                 <span className="font-semibold">Orden en lobby</span>
-                <input
+                <IntegerInput
                   name="sortOrder"
-                  type="number"
                   min={0}
-                  defaultValue={active.sortOrder}
+                  value={editSortOrder}
+                  onChange={setEditSortOrder}
                   className={inputClass}
                 />
               </label>

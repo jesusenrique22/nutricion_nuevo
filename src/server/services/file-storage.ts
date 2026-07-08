@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isMongoConfigured, tryGetMongoDb } from "@/server/db/mongo";
 import { uploadToMongo } from "@/server/services/mongo-storage";
 
 export type StoredFile = {
@@ -10,7 +11,7 @@ export type StoredFile = {
 };
 
 function hasMongoUri(): boolean {
-  return Boolean(process.env.MONGODB_URI?.trim());
+  return isMongoConfigured();
 }
 
 async function storeLocalFile(
@@ -35,7 +36,7 @@ export async function storePublicFile(
   folder: string,
   options?: { ownerId?: string },
 ): Promise<StoredFile> {
-  if (hasMongoUri()) {
+  if (hasMongoUri() && (await tryGetMongoDb())) {
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
       const uploaded = await uploadToMongo(buffer, {
@@ -57,6 +58,10 @@ export async function storePublicFile(
         err instanceof Error ? err.message : err,
       );
     }
+  } else if (hasMongoUri() && process.env.VERCEL === "1") {
+    throw new Error(
+      "MongoDB no está disponible. Revisá MONGODB_URI en Vercel o Atlas.",
+    );
   } else if (process.env.VERCEL === "1") {
     throw new Error(
       "MONGODB_URI no está configurado. Es necesario para subir archivos en producción.",

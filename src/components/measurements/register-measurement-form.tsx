@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createAnthropometryMeasurement } from "@/server/actions/measurement.actions";
+import { DecimalInput } from "@/components/ui/decimal-input";
 
 export function RegisterMeasurementForm({
   patientId,
@@ -16,6 +17,30 @@ export function RegisterMeasurementForm({
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [formKey, setFormKey] = useState(0);
+  const [weight, setWeight] = useState(0);
+  const [bodyFatPct, setBodyFatPct] = useState(0);
+  const [muscleMass, setMuscleMass] = useState(0);
+  const [waist, setWaist] = useState(0);
+  const [hip, setHip] = useState(0);
+
+  function resetFields() {
+    setWeight(0);
+    setBodyFatPct(0);
+    setMuscleMass(0);
+    setWaist(0);
+    setHip(0);
+    setFormKey((k) => k + 1);
+  }
+
+  function optionalMeasurement(
+    fd: FormData,
+    name: string,
+    current: number,
+  ): string | undefined {
+    if (current <= 0) return undefined;
+    return fd.get(name)?.toString() || undefined;
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -27,11 +52,11 @@ export function RegisterMeasurementForm({
         patientId,
         appointmentId,
         measuredAt: fd.get("measuredAt")?.toString() || undefined,
-        weight: fd.get("weight")?.toString() || undefined,
-        bodyFatPct: fd.get("bodyFatPct")?.toString() || undefined,
-        muscleMass: fd.get("muscleMass")?.toString() || undefined,
-        waist: fd.get("waist")?.toString() || undefined,
-        hip: fd.get("hip")?.toString() || undefined,
+        weight: optionalMeasurement(fd, "weight", weight),
+        bodyFatPct: optionalMeasurement(fd, "bodyFatPct", bodyFatPct),
+        muscleMass: optionalMeasurement(fd, "muscleMass", muscleMass),
+        waist: optionalMeasurement(fd, "waist", waist),
+        hip: optionalMeasurement(fd, "hip", hip),
         notes: fd.get("notes")?.toString() || undefined,
       });
 
@@ -41,7 +66,7 @@ export function RegisterMeasurementForm({
       }
 
       setMessage("Medición registrada.");
-      (e.target as HTMLFormElement).reset();
+      resetFields();
       router.refresh();
     });
   }
@@ -50,7 +75,11 @@ export function RegisterMeasurementForm({
     "w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
 
   return (
-    <form onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-4"}>
+    <form
+      key={formKey}
+      onSubmit={handleSubmit}
+      className={compact ? "space-y-3" : "space-y-4"}
+    >
       <div
         className={
           compact
@@ -68,58 +97,58 @@ export function RegisterMeasurementForm({
         </label>
         <label className="block text-sm">
           <span className="font-semibold">Peso (kg)</span>
-          <input
-            type="number"
+          <DecimalInput
             name="weight"
-            step="0.1"
-            min="0"
-            placeholder="Ej. 72.5"
+            value={weight}
+            onChange={setWeight}
+            maxDecimals={1}
             className={`mt-1 ${inputClass}`}
+            placeholder="Ej. 72,5"
           />
         </label>
         <label className="block text-sm">
           <span className="font-semibold">% Grasa</span>
-          <input
-            type="number"
+          <DecimalInput
             name="bodyFatPct"
-            step="0.1"
-            min="0"
-            max="100"
-            placeholder="Ej. 22.4"
+            value={bodyFatPct}
+            onChange={setBodyFatPct}
+            max={100}
+            maxDecimals={1}
             className={`mt-1 ${inputClass}`}
+            placeholder="Ej. 22,4"
           />
         </label>
         <label className="block text-sm">
           <span className="font-semibold">Masa muscular (kg)</span>
-          <input
-            type="number"
+          <DecimalInput
             name="muscleMass"
-            step="0.1"
-            min="0"
-            placeholder="Ej. 35.2"
+            value={muscleMass}
+            onChange={setMuscleMass}
+            maxDecimals={1}
             className={`mt-1 ${inputClass}`}
+            placeholder="Ej. 35,2"
           />
         </label>
         <label className="block text-sm">
           <span className="font-semibold">Cintura (cm)</span>
-          <input
-            type="number"
+          <DecimalInput
             name="waist"
-            step="0.1"
-            min="0"
-            placeholder="Ej. 78"
+            value={waist}
+            onChange={setWaist}
+            maxDecimals={1}
             className={`mt-1 ${inputClass}`}
+            placeholder="Ej. 78"
           />
         </label>
         <label className="block text-sm">
           <span className="font-semibold">Cadera (cm)</span>
-          <input
-            type="number"
+          <DecimalInput
             name="hip"
-            step="0.1"
-            min="0"
-            placeholder="Ej. 98"
+            value={hip}
+            onChange={setHip}
+            maxDecimals={1}
             className={`mt-1 ${inputClass}`}
+            placeholder="Ej. 98"
           />
         </label>
       </div>

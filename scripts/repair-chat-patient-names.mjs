@@ -3,10 +3,10 @@
  * Sincroniza nombres de pacientes en conversaciones de MongoDB con PostgreSQL.
  * Uso: node scripts/repair-chat-patient-names.mjs
  */
-import { PrismaClient } from "@prisma/client";
+import { createPrismaClient } from "./create-prisma-client.mjs";
 import { MongoClient } from "mongodb";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 const mongoUri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB ?? "nutricion_chat";
 

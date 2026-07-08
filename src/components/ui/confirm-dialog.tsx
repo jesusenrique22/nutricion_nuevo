@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { LoadingButton } from "@/components/ui/loading-button";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -104,15 +105,17 @@ export function ConfirmDialog({
             >
               {cancelLabel}
             </button>
-            <button
+            <LoadingButton
               ref={confirmRef}
               type="button"
-              disabled={loading}
+              loading={loading}
+              loadingLabel="Procesando…"
+              indicatorVariant="onPrimary"
               onClick={onConfirm}
               className={confirmClass}
             >
-              {loading ? "Procesando…" : confirmLabel}
-            </button>
+              {confirmLabel}
+            </LoadingButton>
           </div>
         </div>
       </div>

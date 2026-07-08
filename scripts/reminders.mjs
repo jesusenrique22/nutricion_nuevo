@@ -2,10 +2,9 @@
  * Ejecuta recordatorios de citas sin depender de Vercel Cron ni servicios pagos.
  * Uso: npm run reminders
  */
-import { PrismaClient } from "@prisma/client";
-import { MongoClient } from "mongodb";
+import { createPrismaClient } from "./create-prisma-client.mjs";
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 const REMINDER_HOURS_AHEAD = 24;
 const WINDOW_MINUTES = 30;
 
@@ -14,10 +13,6 @@ function fmtTime(date) {
 }
 
 async function main() {
-  const mongoUri = process.env.MONGODB_URI;
-  const mongoDbName = process.env.MONGODB_DB ?? "nutricion_chat";
-  let mongo = null;
-
   const now = new Date();
   const target = new Date(now.getTime() + REMINDER_HOURS_AHEAD * 60 * 60 * 1000);
   const windowMs = WINDOW_MINUTES * 60 * 1000;
@@ -39,14 +34,9 @@ async function main() {
     return;
   }
 
-  if (mongoUri) {
-    mongo = new MongoClient(mongoUri);
-    await mongo.connect();
-    const db = mongo.db(mongoDbName);
-    const col = db.collection("notifications");
-
-    for (const appt of appointments) {
-      await col.insertOne({
+  for (const appt of appointments) {
+    await prisma.notification.create({
+      data: {
         recipientId: appt.patientId,
         type: "APPOINTMENT_REMINDER",
         title: "Recordatorio de cita",
@@ -55,19 +45,15 @@ async function main() {
           deepLink: "/dashboard/patient/appointments",
           appointmentId: appt.id,
         },
-        isRead: false,
-        createdAt: new Date(),
-      });
+      },
+    });
 
-      await prisma.appointment.update({
-        where: { id: appt.id },
-        data: { reminderSentAt: new Date() },
-      });
+    await prisma.appointment.update({
+      where: { id: appt.id },
+      data: { reminderSentAt: new Date() },
+    });
 
-      console.log(`Recordatorio enviado: ${appt.id}`);
-    }
-  } else {
-    console.warn("MONGODB_URI no configurado — solo marcaría citas sin notificar.");
+    console.log(`Recordatorio enviado: ${appt.id}`);
   }
 
   console.log(`Total: ${appointments.length} recordatorio(s).`);

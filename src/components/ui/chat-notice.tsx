@@ -1,6 +1,11 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  CloseIcon,
+  InfoIcon,
+  WarningIcon,
+} from "@/components/ui/link-icons";
 
 export function ChatNotice({
   message,
@@ -28,8 +33,12 @@ export function ChatNotice({
                 : "border-primary/15 bg-white text-foreground"
             }`}
           >
-            <span className="text-lg leading-none">
-              {variant === "error" ? "⚠️" : "ℹ️"}
+            <span className="shrink-0">
+              {variant === "error" ? (
+                <WarningIcon className="h-5 w-5 text-red-600" />
+              ) : (
+                <InfoIcon className="h-5 w-5 text-primary" />
+              )}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">
@@ -40,10 +49,10 @@ export function ChatNotice({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-full px-2 py-1 text-sm font-semibold opacity-60 transition hover:opacity-100"
+              className="shrink-0 rounded-full p-1 opacity-60 transition hover:opacity-100"
               aria-label="Cerrar"
             >
-              ✕
+              <CloseIcon className="h-4 w-4" />
             </button>
           </div>
         </motion.div>
