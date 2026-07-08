@@ -1,6 +1,6 @@
 import { GridFSBucket, ObjectId } from "mongodb";
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { tryGetMongoDb } from "@/server/db/mongo";
@@ -79,29 +79,79 @@ type MediaStreamResult = {
   };
 };
 
-async function openLocalMediaStream(fileId: string): Promise<MediaStreamResult | null> {
+const PUBLIC_UPLOAD_FOLDERS = ["site", "brand", "cv"] as const;
+
+async function findLocalUploadUrl(fileId: string): Promise<{
+  url: string;
+  folder: string;
+} | null> {
   const asset = await prisma.mediaAsset.findFirst({
     where: {
-      OR: [{ fileId }, { url: `/api/media/${fileId}` }],
+      OR: [
+        { fileId },
+        { url: `/api/media/${fileId}` },
+        { url: { contains: fileId } },
+      ],
       provider: "local",
     },
-    select: { url: true, mimeType: true, fileName: true },
+    select: { url: true, folder: true },
   });
 
-  if (!asset?.url.startsWith("/uploads/")) return null;
+  if (asset?.url.startsWith("/uploads/")) {
+    return { url: asset.url, folder: asset.folder };
+  }
 
-  const abs = path.join(process.cwd(), "public", asset.url.replace(/^\//, ""));
+  for (const folder of PUBLIC_UPLOAD_FOLDERS) {
+    const dir = path.join(process.cwd(), "public", "uploads", folder);
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
+    const match = files.find((name) => name.startsWith(fileId));
+    if (match) {
+      return { url: `/uploads/${folder}/${match}`, folder };
+    }
+  }
+
+  return null;
+}
+
+async function openLocalMediaStream(fileId: string): Promise<MediaStreamResult | null> {
+  const located = await findLocalUploadUrl(fileId);
+  if (!located) return null;
+
+  const abs = path.join(process.cwd(), "public", located.url.replace(/^\//, ""));
   try {
     await stat(abs);
   } catch {
     return null;
   }
 
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { url: located.url },
+    select: { mimeType: true, fileName: true },
+  });
+
+  const ext = path.extname(abs).toLowerCase();
+  const mimeFromExt: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".pdf": "application/pdf",
+  };
+
   return {
     stream: createReadStream(abs),
     meta: {
-      filename: asset.fileName ?? path.basename(abs),
-      metadata: { mimeType: asset.mimeType },
+      filename: asset?.fileName ?? path.basename(abs),
+      metadata: {
+        mimeType: asset?.mimeType ?? mimeFromExt[ext] ?? "application/octet-stream",
+        folder: located.folder,
+      },
     },
   };
 }

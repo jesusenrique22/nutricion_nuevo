@@ -45,7 +45,7 @@ const fetchLandingImages = unstable_cache(
     const row = await fetchSiteContent(LANDING_IMAGES_SLUG);
     return mergeLandingImages(asSiteJson(row?.data));
   },
-  ["landing-images"],
+  ["landing-images", "v2"],
   { revalidate: 300, tags: [CMS_CACHE_TAG, "landing-images"] },
 );
 
@@ -57,7 +57,7 @@ const fetchLandingBlocks = unstable_cache(
     ]);
     return mergeLandingBlocks(asSiteJson(blockRow?.data), images);
   },
-  ["landing-blocks"],
+  ["landing-blocks", "v2"],
   { revalidate: 300, tags: [CMS_CACHE_TAG, "landing-blocks"] },
 );
 

@@ -8,6 +8,18 @@ const PUBLIC_CMS_CONTENT_SLUGS = [
   NUTRICIONISTA_PAGE_SLUG,
 ] as const;
 
+function addPublicMediaUrl(out: Set<string>, normalized: string): void {
+  out.add(normalized);
+
+  // HTML cacheado puede seguir pidiendo /api/media/{id} tras migrar a /uploads/.
+  const migrated = normalized.match(
+    /^\/uploads\/(site|brand|cv)\/([a-f0-9]{24})\.[^/]+$/i,
+  );
+  if (migrated) {
+    out.add(`/api/media/${migrated[2]}`);
+  }
+}
+
 function collectMediaUrls(value: unknown, out: Set<string>): void {
   if (typeof value === "string") {
     const normalized = value.trim().split(/[?#]/)[0];
@@ -15,7 +27,7 @@ function collectMediaUrls(value: unknown, out: Set<string>): void {
       normalized.startsWith("/api/media/") ||
       normalized.startsWith("/uploads/")
     ) {
-      out.add(normalized);
+      addPublicMediaUrl(out, normalized);
     }
     return;
   }
@@ -52,7 +64,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
       normalized.startsWith("/api/media/") ||
       normalized.startsWith("/uploads/")
     ) {
-      urls.add(normalized);
+      addPublicMediaUrl(urls, normalized);
     }
   }
 
@@ -61,7 +73,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
 
 export const getPublicSiteMediaUrls = unstable_cache(
   loadPublicSiteMediaUrls,
-  ["public-site-media-urls"],
+  ["public-site-media-urls", "v2"],
   { revalidate: 300, tags: ["public-site-media"] },
 );
 

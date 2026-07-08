@@ -17,7 +17,10 @@ function folderFromUploadPath(url: string): string | null {
 
 async function resolveGridFolder(url: string): Promise<string | null> {
   const mediaId = parseMediaIdFromUrl(url);
-  if (!mediaId) return null;
+  if (!mediaId) {
+    const uploadMatch = url.match(/^\/uploads\/([^/]+)\//);
+    return uploadMatch?.[1] ?? null;
+  }
 
   const meta = await getMongoFileMeta(mediaId);
   const metadata = meta?.metadata as Record<string, unknown> | undefined;
@@ -28,12 +31,15 @@ async function resolveGridFolder(url: string): Promise<string | null> {
 
   const asset = await prisma.mediaAsset.findFirst({
     where: {
-      OR: [{ url }, { fileId: mediaId }],
+      OR: [{ url }, { fileId: mediaId }, { url: { contains: mediaId } }],
     },
     select: { folder: true },
   });
 
-  return asset?.folder ?? null;
+  if (asset?.folder) return asset.folder;
+
+  const uploadMatch = url.match(/^\/uploads\/([^/]+)\//);
+  return uploadMatch?.[1] ?? null;
 }
 
 async function isPublishedResourceCover(url: string): Promise<boolean> {
