@@ -5,6 +5,9 @@ import {
 } from "@/lib/media-access-policy";
 import { isUploadsPath, parseMediaIdFromUrl } from "@/lib/stored-file";
 import { getMongoFileMeta } from "@/server/services/mongo-gridfs";
+import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
+import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
+import { PRODUCTS_SLUG } from "@/types/products";
 
 function folderFromUploadPath(url: string): string | null {
   const match = url.match(/^\/uploads\/([^/]+)\//);
@@ -26,14 +29,16 @@ async function isPublicCmsMediaUrl(url: string): Promise<boolean> {
   const asset = await prisma.mediaAsset.findFirst({
     where: {
       url: normalized,
-      folder: { in: ["site", "cv", "brand"] },
+      folder: { in: ["site", "cv", "brand", "products"] },
     },
     select: { id: true },
   });
   if (asset) return true;
 
   const rows = await prisma.siteContent.findMany({
-    where: { slug: { in: ["landing-images", "nutricionista-page"] } },
+    where: {
+      slug: { in: [LANDING_IMAGES_SLUG, NUTRICIONISTA_PAGE_SLUG, PRODUCTS_SLUG] },
+    },
     select: { data: true },
   });
   return rows.some((row) => JSON.stringify(row.data).includes(normalized));

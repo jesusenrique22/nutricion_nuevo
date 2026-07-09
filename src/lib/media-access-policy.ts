@@ -1,5 +1,5 @@
-/** Carpetas de GridFS accesibles sin iniciar sesión (landing, CV público, etc.). */
-export const PUBLIC_MEDIA_FOLDERS = new Set(["site", "cv", "brand"]);
+/** Carpetas de GridFS accesibles sin iniciar sesión (landing, CV, catálogo, etc.). */
+export const PUBLIC_MEDIA_FOLDERS = new Set(["site", "cv", "brand", "products"]);
 
 /** Carpetas visibles para cualquier usuario autenticado (plan semanal, chat…). */
 export const AUTHENTICATED_MEDIA_FOLDERS = new Set([

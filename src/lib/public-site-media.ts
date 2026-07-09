@@ -1,11 +1,13 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
+import { PRODUCTS_SLUG } from "@/types/products";
 import { prisma } from "@/server/db/prisma";
 
 const PUBLIC_CMS_CONTENT_SLUGS = [
   LANDING_IMAGES_SLUG,
   NUTRICIONISTA_PAGE_SLUG,
+  PRODUCTS_SLUG,
 ] as const;
 
 function addPublicMediaUrl(out: Set<string>, normalized: string): void {
@@ -55,7 +57,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
   }
 
   const assets = await prisma.mediaAsset.findMany({
-    where: { folder: { in: ["site", "cv", "brand"] } },
+    where: { folder: { in: ["site", "cv", "brand", "products"] } },
     select: { url: true },
   });
   for (const asset of assets) {
@@ -73,7 +75,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
 
 export const getPublicSiteMediaUrls = unstable_cache(
   loadPublicSiteMediaUrls,
-  ["public-site-media-urls", "v2"],
+  ["public-site-media-urls", "v3"],
   { revalidate: 300, tags: ["public-site-media"] },
 );
 
