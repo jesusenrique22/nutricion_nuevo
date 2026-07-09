@@ -14,11 +14,17 @@ import {
   notifyAppointmentCancelled,
   notifyAppointmentRescheduled,
 } from "@/server/services/appointment-notify.service";
-import { refreshAppointmentGoogleCalendar } from "@/server/services/google-calendar-sync.service";
+import { formatActionError } from "@/lib/db-errors";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { appointmentRescheduledEmail } from "@/lib/email-messages";
-import { formatActionError } from "@/lib/db-errors";
+
+async function refreshGoogleCalendar(appointmentId: string) {
+  const { refreshAppointmentGoogleCalendar } = await import(
+    "@/server/services/google-calendar-sync.service"
+  );
+  await refreshAppointmentGoogleCalendar(appointmentId);
+}
 
 export type StatusActionResult =
   | { ok: true }
@@ -107,9 +113,9 @@ export async function updateAppointmentStatus(
         startTime: appt.startTime,
         cancelledBy: "ADMIN",
       });
-      await refreshAppointmentGoogleCalendar(appt.id);
+      await refreshGoogleCalendar(appt.id);
     } else {
-      await refreshAppointmentGoogleCalendar(appt.id);
+      await refreshGoogleCalendar(appt.id);
     }
 
     await revalidateAppointmentPaths(appt.patientId);
@@ -182,7 +188,7 @@ export async function cancelAppointment(
       cancelledBy,
     });
 
-    await refreshAppointmentGoogleCalendar(appt.id);
+    await refreshGoogleCalendar(appt.id);
 
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };
@@ -290,7 +296,7 @@ export async function rescheduleAppointment(
       });
     }
 
-    await refreshAppointmentGoogleCalendar(appt.id);
+    await refreshGoogleCalendar(appt.id);
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };
   } catch (err) {

@@ -1,12 +1,34 @@
 import { resolveCalendarAdminIdForNewAppointment } from "@/lib/calendar-admin-resolve";
 import { isAppointmentEligibleForGoogleSync, getCalendarSyncFromDate } from "@/lib/google-calendar/sync-eligibility";
 import { modalityLabels, appointmentStatusLabels } from "@/lib/appointment-labels";
-import {
-  createGoogleCalendarEvent,
-  deleteGoogleCalendarEvent,
-  updateGoogleCalendarEvent,
-} from "@/server/services/google-calendar-api";
+import type { CalendarEventInput } from "@/server/services/google-calendar-api";
 import { prisma } from "@/server/db/prisma";
+
+async function calendarApi() {
+  return import("@/server/services/google-calendar-api");
+}
+
+async function createGoogleCalendarEvent(
+  adminUserId: string,
+  input: CalendarEventInput,
+) {
+  const api = await calendarApi();
+  return api.createGoogleCalendarEvent(adminUserId, input);
+}
+
+async function updateGoogleCalendarEvent(
+  adminUserId: string,
+  eventId: string,
+  input: CalendarEventInput,
+) {
+  const api = await calendarApi();
+  return api.updateGoogleCalendarEvent(adminUserId, eventId, input);
+}
+
+async function deleteGoogleCalendarEvent(adminUserId: string, eventId: string) {
+  const api = await calendarApi();
+  return api.deleteGoogleCalendarEvent(adminUserId, eventId);
+}
 
 function buildEventPayload(appt: {
   status: string;

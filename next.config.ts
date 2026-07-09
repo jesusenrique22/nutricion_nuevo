@@ -84,8 +84,6 @@ const nextConfig: NextConfig = {
   // No forzar Prisma/Neon en todas las rutas API — el trace automático basta.
   outputFileTracingExcludes: {
     "*": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
       "./node_modules/pdfjs-dist/**",
       "./node_modules/@napi-rs/canvas/**",
       "./public/**",
@@ -96,9 +94,6 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfjs-dist/**",
       "./node_modules/@napi-rs/canvas/**",
     ],
-    "/api/google/**": [
-      "./node_modules/googleapis/**",
-    ],
   },
 
   serverExternalPackages: [
@@ -106,7 +101,6 @@ const nextConfig: NextConfig = {
     "prisma",
     "pdfjs-dist",
     "@napi-rs/canvas",
-    "googleapis",
     "mongodb",
   ],
 

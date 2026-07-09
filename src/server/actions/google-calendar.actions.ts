@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
-import { syncUnsyncedAppointmentsForAdmin } from "@/server/services/google-calendar-sync.service";
+
+async function syncExistingAppointments(adminUserId: string) {
+  const { syncUnsyncedAppointmentsForAdmin } = await import(
+    "@/server/services/google-calendar-sync.service"
+  );
+  return syncUnsyncedAppointmentsForAdmin(adminUserId);
+}
 
 export async function setDefaultCalendarAdminAction(): Promise<
   { ok: true } | { ok: false; message: string }
@@ -57,7 +63,7 @@ export async function syncExistingAppointmentsAction(): Promise<
     };
   }
 
-  const { synced, failed, alreadySynced } = await syncUnsyncedAppointmentsForAdmin(
+  const { synced, failed, alreadySynced } = await syncExistingAppointments(
     session.user.id,
   );
 
