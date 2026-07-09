@@ -1,6 +1,6 @@
-import { createRequire } from "node:module";
 import { statSync } from "node:fs";
 import path from "node:path";
+import { Prisma, PrismaClient as PrismaClientCtor } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { ensureDatabaseEnv } from "@/lib/database-url";
 import { createNeonPrismaClientOptions } from "@/server/db/neon-prisma-factory";
@@ -8,17 +8,6 @@ import { createNeonPrismaClientOptions } from "@/server/db/neon-prisma-factory";
 // Debe ejecutarse antes de instanciar PrismaClient para que Neon reciba
 // connection_limit y pool_timeout en la URL (evita pool timeout en dev).
 ensureDatabaseEnv();
-
-const require = createRequire(path.join(process.cwd(), "package.json"));
-
-/** CJS evita client incompleto con Turbopack/ESM (delegates como cartItem ausentes). */
-const { PrismaClient: PrismaClientCtor, Prisma } = require("@prisma/client") as {
-  PrismaClient: new (options?: ConstructorParameters<typeof PrismaClient>[0]) => PrismaClient;
-  Prisma: {
-    ResourcePurchaseScalarFieldEnum?: Record<string, string>;
-    PaymentScalarFieldEnum?: Record<string, string>;
-  };
-};
 
 const REQUIRED_DELEGATES = [
   "user",
@@ -71,7 +60,9 @@ function createPrismaClient(): PrismaClient {
   const log =
     process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"];
   const client = new PrismaClientCtor(
-    createNeonPrismaClientOptions(log as ("error" | "warn")[]),
+    createNeonPrismaClientOptions(log as ("error" | "warn")[]) as ConstructorParameters<
+      typeof PrismaClientCtor
+    >[0],
   );
 
   if (!hasRequiredDelegates(client) || !clientHasExpectedSchema()) {

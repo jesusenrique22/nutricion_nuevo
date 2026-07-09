@@ -92,18 +92,23 @@ export function useRecaptcha(
     [],
   );
   const [ready, setReady] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const enabled = Boolean(siteKey);
 
   useEffect(() => {
     if (!enabled || !active) return;
 
     let cancelled = false;
+    setLoadFailed(false);
     loadRecaptchaScript(siteKey, enterprise)
       .then(() => {
         if (!cancelled) setReady(true);
       })
       .catch(() => {
-        if (!cancelled) setReady(false);
+        if (!cancelled) {
+          setReady(false);
+          setLoadFailed(true);
+        }
       });
 
     return () => {
@@ -129,5 +134,5 @@ export function useRecaptcha(
     return null;
   }, [enabled, ready, action, siteKey, enterprise]);
 
-  return { enabled, ready, getToken };
+  return { enabled, ready, loadFailed, getToken };
 }

@@ -8,11 +8,14 @@ import { resendVerificationEmail } from "@/server/actions/auth.actions";
 function CheckEmailContent() {
   const params = useSearchParams();
   const initialEmail = params.get("email") ?? "";
+  const sendFailed = params.get("sendFailed") === "1";
   const [email, setEmail] = useState(initialEmail);
   const [message, setMessage] = useState<string | null>(
-    initialEmail
-      ? "Te enviamos un correo con el enlace de verificación. Revisá también spam."
-      : null,
+    sendFailed
+      ? "Tu cuenta se creó, pero no pudimos enviar el correo de verificación. Usá «Reenviar enlace» abajo (revisá también spam)."
+      : initialEmail
+        ? "Te enviamos un correo con el enlace de verificación. Revisá también spam."
+        : null,
   );
   const [devLink, setDevLink] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

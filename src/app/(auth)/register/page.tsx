@@ -46,7 +46,9 @@ export default function RegisterPage() {
 
     const email =
       typeof payload.email === "string" ? payload.email : res.email ?? "";
-    router.push(`/check-email?email=${encodeURIComponent(email)}`);
+    const qs = new URLSearchParams({ email });
+    if (res.verificationEmailFailed) qs.set("sendFailed", "1");
+    router.push(`/check-email?${qs.toString()}`);
   }
 
   return (

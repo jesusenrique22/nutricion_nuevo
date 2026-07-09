@@ -33,8 +33,8 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const { enabled: recaptchaEnabled, ready: recaptchaReady, getToken } =
-    useRecaptcha(undefined, step === "confirm");
+  const { enabled: recaptchaEnabled, ready: recaptchaReady, loadFailed: recaptchaLoadFailed, getToken } =
+    useRecaptcha(undefined, step !== "service");
 
   const selectedType = types.find((t) => t.id === typeId);
   const stepIndex = step === "service" ? 0 : step === "details" ? 1 : 2;
@@ -69,6 +69,12 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
       let recaptchaToken: string | undefined;
 
       if (recaptchaEnabled) {
+        if (recaptchaLoadFailed) {
+          setMessage(
+            "No pudimos cargar la verificación de seguridad. Desactivá bloqueadores de anuncios o probá con otra red.",
+          );
+          return;
+        }
         if (!recaptchaReady) {
           setMessage("Cargando verificación de seguridad… Intentá en unos segundos.");
           return;
@@ -242,11 +248,7 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
                 type="button"
                 label={isPending ? "Agregando…" : "Agregar al carrito"}
                 onClick={handleAddToCart}
-                disabled={
-                  !selectedSlot ||
-                  isPending ||
-                  (recaptchaEnabled && !recaptchaReady)
-                }
+                disabled={!selectedSlot || isPending}
               />
               <p className="text-center text-xs text-foreground/50">
                 Podés sumar recursos y pagar todo junto desde el carrito.

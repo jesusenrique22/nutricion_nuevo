@@ -85,6 +85,8 @@ const nextConfig: NextConfig = {
     "/*": [
       "./node_modules/@neondatabase/serverless/**",
       "./node_modules/@prisma/adapter-neon/**",
+      "./node_modules/@prisma/client/**",
+      "./node_modules/.prisma/client/**",
       "./node_modules/ws/**",
       "./node_modules/bufferutil/**",
       "./node_modules/utf-8-validate/**",
@@ -92,6 +94,8 @@ const nextConfig: NextConfig = {
     "/api/**/*": [
       "./node_modules/@neondatabase/serverless/**",
       "./node_modules/@prisma/adapter-neon/**",
+      "./node_modules/@prisma/client/**",
+      "./node_modules/.prisma/client/**",
       "./node_modules/ws/**",
     ],
   },

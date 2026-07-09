@@ -107,7 +107,7 @@ async function sendViaSmtp(
     return {
       ok: false,
       message:
-        "No se pudo enviar el correo. Verificá SMTP en .env o ejecutá pnpm run email:check.",
+        "No se pudo enviar el correo de verificación. Si estás en producción, configurá SMTP en el hosting (Vercel/Render).",
     };
   }
 }

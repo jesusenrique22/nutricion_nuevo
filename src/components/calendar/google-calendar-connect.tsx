@@ -17,11 +17,14 @@ const statusMessages: Record<string, string> = {
   connected:
     "Google Calendar conectado. Las citas nuevas se sincronizan solas; usá «Sincronizar citas existentes» si faltan en Google.",
   denied:
-    "Google bloqueó la autorización. Revisá que tu Gmail esté en Test users del OAuth consent screen y que el scope calendar.events esté agregado.",
+    "Google bloqueó la autorización. Agregá tu correo (david.30249427@uru.edu) en Test users del OAuth consent screen y el scope calendar.events.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
-  no_refresh: "Google no devolvió token persistente. Desconectá y volvé a conectar.",
-  error: "Error al conectar Google Calendar. Revisá el detalle abajo o intentá Desconectar y volver a conectar.",
-  missing_config: "Faltan GOOGLE_CALENDAR_CLIENT_ID y CLIENT_SECRET en el servidor.",
+  no_refresh:
+    "Google no devolvió token persistente. En Google Cloud → desconectá la app de tu cuenta y volvé a conectar con «Conectar mi Google Calendar».",
+  error:
+    "Error al conectar Google Calendar. Revisá el detalle abajo. Si ves redirect_uri_mismatch, agregá la URL de producción en Google Cloud.",
+  missing_config:
+    "Faltan GOOGLE_CALENDAR_CLIENT_ID y GOOGLE_CALENDAR_CLIENT_SECRET en Vercel/Render.",
 };
 
 function GoogleCalendarConnectInner({

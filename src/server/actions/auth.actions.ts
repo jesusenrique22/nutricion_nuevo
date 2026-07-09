@@ -56,6 +56,7 @@ export type AuthActionResult =
       devVerifyUrl?: string;
       email?: string;
       skipVerification?: true;
+      verificationEmailFailed?: true;
     }
   | { ok: false; message: string };
 
@@ -183,7 +184,17 @@ export async function registerPatient(
     };
   }
 
-  return sendVerificationEmailToUser(email, name);
+  const emailResult = await sendVerificationEmailToUser(email, name);
+  if (!emailResult.ok) {
+    // La cuenta ya existe en la BD; permitir reenvío desde /check-email
+    return {
+      ok: true,
+      email,
+      verificationEmailFailed: true as const,
+    };
+  }
+
+  return emailResult;
 }
 
 export async function verifyEmail(
