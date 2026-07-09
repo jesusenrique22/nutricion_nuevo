@@ -8,7 +8,7 @@ import { getBlockedDays, getScheduleBlocks } from "@/server/actions/schedule-blo
 import {
   getCalendarAdminStatus,
   getGoogleCalendarConnectionSummary,
-} from "@/server/services/google-calendar.service";
+} from "@/server/services/google-calendar-oauth";
 
 export const dynamic = "force-dynamic";
 

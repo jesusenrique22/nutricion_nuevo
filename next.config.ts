@@ -81,20 +81,20 @@ const nextConfig: NextConfig = {
   // Imports estáticos en neon-prisma-factory.ts; incluir en el trace de cada función.
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
-  outputFileTracingIncludes: {
-    "/api/**": [
-      "./node_modules/@neondatabase/serverless/**",
-      "./node_modules/@prisma/adapter-neon/**",
-      "./node_modules/@prisma/client/**",
-      "./node_modules/.prisma/client/**",
-      "./node_modules/ws/**",
-    ],
-  },
-
+  // No forzar Prisma/Neon en todas las rutas API — el trace automático basta.
   outputFileTracingExcludes: {
     "*": [
-      "./node_modules/@napi-rs/canvas/**",
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
       "./node_modules/pdfjs-dist/**",
+      "./node_modules/@napi-rs/canvas/**",
+      "./public/**",
+    ],
+    "/api/media/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+      "./node_modules/pdfjs-dist/**",
+      "./node_modules/@napi-rs/canvas/**",
     ],
     "/api/google/**": [
       "./node_modules/googleapis/**",
