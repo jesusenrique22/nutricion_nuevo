@@ -78,8 +78,23 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Imports estáticos en neon-prisma-factory.ts; no marcar Neon como external.
+  // Imports estáticos en neon-prisma-factory.ts; incluir en el trace de cada función.
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
+
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/@neondatabase/serverless/**",
+      "./node_modules/@prisma/adapter-neon/**",
+      "./node_modules/ws/**",
+      "./node_modules/bufferutil/**",
+      "./node_modules/utf-8-validate/**",
+    ],
+    "/api/**/*": [
+      "./node_modules/@neondatabase/serverless/**",
+      "./node_modules/@prisma/adapter-neon/**",
+      "./node_modules/ws/**",
+    ],
+  },
 
   serverExternalPackages: [
     "@prisma/client",

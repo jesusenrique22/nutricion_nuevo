@@ -53,11 +53,13 @@ function LoginForm() {
       }
       if (res.error === "Configuration" || res.error === "DATABASE_UNAVAILABLE") {
         setError(
-          "No se pudo conectar con la base de datos. Revisá DATABASE_URL en el hosting.",
+          "No se pudo conectar con la base de datos (Neon). Revisá DATABASE_URL en Vercel o esperá a que termine el deploy.",
         );
         return;
       }
-      setError("Credenciales inválidas.");
+      setError(
+        "Credenciales inválidas. Cuenta demo: admin@gmail.com / Admin123! (con signo de exclamación al final).",
+      );
       return;
     }
     redirectAfterLogin();

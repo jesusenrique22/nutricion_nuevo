@@ -60,7 +60,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           if (
             err instanceof Error &&
             (err.message === "ACCOUNT_DEACTIVATED" ||
-              err.message === "EMAIL_NOT_VERIFIED")
+              err.message === "EMAIL_NOT_VERIFIED" ||
+              err.message === "DATABASE_UNAVAILABLE")
           ) {
             throw err;
           }
@@ -68,7 +69,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             err && typeof err === "object" && "code" in err
               ? String((err as { code?: string }).code)
               : "";
-          if (code.startsWith("P") || code === "ECONNREFUSED" || code === "ETIMEDOUT") {
+          const message = err instanceof Error ? err.message : String(err);
+          if (
+            code.startsWith("P") ||
+            code === "ECONNREFUSED" ||
+            code === "ETIMEDOUT" ||
+            code === "MODULE_NOT_FOUND" ||
+            message.includes("Cannot find module") ||
+            message.includes("@neondatabase/serverless")
+          ) {
             console.error("[auth/credentials] Base de datos:", err);
             throw new Error("DATABASE_UNAVAILABLE");
           }
