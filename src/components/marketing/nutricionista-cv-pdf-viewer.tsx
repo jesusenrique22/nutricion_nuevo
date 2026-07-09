@@ -1,12 +1,14 @@
-import { NutricionistaCvPdfPart } from "@/components/marketing/nutricionista-cv-pdf-server-part";
+"use client";
+
+import { NutricionistaCvPdfEmbed } from "@/components/marketing/nutricionista-cv-pdf-embed";
 
 export function NutricionistaCvPdfViewerList({ urls }: { urls: string[] }) {
   return (
     <div className="space-y-10">
       {urls.map((url, index) => (
-        <NutricionistaCvPdfPart
+        <NutricionistaCvPdfEmbed
           key={`${url}-${index}`}
-          pdfUrl={url}
+          partIndex={index}
           label={
             urls.length > 1 ? `CV — Parte ${index + 1}` : "CV profesional"
           }

@@ -72,28 +72,14 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "50mb",
     },
-    // Tiempo de caché para rutas prefetchadas (client-side navigation)
-    // static: páginas estáticas en el router cache  (default 5 min)
-    // dynamic: páginas dinámicas en el router cache (default 0 — desactivado)
-    // 30 s en dinámicas reduce round-trips al servidor sin stale-data notable.
     staleTimes: {
       dynamic: 30,
       static: 300,
     },
   },
 
-  // pnpm en Vercel: el tracing no siempre resuelve symlinks de Neon/ws si van como
-  // serverExternalPackages — deben empaquetarse en cada función serverless.
-  outputFileTracingIncludes: {
-    "/*": [
-      "./node_modules/@neondatabase/serverless/**/*",
-      "./node_modules/@prisma/adapter-neon/**/*",
-      "./node_modules/ws/**/*",
-      "./node_modules/.pnpm/@neondatabase+serverless@*/node_modules/@neondatabase/serverless/**/*",
-      "./node_modules/.pnpm/@prisma+adapter-neon@*/node_modules/@prisma/adapter-neon/**/*",
-      "./node_modules/.pnpm/ws@*/node_modules/ws/**/*",
-    ],
-  },
+  // Imports estáticos en neon-prisma-factory.ts; no marcar Neon como external.
+  transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
   serverExternalPackages: [
     "@prisma/client",
