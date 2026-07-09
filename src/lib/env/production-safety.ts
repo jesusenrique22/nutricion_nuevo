@@ -32,6 +32,51 @@ function baseUrl(url: string): string {
   return url.replace(/\/$/, "");
 }
 
+function isLocalhostUrl(url: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
+/** URL pública del deploy (Vercel inyecta VERCEL_URL / VERCEL_PROJECT_PRODUCTION_URL). */
+export function resolveHostingPublicUrl(): string | null {
+  const vercelHosts = [
+    trim(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    trim(process.env.VERCEL_URL),
+  ].filter(Boolean);
+
+  for (const host of vercelHosts) {
+    if (isLocalhostUrl(host)) continue;
+    return host.startsWith("http") ? baseUrl(host) : `https://${host}`;
+  }
+
+  for (const raw of [trim(process.env.AUTH_URL), trim(process.env.NEXTAUTH_URL)]) {
+    if (!raw || isLocalhostUrl(raw)) continue;
+    return baseUrl(raw);
+  }
+
+  return null;
+}
+
+/**
+ * En hosting serverless, si AUTH_URL/NEXTAUTH_URL faltan o apuntan a localhost,
+ * usa el dominio del deploy (p. ej. nutricion-phi.vercel.app).
+ */
+export function ensureProductionAuthUrls(): void {
+  if (process.env.VERCEL !== "1") return;
+
+  const publicUrl = resolveHostingPublicUrl();
+  if (!publicUrl) return;
+
+  const next = trim(process.env.NEXTAUTH_URL);
+  const auth = trim(process.env.AUTH_URL);
+
+  if (!next || isLocalhostUrl(next)) {
+    process.env.NEXTAUTH_URL = publicUrl;
+  }
+  if (!auth || isLocalhostUrl(auth)) {
+    process.env.AUTH_URL = trim(process.env.NEXTAUTH_URL) || publicUrl;
+  }
+}
+
 /** ¿Estamos en un deploy real (Vercel, CI)? */
 export function isProductionDeployContext(): boolean {
   if (process.env.CHECK_PRODUCTION_ENV === "1") return true;
@@ -47,6 +92,8 @@ export function isProductionDeployContext(): boolean {
 }
 
 export function validateProductionEnvironment(): EnvCheckIssue[] {
+  ensureProductionAuthUrls();
+
   const issues: EnvCheckIssue[] = [];
   const strict = isProductionDeployContext();
 
@@ -94,13 +141,23 @@ export function validateProductionEnvironment(): EnvCheckIssue[] {
         message:
           "Falta NEXTAUTH_URL con la URL pública del sitio (sin barra final).",
       });
-    } else if (/localhost|127\.0\.0\.1/i.test(nextAuthUrl)) {
-      issues.push({
-        level: "error",
-        code: "NEXTAUTH_URL_LOCAL",
-        message:
-          "NEXTAUTH_URL no puede ser localhost en producción. Usá tu dominio de Vercel.",
-      });
+    } else if (isLocalhostUrl(nextAuthUrl)) {
+      const auto = resolveHostingPublicUrl();
+      if (auto && process.env.VERCEL === "1") {
+        issues.push({
+          level: "warning",
+          code: "NEXTAUTH_URL_LOCAL",
+          message:
+            `NEXTAUTH_URL apuntaba a localhost; se usará ${auto} en este deploy. Configurá AUTH_URL y NEXTAUTH_URL en el panel del hosting.`,
+        });
+      } else {
+        issues.push({
+          level: "error",
+          code: "NEXTAUTH_URL_LOCAL",
+          message:
+            "NEXTAUTH_URL no puede ser localhost en producción. Usá la URL pública del sitio.",
+        });
+      }
     }
 
     if (authUrl && nextAuthUrl && baseUrl(authUrl) !== baseUrl(nextAuthUrl)) {

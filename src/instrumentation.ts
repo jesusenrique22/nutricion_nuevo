@@ -8,6 +8,11 @@ export async function register() {
   const { ensureDatabaseEnv } = await import("@/lib/database-url");
   ensureDatabaseEnv();
 
+  const { ensureProductionAuthUrls } = await import(
+    "@/lib/env/production-safety"
+  );
+  ensureProductionAuthUrls();
+
   const { logProductionConfigOnStartup } = await import(
     "@/lib/env/production-safety"
   );
