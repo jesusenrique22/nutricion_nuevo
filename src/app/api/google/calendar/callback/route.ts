@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { google } from "googleapis";
 import { auth } from "@/lib/auth";
 import { ensureDefaultCalendarAdmin } from "@/lib/calendar-admin-resolve";
-import { getGoogleCalendarConfig } from "@/lib/google-calendar/config";
 import {
   appOriginFromRequest,
   oauthRedirectUriFromRequest,
 } from "@/lib/google-calendar/redirect-uri";
 import {
   exchangeCodeForTokens,
+  fetchGoogleAccountEmail,
   saveGoogleCalendarConnection,
-} from "@/server/services/google-calendar.service";
-import { syncUnsyncedAppointmentsForAdmin } from "@/server/services/google-calendar-sync.service";
+} from "@/server/services/google-calendar-oauth";
 
 const STATE_COOKIE = "gcal_oauth_state";
 const REDIRECT_COOKIE = "gcal_oauth_redirect";
@@ -59,16 +57,7 @@ export async function GET(request: Request) {
     let connectedEmail: string | null = null;
     if (tokens.access_token) {
       try {
-        const config = getGoogleCalendarConfig();
-        const oauth2 = new google.auth.OAuth2(
-          config.clientId,
-          config.clientSecret,
-          redirectUri,
-        );
-        oauth2.setCredentials({ access_token: tokens.access_token });
-        const oauth2Api = google.oauth2({ version: "v2", auth: oauth2 });
-        const profile = await oauth2Api.userinfo.get();
-        connectedEmail = profile.data.email ?? null;
+        connectedEmail = await fetchGoogleAccountEmail(tokens.access_token);
       } catch (profileErr) {
         console.warn("[google-calendar/callback] userinfo omitido:", profileErr);
       }
@@ -88,14 +77,7 @@ export async function GET(request: Request) {
       console.warn("[google-calendar/callback] default admin:", defaultErr);
     }
 
-    try {
-      const result = await syncUnsyncedAppointmentsForAdmin(session.user.id);
-      console.info("[google-calendar/callback] backfill", result);
-    } catch (backfillErr) {
-      console.warn("[google-calendar/callback] backfill:", backfillErr);
-    }
-
-    return NextResponse.redirect(`${calendarUrl}?gcal=connected`);
+    return NextResponse.redirect(`${calendarUrl}?gcal=connected&sync=1`);
   } catch (err) {
     console.error("[google-calendar/callback]", err);
     const params = new URLSearchParams({ gcal: "error" });

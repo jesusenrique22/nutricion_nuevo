@@ -203,13 +203,16 @@ SiteContent (slug + JSON) — CMS textos e imágenes landing
 FormTemplate (code + fields JSON) — formularios editables
 ```
 
-### MongoDB
+### MongoDB (Atlas)
 
-| Colección | Uso |
-|-----------|-----|
+| Uso | Detalle |
+|-----|---------|
+| **GridFS** (`media` bucket) | Imágenes, PDFs, videos, documentos pesados — `/api/media/{id}`. Neon solo guarda metadatos y URLs. |
 | `conversations` | Hilos paciente ↔ nutricionista |
 | `messages` | Mensajes de chat |
-| `notifications` | Alertas in-app |
+
+> **Neon** = datos relacionales (usuarios, citas, pagos, notificaciones, CMS JSON).  
+> **Mongo** = binarios y chat. No subas archivos grandes a PostgreSQL.
 
 ---
 

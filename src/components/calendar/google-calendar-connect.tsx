@@ -43,18 +43,35 @@ function GoogleCalendarConnectInner({
     "info",
   );
   const [isPending, startTransition] = useTransition();
+  const [autoSyncDone, setAutoSyncDone] = useState(false);
 
   useEffect(() => {
     const gcal = params.get("gcal");
     const detail = params.get("gcal_detail");
+    const shouldSync = params.get("sync") === "1";
+
     if (gcal && statusMessages[gcal]) {
       setMessageTone(gcal === "connected" ? "success" : gcal === "error" ? "error" : "info");
       setMessage(
         detail ? `${statusMessages[gcal]} (${detail})` : statusMessages[gcal],
       );
       router.replace("/dashboard/admin/calendar", { scroll: false });
+
+      if (gcal === "connected" && shouldSync && !autoSyncDone) {
+        setAutoSyncDone(true);
+        startTransition(async () => {
+          const result = await syncExistingAppointmentsAction();
+          if (result.ok && result.synced > 0) {
+            setMessageTone("success");
+            setMessage(
+              `Google Calendar conectado. Sincronizadas ${result.synced} cita(s) existentes.`,
+            );
+            router.refresh();
+          }
+        });
+      }
     }
-  }, [params, router]);
+  }, [params, router, autoSyncDone]);
 
   const messageClassName =
     messageTone === "success"

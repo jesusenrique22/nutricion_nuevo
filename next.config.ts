@@ -82,16 +82,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
   outputFileTracingIncludes: {
-    "/*": [
-      "./node_modules/@neondatabase/serverless/**",
-      "./node_modules/@prisma/adapter-neon/**",
-      "./node_modules/@prisma/client/**",
-      "./node_modules/.prisma/client/**",
-      "./node_modules/ws/**",
-      "./node_modules/bufferutil/**",
-      "./node_modules/utf-8-validate/**",
-    ],
-    "/api/**/*": [
+    "/api/**": [
       "./node_modules/@neondatabase/serverless/**",
       "./node_modules/@prisma/adapter-neon/**",
       "./node_modules/@prisma/client/**",
@@ -100,11 +91,23 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  outputFileTracingExcludes: {
+    "*": [
+      "./node_modules/@napi-rs/canvas/**",
+      "./node_modules/pdfjs-dist/**",
+    ],
+    "/api/google/**": [
+      "./node_modules/googleapis/**",
+    ],
+  },
+
   serverExternalPackages: [
     "@prisma/client",
     "prisma",
     "pdfjs-dist",
     "@napi-rs/canvas",
+    "googleapis",
+    "mongodb",
   ],
 
   images: {

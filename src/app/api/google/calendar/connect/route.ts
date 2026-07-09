@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
 import { oauthRedirectUriFromRequest } from "@/lib/google-calendar/redirect-uri";
-import { getGoogleCalendarAuthUrl } from "@/server/services/google-calendar.service";
+import { getGoogleCalendarAuthUrl } from "@/server/services/google-calendar-oauth";
 
 const STATE_COOKIE = "gcal_oauth_state";
 const REDIRECT_COOKIE = "gcal_oauth_redirect";

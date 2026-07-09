@@ -5,7 +5,7 @@ import {
   createGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
   updateGoogleCalendarEvent,
-} from "@/server/services/google-calendar.service";
+} from "@/server/services/google-calendar-api";
 import { prisma } from "@/server/db/prisma";
 
 function buildEventPayload(appt: {

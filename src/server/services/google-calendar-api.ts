@@ -1,0 +1,92 @@
+import { google } from "googleapis";
+import { getGoogleCalendarConfig } from "@/lib/google-calendar/config";
+import {
+  getAuthedOAuthClient,
+  getConnectionForUser,
+} from "@/server/services/google-calendar-oauth";
+
+export type CalendarEventInput = {
+  summary: string;
+  description: string;
+  startTime: Date;
+  endTime: Date;
+};
+
+export async function createGoogleCalendarEvent(
+  adminUserId: string,
+  input: CalendarEventInput,
+): Promise<string | null> {
+  const connection = await getConnectionForUser(adminUserId);
+  if (!connection) return null;
+
+  const auth = await getAuthedOAuthClient(connection);
+  const calendar = google.calendar({
+    version: "v3",
+    auth: auth as Parameters<typeof google.calendar>[0]["auth"],
+  });
+  const { timeZone } = getGoogleCalendarConfig();
+
+  const res = await calendar.events.insert({
+    calendarId: connection.calendarId,
+    requestBody: {
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: input.startTime.toISOString(), timeZone },
+      end: { dateTime: input.endTime.toISOString(), timeZone },
+    },
+  });
+
+  return res.data.id ?? null;
+}
+
+export async function updateGoogleCalendarEvent(
+  adminUserId: string,
+  eventId: string,
+  input: CalendarEventInput,
+): Promise<void> {
+  const connection = await getConnectionForUser(adminUserId);
+  if (!connection) return;
+
+  const auth = await getAuthedOAuthClient(connection);
+  const calendar = google.calendar({
+    version: "v3",
+    auth: auth as Parameters<typeof google.calendar>[0]["auth"],
+  });
+  const { timeZone } = getGoogleCalendarConfig();
+
+  await calendar.events.patch({
+    calendarId: connection.calendarId,
+    eventId,
+    requestBody: {
+      summary: input.summary,
+      description: input.description,
+      start: { dateTime: input.startTime.toISOString(), timeZone },
+      end: { dateTime: input.endTime.toISOString(), timeZone },
+    },
+  });
+}
+
+export async function deleteGoogleCalendarEvent(
+  adminUserId: string,
+  eventId: string,
+): Promise<void> {
+  const connection = await getConnectionForUser(adminUserId);
+  if (!connection) return;
+
+  const auth = await getAuthedOAuthClient(connection);
+  const calendar = google.calendar({
+    version: "v3",
+    auth: auth as Parameters<typeof google.calendar>[0]["auth"],
+  });
+
+  try {
+    await calendar.events.delete({
+      calendarId: connection.calendarId,
+      eventId,
+    });
+  } catch (err) {
+    const status = (err as { code?: number }).code;
+    if (status === 404 || status === 410) return;
+    throw err;
+  }
+}

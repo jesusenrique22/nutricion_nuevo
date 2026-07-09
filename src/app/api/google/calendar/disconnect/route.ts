@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { disconnectGoogleCalendar } from "@/server/services/google-calendar.service";
+import { disconnectGoogleCalendar } from "@/server/services/google-calendar-oauth";
 
 export async function POST() {
   const session = await auth();
