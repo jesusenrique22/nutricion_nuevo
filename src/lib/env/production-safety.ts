@@ -162,11 +162,13 @@ export function validateProductionEnvironment(): EnvCheckIssue[] {
   }
 
   if (strict && !mongoUri) {
+    const onVercel = process.env.VERCEL === "1";
     issues.push({
-      level: "warning",
+      level: onVercel ? "error" : "warning",
       code: "MONGODB_MISSING",
-      message:
-        "Falta MONGODB_URI (opcional; reservado para chat/archivos en Mongo más adelante).",
+      message: onVercel
+        ? "Falta MONGODB_URI. En Vercel es obligatorio para subir imágenes, PDFs y comprobantes (GridFS en Atlas)."
+        : "Falta MONGODB_URI. En local los uploads usan disco; en Vercel hace falta Atlas (GridFS).",
     });
   }
 

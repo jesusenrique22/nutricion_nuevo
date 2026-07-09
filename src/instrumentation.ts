@@ -24,4 +24,16 @@ export async function register() {
       console.error("[db] Verificá DATABASE_URL en .env y ejecutá: pnpm run db:check");
     }
   }
+
+  if (process.env.MONGODB_URI?.trim()) {
+    try {
+      const { tryGetMongoDb } = await import("@/server/db/mongo");
+      await tryGetMongoDb();
+      console.log("[mongo] ✓ Conexión Atlas activa (GridFS / chat)");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      console.error(`[mongo] ✗ No se pudo conectar a Atlas: ${msg}`);
+      console.error("[mongo] Verificá MONGODB_URI y ejecutá: pnpm run db:check:mongo");
+    }
+  }
 }

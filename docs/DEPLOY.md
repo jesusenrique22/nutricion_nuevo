@@ -28,13 +28,10 @@ Configurá cada variable en su **propia fila** en el panel del hosting (no pegar
 | `NEXTAUTH_URL` | Mismo valor que `AUTH_URL` |
 | `UPSTASH_REDIS_REST_URL` | Rate limit (auth, citas) — [console.upstash.com](https://console.upstash.com) |
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST de Upstash |
-
-### Opcionales (medios / chat legacy)
-
-| Variable | Descripción |
-|----------|-------------|
-| `MONGODB_URI` | Solo si usás GridFS o chat en Mongo |
+| `MONGODB_URI` | **Obligatorio en Vercel** — imágenes, PDFs, comprobantes (GridFS en Atlas) |
 | `MONGODB_DB` | `nutricion_chat` |
+
+> **Notificaciones, usuarios, citas y pagos** están en **Neon** (PostgreSQL). Mongo solo guarda archivos binarios y datos de chat.
 
 ### Email (verificación de cuenta + código de recuperación)
 
@@ -117,7 +114,8 @@ Con `DATABASE_URL` de producción en tu `.env` local, o desde el panel de Neon �
 | Login “Credenciales inválidas” | BD sin seed o contraseña incorrecta | `pnpm run db:seed` — admin: `admin@gmail.com` / `Admin123!` |
 | Error 500 al login | Falta `AUTH_SECRET` | Agregar en hosting + redeploy |
 | Sesión no persiste | `AUTH_URL` incorrecta | Debe coincidir con el dominio del navegador |
-| Imágenes rotas | Faltan archivos en `public/uploads/site/` | Commitear imágenes iniciales o re-subir en Personalizar |
+| Imágenes rotas | Faltan archivos en `public/uploads/site/` o GridFS | Commitear imágenes iniciales, re-subir en Personalizar, o configurar `MONGODB_URI` |
+| Error al subir archivo en prod | Sin `MONGODB_URI` en Vercel | Agregar Atlas URI + `MONGODB_DB` y redeploy |
 | “Demasiadas solicitudes” | Sin Upstash | Configurar `UPSTASH_*` |
 | Emails no llegan | SMTP mal configurado | `pnpm run email:check` local; mismas vars en hosting |
 | Google Calendar `redirect_uri_mismatch` | URI en Google Cloud | `{NEXTAUTH_URL}/api/google/calendar/callback` |
