@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { verifyEmail } from "@/server/actions/auth.actions";
 import { LoadingInline } from "@/components/ui/loading-indicator";
 
@@ -12,7 +12,7 @@ function VerifyContent() {
   const email = params.get("email") ?? "";
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const attempted = useRef(false);
 
   useEffect(() => {
     if (!token || !email) {
@@ -21,15 +21,25 @@ function VerifyContent() {
       return;
     }
 
-    startTransition(async () => {
+    // Evitar doble ejecución (StrictMode / re-render) que consumiría el token.
+    if (attempted.current) return;
+    attempted.current = true;
+
+    let cancelled = false;
+    void (async () => {
       const res = await verifyEmail({ token, email });
+      if (cancelled) return;
       if (!res.ok) {
         setStatus("error");
         setMessage(res.message);
         return;
       }
       setStatus("ok");
-    });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token, email]);
 
   if (status === "loading") {

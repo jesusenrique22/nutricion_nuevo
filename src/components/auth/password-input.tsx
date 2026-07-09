@@ -51,6 +51,10 @@ export function PasswordInput({
   autoComplete,
   className,
   inputClassName,
+  value,
+  onValueChange,
+  onFocus,
+  onBlur,
 }: {
   name?: string;
   label?: string;
@@ -59,6 +63,10 @@ export function PasswordInput({
   autoComplete?: string;
   className?: string;
   inputClassName?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const [visible, setVisible] = useState(false);
   const inputId = useId();
@@ -83,6 +91,12 @@ export function PasswordInput({
           minLength={minLength}
           autoComplete={autoComplete}
           className={inputClasses}
+          {...(value !== undefined ? { value } : {})}
+          onChange={
+            onValueChange ? (e) => onValueChange(e.target.value) : undefined
+          }
+          onFocus={onFocus}
+          onBlur={onBlur}
         />
         <button
           type="button"

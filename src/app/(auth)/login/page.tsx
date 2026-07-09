@@ -39,19 +39,20 @@ function LoginForm() {
     });
     if (res?.error) {
       setLoading(false);
-      if (res.error === "EMAIL_NOT_VERIFIED") {
+      const code = res.code ?? res.error;
+      if (code === "EMAIL_NOT_VERIFIED") {
         setError(
           "Tu email aún no está verificado. Revisá tu correo o reenviá el enlace.",
         );
         return;
       }
-      if (res.error === "ACCOUNT_DEACTIVATED") {
+      if (code === "ACCOUNT_DEACTIVATED") {
         setError(
           "Esta cuenta fue desactivada. Contactá a Anttova si necesitás ayuda.",
         );
         return;
       }
-      if (res.error === "Configuration" || res.error === "DATABASE_UNAVAILABLE") {
+      if (code === "DATABASE_UNAVAILABLE" || res.error === "Configuration") {
         setError(
           "No se pudo conectar con la base de datos (Neon). Revisá DATABASE_URL en Vercel o esperá a que termine el deploy.",
         );

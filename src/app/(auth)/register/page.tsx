@@ -11,18 +11,28 @@ import {
   authLabelClass,
 } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { PASSWORD_REQUIREMENTS_HINT } from "@/lib/validators/password";
+import { isPasswordValid } from "@/lib/validators/password";
 import { registerPatient } from "@/server/actions/auth.actions";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [pwdFocused, setPwdFocused] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    if (!isPasswordValid(password)) {
+      setError("La contraseña no cumple todos los requisitos.");
+      setPwdFocused(true);
+      return;
+    }
+
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const payload = {
@@ -77,16 +87,23 @@ export default function RegisterPage() {
               className={authInputClass}
             />
           </div>
-          <PasswordInput
-            label="Contraseña"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            inputClassName={`${authInputClass} pr-12`}
-          />
-          <p className="text-xs text-foreground/55 sm:text-sm">
-            {PASSWORD_REQUIREMENTS_HINT}
-          </p>
+          <div className="relative">
+            <PasswordInput
+              label="Contraseña"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              inputClassName={`${authInputClass} pr-12`}
+              value={password}
+              onValueChange={setPassword}
+              onFocus={() => setPwdFocused(true)}
+              onBlur={() => setPwdFocused(false)}
+            />
+            <PasswordRequirements
+              password={password}
+              visible={pwdFocused || password.length > 0}
+            />
+          </div>
           <p className="text-xs text-foreground/55 sm:text-sm">
             Te enviaremos un email para confirmar tu cuenta antes de ingresar.
           </p>

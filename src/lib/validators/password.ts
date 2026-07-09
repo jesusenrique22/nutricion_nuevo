@@ -7,6 +7,56 @@ const ALLOWED_CHARS = /^[\x20-\x7E]+$/;
 export const PASSWORD_REQUIREMENTS_HINT =
   "Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo. Sin acentos.";
 
+export interface PasswordCheck {
+  id: string;
+  label: string;
+  met: boolean;
+}
+
+/** Estado de cada requisito para mostrar un checklist en vivo durante el registro. */
+export function getPasswordChecks(password: string): PasswordCheck[] {
+  const withoutSpaces = password.replace(/\s/g, "");
+  const noAccents = password.length === 0 || ALLOWED_CHARS.test(password);
+
+  return [
+    {
+      id: "length",
+      label: "Al menos 8 caracteres",
+      met: password.length >= PASSWORD_MIN_LENGTH,
+    },
+    {
+      id: "uppercase",
+      label: "Una letra mayúscula (A-Z)",
+      met: /[A-Z]/.test(withoutSpaces),
+    },
+    {
+      id: "lowercase",
+      label: "Una letra minúscula (a-z)",
+      met: /[a-z]/.test(withoutSpaces),
+    },
+    {
+      id: "number",
+      label: "Un número (0-9)",
+      met: /[0-9]/.test(withoutSpaces),
+    },
+    {
+      id: "symbol",
+      label: "Un símbolo (!, @, #, $…)",
+      met: /[^A-Za-z0-9]/.test(withoutSpaces),
+    },
+    {
+      id: "noAccents",
+      label: "Sin acentos ni caracteres especiales",
+      met: noAccents,
+    },
+  ];
+}
+
+/** ¿La contraseña cumple todos los requisitos? */
+export function isPasswordValid(password: string): boolean {
+  return getPasswordChecks(password).every((c) => c.met);
+}
+
 export function validatePasswordRequirements(password: string): string | null {
   if (password.length < PASSWORD_MIN_LENGTH) {
     return "Mínimo 8 caracteres";

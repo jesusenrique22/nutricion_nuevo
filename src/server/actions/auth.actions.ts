@@ -208,7 +208,8 @@ export async function verifyEmail(
     return { ok: false, message: "Enlace inválido." };
   }
 
-  const identifier = verifyIdentifier(parsed.data.email);
+  const email = normalizeEmail(parsed.data.email);
+  const identifier = verifyIdentifier(email);
   const record = await prisma.verificationToken.findFirst({
     where: {
       identifier,
@@ -218,21 +219,25 @@ export async function verifyEmail(
   });
 
   if (!record) {
+    // Idempotente: si la cuenta ya quedó verificada (doble clic, prefetch del
+    // cliente de correo, reintento), no mostrar error.
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { emailVerified: true },
+    });
+    if (user?.emailVerified) {
+      return { ok: true };
+    }
     return { ok: false, message: "Enlace inválido o expirado." };
   }
 
   await prisma.$transaction([
-    prisma.user.update({
-      where: { email: parsed.data.email },
+    prisma.user.updateMany({
+      where: { email: { equals: email, mode: "insensitive" } },
       data: { emailVerified: new Date() },
     }),
-    prisma.verificationToken.delete({
-      where: {
-        identifier_token: {
-          identifier,
-          token: parsed.data.token,
-        },
-      },
+    prisma.verificationToken.deleteMany({
+      where: { identifier },
     }),
   ]);
 

@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
@@ -11,6 +11,17 @@ const credentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+/** Errores de login con `code` legible en el cliente (res.code de signIn). */
+class EmailNotVerifiedError extends CredentialsSignin {
+  code = "EMAIL_NOT_VERIFIED";
+}
+class AccountDeactivatedError extends CredentialsSignin {
+  code = "ACCOUNT_DEACTIVATED";
+}
+class DatabaseUnavailableError extends CredentialsSignin {
+  code = "DATABASE_UNAVAILABLE";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -43,11 +54,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             user.role === "PATIENT" &&
             user.patientProfile?.hiddenFromAdminList
           ) {
-            throw new Error("ACCOUNT_DEACTIVATED");
+            throw new AccountDeactivatedError();
           }
 
           if (user.role === "PATIENT" && !user.emailVerified) {
-            throw new Error("EMAIL_NOT_VERIFIED");
+            throw new EmailNotVerifiedError();
           }
 
           return {
@@ -57,12 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             role: user.role,
           };
         } catch (err) {
-          if (
-            err instanceof Error &&
-            (err.message === "ACCOUNT_DEACTIVATED" ||
-              err.message === "EMAIL_NOT_VERIFIED" ||
-              err.message === "DATABASE_UNAVAILABLE")
-          ) {
+          if (err instanceof CredentialsSignin) {
             throw err;
           }
           const code =
@@ -79,7 +85,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             message.includes("@neondatabase/serverless")
           ) {
             console.error("[auth/credentials] Base de datos:", err);
-            throw new Error("DATABASE_UNAVAILABLE");
+            throw new DatabaseUnavailableError();
           }
           console.error("[auth/credentials]", err);
           return null;
