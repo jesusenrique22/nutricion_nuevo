@@ -82,14 +82,24 @@ const nextConfig: NextConfig = {
     },
   },
 
+  // pnpm en Vercel: el tracing no siempre resuelve symlinks de Neon/ws si van como
+  // serverExternalPackages — deben empaquetarse en cada función serverless.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./node_modules/@neondatabase/serverless/**/*",
+      "./node_modules/@prisma/adapter-neon/**/*",
+      "./node_modules/ws/**/*",
+      "./node_modules/.pnpm/@neondatabase+serverless@*/node_modules/@neondatabase/serverless/**/*",
+      "./node_modules/.pnpm/@prisma+adapter-neon@*/node_modules/@prisma/adapter-neon/**/*",
+      "./node_modules/.pnpm/ws@*/node_modules/ws/**/*",
+    ],
+  },
+
   serverExternalPackages: [
     "@prisma/client",
     "prisma",
     "pdfjs-dist",
     "@napi-rs/canvas",
-    "@prisma/adapter-neon",
-    "@neondatabase/serverless",
-    "ws",
   ],
 
   images: {
