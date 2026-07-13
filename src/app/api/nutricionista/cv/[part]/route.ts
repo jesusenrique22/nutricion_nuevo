@@ -1,12 +1,10 @@
 import { isAllowedCvPdfRequest } from "@/lib/cv-pdf-access";
-import { renderStoredPdfPageAsPng } from "@/server/services/cv-pdf-render.service";
+import { openStoredFileUrl, storedFileToResponse } from "@/lib/stored-file";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 
-export const maxDuration = 60;
-
 /**
- * Compatibilidad: clientes con iframe antiguo reciben la 1.ª página como PNG
- * (sin visor PDF del navegador). La vista nueva usa /pages y /pages/[page].
+ * Sirve el PDF del CV (bytes). El render a páginas se hace en el cliente
+ * para no empaquetar pdfjs + canvas nativo en la función de Vercel (~250 MB).
  */
 export async function GET(
   req: Request,
@@ -29,20 +27,17 @@ export async function GET(
   }
 
   try {
-    const png = await renderStoredPdfPageAsPng(url, 1, 1400);
-    if (!png) {
-      return new Response("Página no encontrada", { status: 404 });
+    const file = await openStoredFileUrl(url);
+    if (!file) {
+      return new Response("PDF no encontrado", { status: 404 });
     }
 
-    return new Response(new Uint8Array(png), {
-      headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return storedFileToResponse(
+      { ...file, mimeType: "application/pdf" },
+      { inline: true },
+    );
   } catch (err) {
-    console.error("[nutricionista/cv/legacy]", err);
-    return new Response("Error al renderizar página", { status: 500 });
+    console.error("[nutricionista/cv]", err);
+    return new Response("Error al cargar PDF", { status: 500 });
   }
 }
