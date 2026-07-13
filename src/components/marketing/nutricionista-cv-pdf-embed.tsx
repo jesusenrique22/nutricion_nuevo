@@ -81,6 +81,14 @@ export function NutricionistaCvPdfEmbed({
 
     fetch(`/api/nutricionista/cv/${partIndex}/pages`, { credentials: "include" })
       .then(async (res) => {
+        const contentType = res.headers.get("content-type") ?? "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            res.ok
+              ? "Respuesta inválida del servidor."
+              : `No se pudo cargar el CV (${res.status}).`,
+          );
+        }
         const data = (await res.json()) as {
           totalPages?: number;
           error?: string;

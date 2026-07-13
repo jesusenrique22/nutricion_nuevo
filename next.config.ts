@@ -85,16 +85,23 @@ const nextConfig: NextConfig = {
   // Imports estáticos en neon-prisma-factory.ts; incluir en el trace de cada función.
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
-  // No forzar Prisma/Neon en todas las rutas API — el trace automático basta.
+  // Excluir librerías pesadas SOLO de rutas que no las usan.
+  // Nunca en "*": el CV y los PDF de recursos necesitan canvas + pdfjs en Vercel.
   outputFileTracingExcludes: {
-    "*": [
-      "./node_modules/pdfjs-dist/**",
-      "./node_modules/@napi-rs/canvas/**",
-      "./public/**",
-    ],
     "/api/media/**": [
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
+      "./node_modules/pdfjs-dist/**",
+      "./node_modules/@napi-rs/canvas/**",
+    ],
+  },
+
+  outputFileTracingIncludes: {
+    "/api/nutricionista/cv/**": [
+      "./node_modules/pdfjs-dist/**",
+      "./node_modules/@napi-rs/canvas/**",
+    ],
+    "/api/resources/**/pages/**": [
       "./node_modules/pdfjs-dist/**",
       "./node_modules/@napi-rs/canvas/**",
     ],
