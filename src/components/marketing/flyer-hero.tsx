@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { limitHeroSlides } from "@/lib/landing-images-parse";
-import { scrollToLobbySection } from "@/lib/lobby-scroll";
+import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { HeroSlide } from "@/types/landing-images";
 
@@ -62,6 +62,7 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
 
       <div className="absolute inset-0 bg-gradient-to-r from-primary/92 via-primary/55 to-primary/20" />
       <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-primary/25" />
+      <DarkSectionSparks />
 
       <motion.div
         aria-hidden
@@ -109,48 +110,32 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
           <p className="mt-8 max-w-lg text-base leading-relaxed text-primary-foreground/80 sm:text-lg">
             Acompañamiento profesional con la Lic. Ma Antonieta Lanza.
           </p>
-
-          <div className="mt-10 flex flex-wrap gap-4">
-            <Link
-              href="/register"
-              className="rounded-full bg-primary-foreground px-8 py-3.5 text-sm font-semibold text-primary shadow-lg transition hover:scale-105"
-            >
-              Empezar ahora
-            </Link>
-            <Link
-              href="#paquetes"
-              className="rounded-full border border-primary-foreground/35 bg-primary-foreground/10 px-8 py-3.5 text-sm font-semibold text-primary-foreground backdrop-blur-sm transition hover:bg-primary-foreground/20"
-            >
-              Ver paquetes
-            </Link>
-            <Link
-              href="#contacto"
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToLobbySection("contacto");
-                window.history.replaceState(null, "", "#contacto");
-              }}
-              className="rounded-full border border-accent-soft/50 bg-accent-soft/15 px-8 py-3.5 text-sm font-semibold text-primary-foreground backdrop-blur-sm transition hover:bg-accent-soft/25"
-            >
-              Contáctame
-            </Link>
-          </div>
         </div>
 
-        <div className="flex gap-2">
-          {items.map((s, i) => (
-            <button
-              key={`${s.src}-dot-${i}`}
-              type="button"
-              aria-label={`Ir a slide ${i + 1}`}
-              onClick={() => setIndex(i)}
-              className={`h-1.5 rounded-full transition-all ${
-                i === index
-                  ? "w-10 bg-primary-foreground"
-                  : "w-4 bg-primary-foreground/35 hover:bg-primary-foreground/55"
-              }`}
-            />
-          ))}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-2">
+            {items.map((s, i) => (
+              <button
+                key={`${s.src}-dot-${i}`}
+                type="button"
+                aria-label={`Ir a slide ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index
+                    ? "w-10 bg-primary-foreground"
+                    : "w-4 bg-primary-foreground/35 hover:bg-primary-foreground/55"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* CTA discreto: no compite con el flyer */}
+          <Link
+            href="#paquetes"
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/55 transition hover:text-primary-foreground"
+          >
+            Ver paquetes ↓
+          </Link>
         </div>
       </div>
     </section>

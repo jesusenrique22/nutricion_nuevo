@@ -53,7 +53,7 @@ export function BrandSocialFooter() {
               </div>
             ))}
           </div>
-          <p className="mt-8 text-center text-xs text-foreground/45 md:text-left">
+          <p className="mt-8 text-center text-sm font-medium text-primary/75 md:text-left">
             Nutrición · Fitness · Wellness · Buenos Aires, Argentina · Est. 2025
           </p>
         </motion.div>

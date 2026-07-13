@@ -42,7 +42,7 @@ export function BrandServicesDetail({
             <RevealScale key={service.key} delay={i * 0.06}>
               <Link
                 href="/login"
-                className="group block overflow-hidden rounded-2xl shadow-lg shadow-primary/10 ring-1 ring-foreground/5 transition hover:-translate-y-0.5 hover:shadow-xl hover:ring-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:rounded-3xl"
+                className="group block overflow-hidden rounded-2xl ring-1 ring-primary/12 transition hover:-translate-y-0.5 hover:ring-primary/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:rounded-3xl"
                 aria-label={`${service.alt} — iniciar sesión para reservar`}
               >
                 <Image

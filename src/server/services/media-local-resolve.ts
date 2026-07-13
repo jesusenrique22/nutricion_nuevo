@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
-const PUBLIC_UPLOAD_FOLDERS = ["site", "brand", "cv"] as const;
+const PUBLIC_UPLOAD_FOLDERS = ["site", "brand", "cv", "products"] as const;
 
 const MIME_FROM_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",

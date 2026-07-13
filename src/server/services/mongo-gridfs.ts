@@ -1,6 +1,6 @@
 import { GridFSBucket, ObjectId } from "mongodb";
 import { Readable } from "node:stream";
-import { tryGetMongoDb } from "@/server/db/mongo";
+import { tryGetMongoDb, tryGetMongoDbFast } from "@/server/db/mongo";
 
 const BUCKET = "media";
 
@@ -42,7 +42,7 @@ export async function uploadToMongo(
 
 export async function getMongoFileMeta(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbFast();
   if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
@@ -54,10 +54,14 @@ export async function getMongoFileMeta(fileId: string) {
 
 export async function openGridFsDownloadStream(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbFast();
   if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
-  const meta = await getMongoFileMeta(fileId);
+  const files = await bucket
+    .find({ _id: new ObjectId(fileId) })
+    .limit(1)
+    .toArray();
+  const meta = files[0] ?? null;
   if (!meta) return null;
   const stream = bucket.openDownloadStream(new ObjectId(fileId));
   return { stream, meta };

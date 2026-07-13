@@ -65,6 +65,8 @@ export default function RegisterPage() {
     <AuthShell
       title="Empezá hoy"
       subtitle="Creá tu cuenta y accedé a consultas, recursos y seguimiento personalizado con Anttova."
+      formTitle="Crear cuenta"
+      formHint="Registrá tus datos para empezar el acompañamiento."
     >
       <AuthFormCard>
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">

@@ -40,7 +40,7 @@ export function PortadaBackground({ children }: { children: React.ReactNode }) {
             className="object-cover"
             sizes="100vw"
           />
-          <div className="absolute inset-0 bg-background/45 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-background/35 backdrop-blur-[1px]" />
         </motion.div>
       </AnimatePresence>
 

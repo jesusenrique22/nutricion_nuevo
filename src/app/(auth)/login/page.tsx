@@ -59,7 +59,7 @@ function LoginForm() {
         return;
       }
       setError(
-        "Credenciales inválidas. Cuenta demo: admin@gmail.com / Admin123! (con signo de exclamación al final).",
+        "Credenciales inválidas.",
       );
       return;
     }
@@ -132,7 +132,7 @@ function LoginForm() {
           type="submit"
           loading={loading}
           loadingLabel="Ingresando…"
-          className={authButtonClass}
+          className={`${authButtonClass} shadow-[0_14px_32px_-14px_rgba(116,30,49,0.65)] hover:bg-[#5a1728]`}
         >
           Iniciar sesión
         </LoadingButton>
@@ -145,7 +145,9 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Bienvenid@"
-      subtitle="Ingresá a tu panel para ver citas, estadísticas, planes y seguimiento con Anttova."
+      subtitle="Tu panel Anttova: citas, planes y seguimiento con la Lic. Ma Antonieta Lanza."
+      formTitle="Ingresar"
+      formHint="Email y contraseña para abrir tu panel."
     >
       <Suspense>
         <LoginForm />

@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import { signOutAction } from "@/server/actions/auth.actions";
-import { BackgroundCharacters } from "@/components/brand/background-characters";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { DashboardMain } from "@/components/dashboard/dashboard-main";
 import { RealtimeSync } from "@/components/realtime/realtime-sync";
 import { SocketProvider } from "@/contexts/socket-context";
 import { isSocketClientEnabled } from "@/lib/socket-config";
@@ -31,6 +31,7 @@ export default async function DashboardLayout({
     { href: "/dashboard/admin/payments", label: "Pagos" },
     { href: "/dashboard/admin/analytics", label: "Estadísticas" },
     { href: "/dashboard/admin/resources", label: "Recursos" },
+    { href: "/dashboard/admin/reviews", label: "Reseñas" },
     { href: "/dashboard/admin/personalizar", label: "Personalizar" },
   ];
   const patientLinks = [
@@ -38,6 +39,7 @@ export default async function DashboardLayout({
     { href: "/dashboard/patient/appointments", label: "Mis citas" },
     { href: "/dashboard/patient/library", label: "Recursos" },
     { href: "/dashboard/patient/products", label: "Productos" },
+    { href: "/dashboard/patient/reviews", label: "Reseñas" },
     { href: "/dashboard/patient/cart", label: "Carrito" },
   ];
   const links = isAdmin ? adminLinks : patientLinks;
@@ -45,7 +47,7 @@ export default async function DashboardLayout({
 
   const signOutButton = (
     <form action={signOutAction}>
-      <button className="w-full rounded-xl px-4 py-2.5 text-left font-semibold text-accent-soft transition hover:bg-white/10">
+      <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-accent-soft transition hover:bg-white/10">
         Cerrar sesión
       </button>
     </form>
@@ -61,12 +63,9 @@ export default async function DashboardLayout({
         footer={signOutButton}
         cartCount={cartCount}
       />
-      <main className="scrollbar-stable relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background">
-        <BackgroundCharacters />
+      <main className="scrollbar-stable relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background/70 backdrop-blur-[1px]">
         <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
-          <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-1 flex-col px-4 pt-4 pb-10 sm:px-6 sm:pt-6 sm:pb-12 md:px-8 md:pt-8 md:pb-14">
-            {children}
-          </div>
+          <DashboardMain>{children}</DashboardMain>
         </div>
       </main>
     </div>

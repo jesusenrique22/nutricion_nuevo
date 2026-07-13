@@ -12,6 +12,7 @@ import {
 
 import { parseAdminPaymentItemId } from "@/lib/admin-payment-item";
 import { formatActionError } from "@/lib/db-errors";
+import { notifyReviewRequested } from "@/server/services/review-notify.service";
 
 export type PaymentAdminActionResult =
   | { ok: true }
@@ -130,7 +131,7 @@ export async function approveProductPayment(params: {
 
       const purchase = await prisma.productPurchase.findUnique({
         where: { id: params.purchaseId },
-        select: { userId: true, status: true },
+        select: { userId: true, status: true, productName: true },
       });
       if (!purchase || purchase.status !== "PENDING") {
         return { ok: false, message: "Solicitud no encontrada o ya procesada." };
@@ -143,6 +144,13 @@ export async function approveProductPayment(params: {
           grantedAt: new Date(),
           adminNote: params.adminNote ?? null,
         },
+      });
+
+      await notifyReviewRequested({
+        patientId: purchase.userId,
+        itemTitle: purchase.productName,
+        itemKind: "PRODUCT",
+        entityId: params.purchaseId,
       });
 
       revalidateAll(purchase.userId);

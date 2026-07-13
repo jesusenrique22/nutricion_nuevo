@@ -5,20 +5,23 @@ import { LandingBlocksRegion } from "@/components/marketing/landing-blocks-regio
 import { LandingCtaSection } from "@/components/marketing/landing-cta-section";
 import { LandingLobbyShell } from "@/components/marketing/landing-lobby-shell";
 import { LandingPackagesSection } from "@/components/marketing/landing-packages-section";
+import { ReviewsShowcase } from "@/components/marketing/reviews-showcase";
 import { getConsultationTypes } from "@/server/actions/booking.queries";
 import {
   getLandingBlocks,
   getLandingImages,
 } from "@/server/queries/landing.queries";
+import { getPublishedReviews } from "@/server/queries/reviews.queries";
 import type { LandingBlockPlacement } from "@/types/landing-blocks";
 
 export const revalidate = 60;
 
 export default async function LandingPage() {
-  const [images, consultations, blocksData] = await Promise.all([
+  const [images, consultations, blocksData, reviews] = await Promise.all([
     getLandingImages(),
     getConsultationTypes(),
     getLandingBlocks(),
+    getPublishedReviews(),
   ]);
 
   const enabledBlocks = blocksData.blocks.filter((block) => block.enabled);
@@ -44,6 +47,8 @@ export default async function LandingPage() {
       />
 
       <LandingBlocksRegion blocks={blocksAt("after_packages")} />
+
+      <ReviewsShowcase reviews={reviews} />
 
       <LandingCtaSection backgroundSrc={images.ctaBackground} />
 

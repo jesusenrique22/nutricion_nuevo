@@ -122,7 +122,9 @@ function parseCv(raw: unknown): NutricionistaCvData {
     bio: String(o.bio ?? defaults.bio).trim() || defaults.bio,
     photoUrl:
       typeof o.photoUrl === "string" && o.photoUrl.trim()
-        ? o.photoUrl.trim()
+        ? o.photoUrl.trim() === "/brand/professional-profile.jpg"
+          ? BRAND_PROFILE.professional
+          : o.photoUrl.trim()
         : defaults.photoUrl ?? BRAND_PROFILE.professional,
     est: String(o.est ?? defaults.est).trim() || defaults.est,
     city: String(o.city ?? defaults.city).trim() || defaults.city,

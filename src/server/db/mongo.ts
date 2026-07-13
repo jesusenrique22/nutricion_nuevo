@@ -7,6 +7,15 @@ import {
   Db,
   ServerApiVersion,
 } from "mongodb";
+import dns from "node:dns";
+
+/** Atlas SRV: el DNS del router (10.x) suele fallar; Google/Cloudflare lo resuelven. */
+if (
+  process.env.MONGODB_URI?.includes("mongodb+srv://") &&
+  process.env.MONGODB_USE_SYSTEM_DNS !== "1"
+) {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+}
 
 const dbName = process.env.MONGODB_DB ?? "nutricion_chat";
 
@@ -165,6 +174,43 @@ export async function getMongoDb(): Promise<Db> {
 
 export function isMongoConfigured(): boolean {
   return Boolean(process.env.MONGODB_URI?.trim());
+}
+
+/**
+ * Lectura tolerante con timeout corto (evita ~80s de espera en /api/media cuando Atlas no responde).
+ */
+export async function tryGetMongoDbFast(): Promise<Db | null> {
+  if (!isMongoConfigured()) return null;
+
+  if (globalForMongo._mongoClient) {
+    try {
+      const db = globalForMongo._mongoClient.db(dbName);
+      await Promise.race([
+        db.command({ ping: 1 }),
+        sleep(2_500),
+      ]);
+      return db;
+    } catch {
+      resetMongoConnection();
+    }
+  }
+
+  const client = new MongoClient(getMongoUri(), {
+    ...getClientOptions(),
+    serverSelectionTimeoutMS: 4_000,
+    connectTimeoutMS: 4_000,
+    socketTimeoutMS: 10_000,
+  });
+
+  try {
+    await client.connect();
+    globalForMongo._mongoClient = client;
+    globalForMongo._mongoClientPromise = Promise.resolve(client);
+    return client.db(dbName);
+  } catch {
+    await client.close().catch(() => {});
+    return null;
+  }
 }
 
 /**

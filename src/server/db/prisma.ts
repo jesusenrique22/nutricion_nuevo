@@ -16,6 +16,9 @@ const REQUIRED_DELEGATES = [
   "notification",
 ] as const;
 
+/** Modelos nuevos: no bloquean el arranque si Turbopack aún tiene un bundle viejo. */
+const OPTIONAL_DELEGATES = ["review"] as const;
+
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaSchemaMtime?: number;
@@ -31,6 +34,19 @@ function schemaMtimeMs(): number {
 
 function hasRequiredDelegates(client: PrismaClient): boolean {
   return REQUIRED_DELEGATES.every((key) => key in client);
+}
+
+export function prismaHasDelegate(name: string): boolean {
+  try {
+    const client = getPrismaClient();
+    return name in client;
+  } catch {
+    return false;
+  }
+}
+
+export function isPrismaReviewReady(): boolean {
+  return prismaHasDelegate("review");
 }
 
 /** Campos recientes del schema; si faltan, el bundle de Turbopack sigue con client viejo. */
@@ -66,8 +82,11 @@ function createPrismaClient(): PrismaClient {
   );
 
   if (!hasRequiredDelegates(client) || !clientHasExpectedSchema()) {
+    const missing = REQUIRED_DELEGATES.filter((key) => !(key in client));
     const message =
-      "Prisma Client desactualizado. Ejecuta: pnpm prisma generate && reinicia el servidor.";
+      missing.length > 0
+        ? `Prisma Client desactualizado (falta: ${missing.join(", ")}). Ejecutá: pnpm db:generate && pnpm dev:clean`
+        : "Prisma Client desactualizado. Ejecutá: pnpm db:generate && pnpm dev:clean";
     if (process.env.NODE_ENV === "production") {
       console.error(`[prisma] ${message}`);
     } else {

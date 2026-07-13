@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { LandingAmbientMotion } from "@/components/marketing/landing-ambient";
 
+/** Scroll-snap del lobby solo en la portada (`/`). */
 export function LandingLobbyShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.add("landing-lobby");
@@ -11,10 +11,5 @@ export function LandingLobbyShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <>
-      <LandingAmbientMotion />
-      <div className="relative z-10 flex flex-col">{children}</div>
-    </>
-  );
+  return <>{children}</>;
 }

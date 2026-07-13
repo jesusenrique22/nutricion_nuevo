@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { useState } from "react";
-import { Reveal } from "@/components/motion/reveal";
+import { Reveal, RevealScale, StaggerReveal, StaggerRevealItem } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import type { LandingImagesData } from "@/types/landing-images";
 
@@ -66,7 +66,7 @@ export function BrandPillarsShowcase({
   const detailSrc = serviceImages[current.key];
 
   return (
-    <section className="relative overflow-hidden bg-muted/40 px-6 py-16 sm:py-20">
+    <section className="lobby-panel relative scroll-mt-20 overflow-hidden bg-muted/40 px-6 py-16 sm:min-h-[100svh] sm:py-20">
       <motion.div
         aria-hidden
         className="pointer-events-none absolute -right-24 top-1/4 h-72 w-72 rounded-full bg-accent-soft/45 blur-3xl"
@@ -80,7 +80,7 @@ export function BrandPillarsShowcase({
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="relative mx-auto max-w-5xl">
+      <div className="relative mx-auto flex max-w-5xl flex-col justify-center">
         <Reveal>
           <p className="text-center text-xs font-semibold uppercase tracking-[0.28em] text-foreground/60">
             Nuestro enfoque
@@ -94,7 +94,7 @@ export function BrandPillarsShowcase({
           </p>
         </Reveal>
 
-        <div
+        <StaggerReveal
           role="tablist"
           aria-label="Pilares de servicio"
           className="mt-10 flex flex-col gap-2 sm:mt-12 sm:flex-row sm:justify-center sm:gap-3"
@@ -102,18 +102,18 @@ export function BrandPillarsShowcase({
           {PILLARS.map((pillar) => {
             const selected = pillar.key === active;
             return (
-              <button
-                key={pillar.key}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setActive(pillar.key)}
-                className={`flex min-w-0 flex-1 flex-col rounded-2xl border px-4 py-4 text-left transition sm:max-w-[16rem] ${
-                  selected
-                    ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/15"
-                    : "border-foreground/10 bg-surface text-foreground hover:border-primary/20 hover:bg-surface/90"
-                }`}
-              >
+              <StaggerRevealItem key={pillar.key} className="flex min-w-0 flex-1 sm:max-w-[16rem]">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActive(pillar.key)}
+                  className={`flex w-full flex-col rounded-2xl border px-4 py-4 text-left transition sm:flex-1 ${
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground ring-1 ring-primary/20"
+                      : "border-foreground/10 bg-surface text-foreground hover:border-primary/20 hover:bg-surface/90"
+                  }`}
+                >
                 <span
                   className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
                     selected ? "text-primary-foreground/70" : "text-primary/50"
@@ -133,12 +133,13 @@ export function BrandPillarsShowcase({
                 >
                   {pillar.teaser}
                 </span>
-              </button>
+                </button>
+              </StaggerRevealItem>
             );
           })}
-        </div>
+        </StaggerReveal>
 
-        <div className="relative mt-8 sm:mt-10">
+        <RevealScale delay={0.15} className="relative mt-8 sm:mt-10">
           <motion.div
             aria-hidden
             className="pointer-events-none absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-accent-soft/30 via-transparent to-primary/10"
@@ -146,7 +147,7 @@ export function BrandPillarsShowcase({
             transition={{ type: "spring", stiffness: 200, damping: 28 }}
           />
 
-          <div className="relative overflow-hidden rounded-3xl bg-surface shadow-xl shadow-primary/10 ring-1 ring-foreground/8">
+          <div className="relative overflow-hidden rounded-3xl bg-surface ring-1 ring-primary/12">
             <AnimatePresence mode="wait">
               <motion.div
                 key={active}
@@ -166,7 +167,7 @@ export function BrandPillarsShowcase({
               </motion.div>
             </AnimatePresence>
           </div>
-        </div>
+        </RevealScale>
       </div>
     </section>
   );

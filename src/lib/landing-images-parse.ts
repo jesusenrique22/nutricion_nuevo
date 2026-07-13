@@ -17,10 +17,13 @@ function isNonEmptyString(v: unknown): v is string {
 const FLYER_PNG_TO_JPG: Record<string, string> = {
   "/brand/flyers/jump.png": "/brand/flyers/jump.jpg",
   "/brand/flyers/medical.png": "/brand/flyers/medical.jpg",
-  "/brand/flyers/training.png": "/brand/flyers/training.jpg",
+  // training.jpg era un capture de diapositiva; usamos el PNG oficial
 };
 
 function optimizeHeroFlyerSrc(src: string): string {
+  if (src === "/brand/flyers/training.jpg") {
+    return "/brand/flyers/training.png";
+  }
   return FLYER_PNG_TO_JPG[src] ?? src;
 }
 

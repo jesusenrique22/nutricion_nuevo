@@ -8,6 +8,7 @@ import {
   upsertResourceSchema,
 } from "@/lib/validators/resource";
 import { createNotification } from "@/server/services/notification.service";
+import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import { syncUser } from "@/server/realtime/sync";
 import { formatActionError } from "@/lib/db-errors";
 
@@ -214,6 +215,13 @@ export async function grantResourceAccess(
         resourceId: resource.id,
         deepLink: `/dashboard/patient/library/${resource.id}`,
       },
+    });
+
+    await notifyReviewRequested({
+      patientId: parsed.data.userId,
+      itemTitle: resource.title,
+      itemKind: "RESOURCE",
+      entityId: resource.id,
     });
 
     await syncUser(parsed.data.userId, "notifications", { action: "created" });

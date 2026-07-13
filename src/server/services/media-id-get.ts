@@ -1,5 +1,6 @@
 import { isPublicMediaFolder } from "@/lib/media-access-policy";
-import { findLocalUploadByFileId, openLocalMediaStream } from "@/server/services/media-local-resolve";
+import { findLocalUploadUrl } from "@/server/services/mongo-storage";
+import { openLocalMediaStream } from "@/server/services/media-local-resolve";
 import {
   gridFileMimeType,
   mongoStreamToWebResponse,
@@ -10,7 +11,7 @@ export async function handleMediaGet(
   req: Request,
   { id }: { id: string },
 ): Promise<Response> {
-  const located = await findLocalUploadByFileId(id);
+  const located = await findLocalUploadUrl(id);
   if (located && isPublicMediaFolder(located.folder)) {
     return Response.redirect(new URL(located.url, req.url), 307);
   }

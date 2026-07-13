@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { NotificationType as PrismaNotificationType } from "@prisma/client";
+import { NotificationType as PrismaNotificationType } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import { syncUser } from "@/server/realtime/sync";
@@ -11,7 +11,14 @@ import { VISIBLE_NOTIFICATION_TYPES } from "@/types/chat";
 
 const notificationIdSchema = z.string().min(1);
 
-const visibleTypes = VISIBLE_NOTIFICATION_TYPES as PrismaNotificationType[];
+/** Solo tipos que el cliente Prisma actual conoce (evita crash si falta migrate/generate). */
+const prismaNotificationTypes = new Set(
+  Object.values(PrismaNotificationType),
+);
+
+const visibleTypes = VISIBLE_NOTIFICATION_TYPES.filter((t) =>
+  prismaNotificationTypes.has(t as PrismaNotificationType),
+) as PrismaNotificationType[];
 
 function toDto(n: {
   id: string;
@@ -48,31 +55,41 @@ export interface NotificationDTO {
 
 export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
   const session = await auth();
-  if (!session?.user?.id) return [];
+  if (!session?.user?.id || visibleTypes.length === 0) return [];
 
-  const docs = await prisma.notification.findMany({
-    where: {
-      recipientId: session.user.id,
-      type: { in: visibleTypes },
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+  try {
+    const docs = await prisma.notification.findMany({
+      where: {
+        recipientId: session.user.id,
+        type: { in: visibleTypes },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
 
-  return docs.map(toDto);
+    return docs.map(toDto);
+  } catch (err) {
+    console.error("[getNotifications]", err);
+    return [];
+  }
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
   const session = await auth();
-  if (!session?.user?.id) return 0;
+  if (!session?.user?.id || visibleTypes.length === 0) return 0;
 
-  return prisma.notification.count({
-    where: {
-      recipientId: session.user.id,
-      isRead: false,
-      type: { in: visibleTypes },
-    },
-  });
+  try {
+    return await prisma.notification.count({
+      where: {
+        recipientId: session.user.id,
+        isRead: false,
+        type: { in: visibleTypes },
+      },
+    });
+  } catch (err) {
+    console.error("[getUnreadNotificationCount]", err);
+    return 0;
+  }
 }
 
 export async function markNotificationRead(

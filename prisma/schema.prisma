@@ -77,6 +77,23 @@ enum NotificationType {
   RESOURCE_UNLOCKED
   REFUND_REQUESTED
   REFUND_RESOLVED
+  REVIEW_SUBMITTED
+  REVIEW_PUBLISHED
+  REVIEW_REQUESTED
+}
+
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+// Tema al que apunta la reseña (para mostrar "estrellas al servicio, producto…")
+enum ReviewTopic {
+  GENERAL
+  SERVICE
+  PRODUCT
+  CARE
 }
 
 // ──────────────────────────────────────────────
@@ -103,6 +120,7 @@ model User {
   cartItems   CartItem[]
   weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
   notifications  Notification[]
+  reviews        Review[]
 
   accounts Account[]
   sessions Session[]
@@ -173,7 +191,7 @@ model ConsultationType {
 model Appointment {
   id                 String               @id @default(cuid())
   patientId          String
-  patient            User                 @relation("PatientAppointments", fields: [patientId], references: [id])
+  patient            User                 @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
   consultationTypeId String
   consultationType   ConsultationType     @relation(fields: [consultationTypeId], references: [id])
   startTime          DateTime
@@ -505,7 +523,7 @@ model PatientWeeklyPlan {
 model ResourcePurchase {
   id         String               @id @default(cuid())
   userId     String
-  user       User                 @relation(fields: [userId], references: [id])
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   resourceId String
   resource   Resource             @relation(fields: [resourceId], references: [id])
   pricePaid  Decimal              @db.Decimal(10, 2)
@@ -532,7 +550,7 @@ model ResourcePurchase {
 model ProductPurchase {
   id                      String               @id @default(cuid())
   userId                  String
-  user                    User                 @relation(fields: [userId], references: [id])
+  user                    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId               String
   productName             String
   quantity                Int                  @default(1)
@@ -642,4 +660,28 @@ model Notification {
 
   @@index([recipientId, isRead, createdAt(sort: Desc)])
   @@index([recipientId, createdAt(sort: Desc)])
+}
+
+// ──────────────────────────────────────────────
+// RESEÑAS (Testimonios de pacientes)
+// ──────────────────────────────────────────────
+
+model Review {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** Nombre denormalizado del autor para mostrar en el lobby. */
+  authorName String
+  rating     Int // 1–5 estrellas (validado en zod)
+  topic      ReviewTopic  @default(GENERAL)
+  body       String       @db.Text
+  status     ReviewStatus @default(PENDING)
+  adminNote  String?
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId])
 }

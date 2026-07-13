@@ -14,6 +14,7 @@ import {
   notifyAppointmentCancelled,
   notifyAppointmentRescheduled,
 } from "@/server/services/appointment-notify.service";
+import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import { formatActionError } from "@/lib/db-errors";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
@@ -112,6 +113,14 @@ export async function updateAppointmentStatus(
         consultationName: appt.consultationType.name,
         startTime: appt.startTime,
         cancelledBy: "ADMIN",
+      });
+      await refreshGoogleCalendar(appt.id);
+    } else if (parsed.data.status === "COMPLETED") {
+      await notifyReviewRequested({
+        patientId: appt.patientId,
+        itemTitle: appt.consultationType.name,
+        itemKind: "APPOINTMENT",
+        entityId: appt.id,
       });
       await refreshGoogleCalendar(appt.id);
     } else {

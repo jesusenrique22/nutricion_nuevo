@@ -8,7 +8,10 @@ export type NotificationType =
   | "APPOINTMENT_CANCELLED"
   | "RESOURCE_UNLOCKED"
   | "REFUND_REQUESTED"
-  | "REFUND_RESOLVED";
+  | "REFUND_RESOLVED"
+  | "REVIEW_SUBMITTED"
+  | "REVIEW_PUBLISHED"
+  | "REVIEW_REQUESTED";
 
 export const VISIBLE_NOTIFICATION_TYPES: NotificationType[] = [
   "APPOINTMENT_CONFIRMED",
@@ -17,6 +20,9 @@ export const VISIBLE_NOTIFICATION_TYPES: NotificationType[] = [
   "RESOURCE_UNLOCKED",
   "REFUND_REQUESTED",
   "REFUND_RESOLVED",
+  "REVIEW_SUBMITTED",
+  "REVIEW_PUBLISHED",
+  "REVIEW_REQUESTED",
 ];
 
 export type ConsultationChatCode = "NUT_01" | "ENT_02" | "ANT_03";

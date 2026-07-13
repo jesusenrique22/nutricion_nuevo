@@ -241,8 +241,10 @@ function ForgotPasswordFlow() {
 export default function ForgotPasswordPage() {
   return (
     <AuthShell
-      title="Recuperar contraseña"
+      title="Recuperar"
       subtitle="Te enviamos un código a tu correo para verificar tu identidad antes de cambiar la contraseña."
+      formTitle="Restablecer"
+      formHint="Ingresá tu email y seguí los pasos del código."
     >
       <Suspense>
         <ForgotPasswordFlow />

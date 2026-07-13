@@ -3,7 +3,7 @@
 export const BRAND_FLYERS = {
   jump: "/brand/flyers/jump.jpg",
   medical: "/brand/flyers/medical.jpg",
-  training: "/brand/flyers/training.jpg",
+  training: "/brand/flyers/training.png",
 } as const;
 
 export const BRAND_PORTADAS = {
@@ -42,5 +42,6 @@ export const BRAND_PROFILE = {
   doctoraAnto: "/brand/doctora-anto.png",
   cvFolder: "/brand/cv-folder.png",
   scrubs: "/brand/nutricionist-scrubs.png",
-  professional: "/brand/professional-profile.jpg",
+  /** Retrato de la Lic. María Antonieta Lanza (reemplazable). */
+  professional: "/brand/maria-antonieta.jpg",
 } as const;

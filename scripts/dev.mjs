@@ -3,6 +3,8 @@
  * Dev server en puerto fijo 3000.
  * NextAuth (NEXTAUTH_URL) y el socket (3001) dependen de que la app NO cambie de puerto.
  */
+import { statSync, existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import path from "node:path";
 import { execSync, spawn } from "node:child_process";
 import { ensureDatabaseEnv } from "./ensure-database-env.mjs";
 
@@ -20,6 +22,41 @@ function portListeners(port) {
 }
 
 ensureDatabaseEnv();
+
+/** Si cambió schema.prisma, limpiar .next para que Turbopack no use Prisma Client viejo. */
+function syncDevCacheWithSchema() {
+  const schemaPath = path.join(process.cwd(), "prisma/schema.prisma");
+  const stampDir = path.join(process.cwd(), ".next");
+  const stampPath = path.join(stampDir, "dev-schema.stamp");
+
+  let mtime = 0;
+  try {
+    mtime = statSync(schemaPath).mtimeMs;
+  } catch {
+    return;
+  }
+
+  const prev = existsSync(stampPath)
+    ? Number(readFileSync(stampPath, "utf8"))
+    : 0;
+
+  if (prev && prev !== mtime) {
+    console.log("→ Schema Prisma cambió — limpiando caché de Next (.next)…");
+    rmSync(stampDir, { recursive: true, force: true });
+  }
+
+  mkdirSync(stampDir, { recursive: true });
+  writeFileSync(stampPath, String(mtime));
+}
+
+syncDevCacheWithSchema();
+
+console.log("→ Generando Prisma Client…");
+try {
+  execSync("node scripts/prisma-cli.mjs generate", { stdio: "inherit" });
+} catch {
+  console.warn("⚠ No se pudo generar Prisma Client. Ejecutá: pnpm db:generate\n");
+}
 
 if (process.env.DATABASE_URL?.includes("neon.tech")) {
   try {

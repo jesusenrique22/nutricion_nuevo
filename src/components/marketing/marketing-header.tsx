@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
 import { CurrencySelector } from "@/components/currency/currency-selector";
 import { showsPublicCurrencySelector } from "@/lib/currency/visibility";
@@ -16,14 +17,11 @@ import {
 
 export type { LobbySectionId };
 
-/** Enlace ya resuelto para renderizar en el header. */
 type ResolvedNavItem = {
   key: string;
   label: string;
   href: string;
-  /** id de sección si el enlace hace scroll suave en la portada. */
   sectionId: LobbySectionId | null;
-  /** ruta que marca el enlace como activo. */
   matchPath: string | null;
   external: boolean;
 };
@@ -52,7 +50,6 @@ function resolveItems(items: NavMenuItem[]): ResolvedNavItem[] {
           external: false,
         };
       }
-      // section
       const sectionId = isLobbySectionId(item.target) ? item.target : null;
       return {
         key: `${item.id}-${index}`,
@@ -65,11 +62,11 @@ function resolveItems(items: NavMenuItem[]): ResolvedNavItem[] {
     });
 }
 
-function navLinkClass(active: boolean) {
-  return `rounded-full px-4 py-2 transition ${
+function navClass(active: boolean) {
+  return `group relative rounded-full px-3.5 py-2 transition ${
     active
       ? "bg-primary/10 font-semibold text-primary"
-      : "text-foreground/70 hover:bg-muted hover:text-primary"
+      : "text-foreground/70 hover:text-primary"
   }`;
 }
 
@@ -78,16 +75,23 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
   const isHome = pathname === "/";
   const showCurrency = showsPublicCurrencySelector(pathname);
   const navItems = resolveItems(items ?? DEFAULT_NAV_MENU.items);
+  // false en SSR y 1er paint → sin mismatch de hidratación
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (!isHome || typeof window === "undefined") return;
-
     const scrollFromHash = () => {
       const hash = window.location.hash.replace("#", "");
       if (!hash || !isLobbySectionId(hash)) return;
       requestAnimationFrame(() => scrollToLobbySection(hash));
     };
-
     scrollFromHash();
     window.addEventListener("hashchange", scrollFromHash);
     return () => window.removeEventListener("hashchange", scrollFromHash);
@@ -104,11 +108,17 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-foreground/5 bg-surface/90 backdrop-blur-md">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-4">
+    <header
+      className={`sticky top-0 z-50 border-b transition-[background,box-shadow,border-color] duration-300 ${
+        scrolled
+          ? "border-primary/10 bg-surface/85 shadow-[0_8px_30px_-12px_rgba(116,30,49,0.25)] backdrop-blur-xl"
+          : "border-foreground/5 bg-surface/90 backdrop-blur-md"
+      }`}
+    >
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5">
         <BrandLogoLink href="/#inicio" priority />
 
-        <div className="hidden items-center gap-1 text-sm font-semibold md:flex">
+        <div className="hidden items-center gap-0.5 text-sm font-semibold md:flex">
           {navItems.map((item) => {
             const active = item.matchPath ? pathname === item.matchPath : false;
 
@@ -119,9 +129,10 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
                   href={item.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={navLinkClass(false)}
+                  className={navClass(false)}
                 >
                   {item.label}
+                  <span className="absolute inset-x-3 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-accent transition group-hover:scale-x-100" />
                 </a>
               );
             }
@@ -132,27 +143,33 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
                   key={item.key}
                   href={item.href}
                   onClick={(e) => handleSectionNav(e, item.sectionId!)}
-                  className={navLinkClass(active)}
+                  className={navClass(active)}
                 >
                   {item.label}
+                  <span
+                    className={`absolute inset-x-3 -bottom-0.5 h-0.5 origin-left rounded-full bg-primary transition ${
+                      active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                    }`}
+                  />
                 </Link>
               );
             }
 
             return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className={navLinkClass(active)}
-              >
+              <Link key={item.key} href={item.href} className={navClass(active)}>
                 {item.label}
+                <span
+                  className={`absolute inset-x-3 -bottom-0.5 h-0.5 origin-left rounded-full bg-primary transition ${
+                    active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  }`}
+                />
               </Link>
             );
           })}
           {showCurrency && <CurrencySelector className="ml-1" />}
           <Link
             href="/login"
-            className="ml-2 rounded-full bg-primary px-5 py-2 text-primary-foreground transition hover:bg-foreground/90"
+            className="ml-2 inline-flex rounded-full bg-primary px-5 py-2 text-primary-foreground transition hover:bg-[#5a1728]"
           >
             Iniciar sesión
           </Link>
@@ -199,7 +216,7 @@ function MobileNav({
       <button
         type="button"
         onClick={() => setMenuOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-foreground/10 bg-muted md:hidden"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/15 bg-muted md:hidden"
         aria-label="Abrir menú"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -207,81 +224,110 @@ function MobileNav({
         </svg>
       </button>
 
-      {menuOpen && (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-50 bg-black/40 md:hidden"
-            aria-label="Cerrar menú"
-            onClick={close}
-          />
-          <div className="fixed inset-x-0 top-0 z-50 border-b border-foreground/10 bg-surface p-4 shadow-xl md:hidden">
-            <div className="flex items-center justify-between">
-              <Link href="/#inicio" onClick={close}>
-                <BrandLogo />
-              </Link>
-              <button type="button" onClick={close} className="rounded-full px-3 py-1 text-sm font-semibold hover:bg-muted" aria-label="Cerrar menú">
-                ✕
-              </button>
-            </div>
-            <div className="mt-6 flex flex-col gap-2 text-sm font-semibold">
-              {items.map((item) => {
-                const active = item.matchPath ? pathname === item.matchPath : false;
+      <AnimatePresence>
+        {menuOpen && (
+          <>
+            <motion.button
+              type="button"
+              className="fixed inset-0 z-50 bg-black/40 md:hidden"
+              aria-label="Cerrar menú"
+              onClick={close}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+            <motion.div
+              className="fixed inset-x-0 top-0 z-50 border-b border-foreground/10 bg-surface/95 p-4 shadow-[0_16px_40px_-16px_rgba(116,30,49,0.35)] backdrop-blur-xl md:hidden"
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex items-center justify-between">
+                <Link href="/#inicio" onClick={close}>
+                  <BrandLogo />
+                </Link>
+                <button
+                  type="button"
+                  onClick={close}
+                  className="rounded-full px-3 py-1 text-sm font-semibold hover:bg-muted"
+                  aria-label="Cerrar menú"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="mt-6 flex flex-col gap-2 text-sm font-semibold">
+                {items.map((item) => {
+                  const active = item.matchPath
+                    ? pathname === item.matchPath
+                    : false;
 
-                if (item.external) {
-                  return (
-                    <a
-                      key={item.key}
-                      href={item.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={close}
-                      className="rounded-xl px-3 py-2.5 text-foreground/80 hover:bg-muted"
-                    >
-                      {item.label}
-                    </a>
-                  );
-                }
+                  if (item.external) {
+                    return (
+                      <a
+                        key={item.key}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={close}
+                        className="rounded-xl px-3 py-2.5 text-foreground/80 hover:bg-muted"
+                      >
+                        {item.label}
+                      </a>
+                    );
+                  }
 
-                if (item.sectionId) {
+                  if (item.sectionId) {
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        onClick={(e) => {
+                          if (isHome) onSectionNav(e, item.sectionId!);
+                          close();
+                        }}
+                        className={`rounded-xl px-3 py-2.5 ${
+                          active
+                            ? "bg-primary/10 text-primary"
+                            : "text-foreground/80 hover:bg-muted"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  }
+
                   return (
                     <Link
                       key={item.key}
                       href={item.href}
-                      onClick={(e) => {
-                        if (isHome) onSectionNav(e, item.sectionId!);
-                        close();
-                      }}
-                      className={`rounded-xl px-3 py-2.5 ${active ? "bg-primary/10 text-primary" : "text-foreground/80 hover:bg-muted"}`}
+                      onClick={close}
+                      className={`rounded-xl px-3 py-2.5 ${
+                        active ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                      }`}
                     >
                       {item.label}
                     </Link>
                   );
-                }
-
-                return (
-                  <Link
-                    key={item.key}
-                    href={item.href}
-                    onClick={close}
-                    className={`rounded-xl px-3 py-2.5 ${active ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-              {showCurrency && (
-                <div className="px-3 py-2">
-                  <CurrencySelector />
-                </div>
-              )}
-              <Link href="/login" onClick={close} className="mt-2 rounded-full bg-primary px-5 py-2.5 text-center text-primary-foreground">
-                Iniciar sesión
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
+                })}
+                {showCurrency && (
+                  <div className="px-3 py-2">
+                    <CurrencySelector />
+                  </div>
+                )}
+                <Link
+                  href="/login"
+                  onClick={close}
+                  className="mt-2 block rounded-full bg-primary px-5 py-2.5 text-center text-primary-foreground"
+                >
+                  Iniciar sesión
+                </Link>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

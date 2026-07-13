@@ -3,8 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PackageCarousel } from "@/components/marketing/package-carousel";
+import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
 import { DisplayPrice } from "@/components/currency/display-price";
-import { Reveal } from "@/components/motion/reveal";
+import { Reveal, RevealScale } from "@/components/motion/reveal";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import type { LandingImagesData } from "@/types/landing-images";
 
@@ -34,9 +35,9 @@ function ConsultationPackageCard({
 }) {
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 hover:shadow-xl ${
+      className={`flex h-full flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 ${
         highlight
-          ? "bg-accent-soft text-foreground shadow-lg"
+          ? "bg-accent-soft text-foreground ring-1 ring-primary/15"
           : "border border-white/10 bg-white/5 backdrop-blur-sm"
       }`}
     >
@@ -88,9 +89,10 @@ export function LandingPackagesSection({
   return (
     <section
       id="paquetes"
-      className="lobby-panel scroll-mt-20 bg-primary text-primary-foreground"
+      className="lobby-panel relative scroll-mt-20 bg-primary text-primary-foreground"
     >
-      <div className="flex min-h-[100svh] flex-col justify-center px-6 py-16 sm:py-20">
+      <DarkSectionSparks />
+      <div className="relative flex min-h-[100svh] flex-col justify-center px-6 py-16 sm:py-20">
         <div className="mx-auto w-full max-w-6xl">
           <Reveal direction="fade">
             <p className="text-center text-xs font-semibold uppercase tracking-[0.28em] text-accent-soft">
@@ -111,12 +113,13 @@ export function LandingPackagesSection({
           ) : (
             <PackageCarousel ariaLabel="Paquetes de consulta">
               {consultations.map((pkg, i) => (
-                <ConsultationPackageCard
-                  key={pkg.id}
-                  pkg={pkg}
-                  highlight={i === 0}
-                  imageSrc={planImageForCode(pkg, planImages)}
-                />
+                <RevealScale key={pkg.id} delay={i * 0.08}>
+                  <ConsultationPackageCard
+                    pkg={pkg}
+                    highlight={i === 0}
+                    imageSrc={planImageForCode(pkg, planImages)}
+                  />
+                </RevealScale>
               ))}
             </PackageCarousel>
           )}

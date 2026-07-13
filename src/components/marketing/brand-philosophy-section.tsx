@@ -70,7 +70,7 @@ export function BrandPhilosophySection({
         </Reveal>
 
         <Reveal direction="right" delay={0.1}>
-          <div className="relative overflow-hidden rounded-3xl bg-muted/40 shadow-xl ring-1 ring-foreground/5">
+          <div className="relative overflow-hidden rounded-3xl bg-muted/40 ring-1 ring-primary/10">
             <Image
               src={src}
               alt="Receta para el éxito Anttova"

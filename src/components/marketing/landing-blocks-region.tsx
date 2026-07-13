@@ -1,3 +1,6 @@
+"use client";
+
+import { Reveal } from "@/components/motion/reveal";
 import { BrandGalleryStrip } from "@/components/marketing/brand-gallery-strip";
 import { LandingBannerBlock } from "@/components/marketing/landing-banner-block";
 import type { LandingBlock } from "@/types/landing-blocks";
@@ -20,8 +23,10 @@ export function LandingBlocksRegion({ blocks }: { blocks: LandingBlock[] }) {
   if (blocks.length === 0) return null;
   return (
     <>
-      {blocks.map((block) => (
-        <LandingBlockView key={block.id} block={block} />
+      {blocks.map((block, i) => (
+        <Reveal key={block.id} delay={i * 0.06} direction="up">
+          <LandingBlockView block={block} />
+        </Reveal>
       ))}
     </>
   );

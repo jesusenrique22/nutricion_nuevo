@@ -35,10 +35,10 @@ export function BrandLinkButton({
   const labelClass = compact
     ? "text-xs font-semibold tracking-wide sm:text-sm"
     : "text-base font-semibold tracking-wide";
-  const className = `group flex ${widthClass} flex-col items-center justify-center ${sizeClass} text-center transition-shadow disabled:pointer-events-none disabled:opacity-50 ${
+  const className = `group flex ${widthClass} flex-col items-center justify-center ${sizeClass} text-center transition disabled:pointer-events-none disabled:opacity-50 ${
     selected
-      ? "bg-[#5a1728] text-primary-foreground shadow-lg ring-2 ring-accent-soft/50"
-      : "bg-primary text-primary-foreground shadow-md hover:shadow-xl"
+      ? "bg-[#5a1728] text-primary-foreground ring-2 ring-accent-soft/50"
+      : "bg-primary text-primary-foreground hover:bg-[#5a1728]"
   }`;
 
   const inner = (
@@ -60,8 +60,8 @@ export function BrandLinkButton({
       duration: 0.45,
       ease: [0.22, 1, 0.36, 1] as const,
     },
-    whileHover: { scale: 1.02, y: -2 },
-    whileTap: { scale: 0.98 },
+    whileHover: { scale: 1.05, y: -3 },
+    whileTap: { scale: 0.97 },
   };
 
   if (type === "button" || onClick) {

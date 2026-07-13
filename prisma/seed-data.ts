@@ -53,7 +53,7 @@ export const SITE_CONTENT_DEFAULTS: Record<
           line2: "Cuando tu estilo de vida cambia contigo",
         },
         {
-          src: "/brand/flyers/training.jpg",
+          src: "/brand/flyers/training.png",
           alt: "Entrenamiento Anttova",
           line1: "Entrena tu cuerpo",
           line2: "Equilibra tu vida",

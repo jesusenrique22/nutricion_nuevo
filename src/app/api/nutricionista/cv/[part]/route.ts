@@ -1,8 +1,13 @@
-import { Readable } from "node:stream";
 import { isAllowedCvPdfRequest } from "@/lib/cv-pdf-access";
-import { openStoredFileUrl } from "@/lib/stored-file";
+import { renderStoredPdfPageAsPng } from "@/server/services/cv-pdf-render.service";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 
+export const maxDuration = 60;
+
+/**
+ * Compatibilidad: clientes con iframe antiguo reciben la 1.ª página como PNG
+ * (sin visor PDF del navegador). La vista nueva usa /pages y /pages/[page].
+ */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ part: string }> },
@@ -23,18 +28,21 @@ export async function GET(
     return new Response("No encontrado", { status: 404 });
   }
 
-  const file = await openStoredFileUrl(url);
-  if (!file) {
-    return new Response("No encontrado", { status: 404 });
-  }
+  try {
+    const png = await renderStoredPdfPageAsPng(url, 1, 1400);
+    if (!png) {
+      return new Response("Página no encontrada", { status: 404 });
+    }
 
-  const webStream = Readable.toWeb(file.stream) as ReadableStream;
-  return new Response(webStream, {
-    headers: {
-      "Content-Type": file.mimeType || "application/pdf",
-      "Content-Disposition": "inline",
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+    return new Response(new Uint8Array(png), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (err) {
+    console.error("[nutricionista/cv/legacy]", err);
+    return new Response("Error al renderizar página", { status: 500 });
+  }
 }

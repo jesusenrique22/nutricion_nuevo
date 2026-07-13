@@ -14,6 +14,7 @@ import {
   validateAppointmentSlot,
 } from "@/server/services/scheduling.service";
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
+import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import {
   isTimeSlotConflictError,
   TIME_SLOT_TAKEN_MESSAGE,
@@ -308,6 +309,29 @@ export async function fulfillCartCheckout(params: {
 
     await tx.cartItem.deleteMany({ where: { userId: params.patientId } });
   });
+
+  for (const item of params.resourceItems) {
+    if (item.resource.price.toNumber() === 0) {
+      await notifyReviewRequested({
+        patientId: params.patientId,
+        itemTitle: item.resource.title,
+        itemKind: "RESOURCE",
+        entityId: item.resourceId,
+      });
+    }
+  }
+
+  for (const item of params.productItems) {
+    const qty = Math.max(1, item.quantity ?? 1);
+    if (item.product.price * qty <= 0) {
+      await notifyReviewRequested({
+        patientId: params.patientId,
+        itemTitle: item.product.name,
+        itemKind: "PRODUCT",
+        entityId: item.productId,
+      });
+    }
+  }
 
   for (const appointmentId of newAppointmentIds) {
     const appt = await prisma.appointment.findUnique({
