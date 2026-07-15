@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { guessContentKindFromUrl } from "@/lib/content-kind";
 import {
   gridFileMimeType,
   getMongoFileMeta,
@@ -12,6 +13,8 @@ import {
   gridFileMimeType as gridMime,
   openGridFsDownloadStream,
 } from "@/server/services/mongo-gridfs";
+
+export { guessContentKindFromUrl };
 
 export type StoredFileOpenResult = {
   stream: Readable;
@@ -58,19 +61,6 @@ export function isUploadsPath(url: string): boolean {
 function mimeFromPath(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
-}
-
-export function guessContentKindFromUrl(
-  url: string | null | undefined,
-  resourceType?: string,
-): "pdf" | "image" | "video" | "unknown" {
-  if (!url) return "unknown";
-  const lower = normalizeStoredUrl(url).toLowerCase();
-  if (/\.(jpe?g|png|webp|gif)(\?|$)/.test(lower)) return "image";
-  if (/\.(mp4|webm)(\?|$)/.test(lower)) return "video";
-  if (/\.pdf(\?|$)/.test(lower)) return "pdf";
-  if (resourceType === "EBOOK" || resourceType === "PACKAGE") return "pdf";
-  return "unknown";
 }
 
 export async function guessContentKindFromStoredUrl(

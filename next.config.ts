@@ -85,29 +85,46 @@ const nextConfig: NextConfig = {
   // Imports estáticos en neon-prisma-factory.ts; incluir en el trace de cada función.
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
-  // Mantener funciones Vercel < 250 MB: pdfjs/canvas nativo solo en el navegador.
-  // googleapis/google-auth-library pesan mucho; se excluyen del trace de las rutas
-  // de medios y subidas, que nunca sincronizan con Google Calendar.
+  // Mantener funciones Vercel < 250 MB.
+  // googleapis (~202 MB) NO debe entrar en páginas de paciente / medios:
+  // el sync de Calendar solo corre en admin + APIs de Google.
   outputFileTracingExcludes: {
     "*": [
       "./node_modules/pdfjs-dist/**",
       "./node_modules/@napi-rs/canvas/**",
     ],
+    "/dashboard/patient/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
+    ],
+    "/dashboard/patient/library/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
+      "./node_modules/mongodb/**",
+      "./node_modules/bson/**",
+      "./node_modules/@mongodb-js/**",
+    ],
     "/api/media/**": [
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
     ],
     "/api/resources/**": [
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
     ],
     "/api/payments/**": [
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
     ],
     "/api/secure-file/**": [
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
+      "./node_modules/googleapis-common/**",
     ],
   },
 

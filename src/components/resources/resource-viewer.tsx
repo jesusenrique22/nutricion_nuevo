@@ -1,13 +1,15 @@
 import type { ResourceDTO } from "@/server/actions/resource.queries";
-import { guessContentKindFromStoredUrl } from "@/lib/stored-file";
+import { guessContentKindFromUrl } from "@/lib/content-kind";
 import { ProtectedContentViewer } from "@/components/resources/protected-content-viewer";
 
-export async function ResourceViewer({
+export function ResourceViewer({
   resource,
 }: {
   resource: ResourceDTO;
 }) {
-  const contentKind = await guessContentKindFromStoredUrl(
+  // Solo heurística por URL/tipo — no abrir Mongo aquí (evita meter mongodb
+  // en el bundle SSR de /dashboard/patient/library/[id]).
+  const contentKind = guessContentKindFromUrl(
     resource.contentUrl,
     resource.type,
   );

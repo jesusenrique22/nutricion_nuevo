@@ -16,10 +16,11 @@ import { getProductPrimaryImage } from "@/lib/product-images";
 import { getProducts } from "@/server/queries/landing.queries";
 import { createNotification } from "@/server/services/notification.service";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
-import { fulfillCartCheckout, findReusableCartAppointment } from "@/server/services/cart-checkout.service";
 import { formatActionError } from "@/lib/db-errors";
 import { modalityLabels } from "@/lib/appointment-labels";
 import { Prisma } from "@prisma/client";
+// cart-checkout (y su cadena hacia googleapis) se importa dinámico solo en
+// submitCart — evita meter ~200 MB de googleapis en cada página del dashboard.
 
 export type CartActionResult =
   | { ok: true }
@@ -528,6 +529,10 @@ export async function submitCart(options?: {
         resource: NonNullable<typeof item.resource>;
         resourceId: string;
       } => item.type === "RESOURCE" && !!item.resource && !!item.resourceId,
+    );
+
+    const { findReusableCartAppointment, fulfillCartCheckout } = await import(
+      "@/server/services/cart-checkout.service"
     );
 
     for (const item of appointmentItems) {
