@@ -3,7 +3,11 @@
 import Image from "next/image";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { ImageMedia } from "@/components/media/image-media";
+import {
+  ProgressStatusModal,
+  type ProgressStatusPhase,
+} from "@/components/ui/progress-status-modal";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
 import { updateConsultationType } from "@/server/actions/cms.actions";
 import type { ConsultationAdminDTO } from "@/server/actions/cms.actions";
@@ -17,38 +21,62 @@ export function PackageImagesEditor({
   const [urls, setUrls] = useState<Record<string, string>>(() =>
     Object.fromEntries(types.map((t) => [t.id, t.imageUrl ?? ""])),
   );
-  const [message, setMessage] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [phase, setPhase] = useState<ProgressStatusPhase>("working");
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalDescription, setModalDescription] = useState("");
 
   useEffect(() => {
     setUrls(Object.fromEntries(types.map((t) => [t.id, t.imageUrl ?? ""])));
   }, [types]);
 
+  async function persistImage(type: ConsultationAdminDTO, imageUrl: string) {
+    const res = await updateConsultationType({
+      id: type.id,
+      name: type.name,
+      description: type.description ?? undefined,
+      price: type.price,
+      durationMinutes: type.durationMinutes,
+      isPublished: type.isPublished,
+      sortOrder: type.sortOrder,
+      imageUrl,
+      allowsOnline: type.allowsOnline,
+      allowsPresencial: type.allowsPresencial,
+      morningOnly: type.morningOnly,
+    });
+    if (!res.ok) {
+      throw new Error(res.message ?? "No se pudo guardar la imagen.");
+    }
+  }
+
   function saveOne(type: ConsultationAdminDTO) {
-    setMessage(null);
     setSavingId(type.id);
+    setModalOpen(true);
+    setPhase("working");
+    setModalTitle("Guardando imagen…");
+    setModalDescription(
+      `Estamos publicando la foto de «${type.name}». No salgas de esta pantalla.`,
+    );
     startTransition(async () => {
-      const res = await updateConsultationType({
-        id: type.id,
-        name: type.name,
-        description: type.description ?? undefined,
-        price: type.price,
-        durationMinutes: type.durationMinutes,
-        isPublished: type.isPublished,
-        sortOrder: type.sortOrder,
-        imageUrl: urls[type.id] ?? "",
-        allowsOnline: type.allowsOnline,
-        allowsPresencial: type.allowsPresencial,
-        morningOnly: type.morningOnly,
-      });
-      setMessage(
-        res.ok
-          ? `Imagen de «${type.name}» guardada.`
-          : res.message ?? "No se pudo guardar.",
-      );
-      setSavingId(null);
-      if (res.ok) router.refresh();
+      try {
+        await persistImage(type, urls[type.id] ?? "");
+        setPhase("success");
+        setModalTitle("Imagen guardada");
+        setModalDescription(
+          `«${type.name}» ya muestra esta foto en el lobby.`,
+        );
+        router.refresh();
+      } catch (err) {
+        setPhase("error");
+        setModalTitle("No se pudo guardar");
+        setModalDescription(
+          err instanceof Error ? err.message : "Intentá de nuevo en unos segundos.",
+        );
+      } finally {
+        setSavingId(null);
+      }
     });
   }
 
@@ -63,15 +91,16 @@ export function PackageImagesEditor({
   return (
     <div className="space-y-4">
       <p className="text-sm text-foreground/60">
-        Cada paquete (incluido uno nuevo) puede tener su propia foto del lobby.
-        Si está vacío, se usa la imagen genérica por tipo.
+        Cada paquete puede tener su propia foto del lobby. Al{" "}
+        <strong>subir</strong> una imagen se guarda sola; no hace falta salir de
+        la página antes de que aparezca el aviso de “Listo”.
       </p>
       {types.map((type) => {
         const value = urls[type.id] ?? "";
         return (
           <div
             key={type.id}
-            className="rounded-2xl border border-foreground/10 bg-white p-4 space-y-3"
+            className="space-y-3 rounded-2xl border border-foreground/10 bg-white p-4"
           >
             <div className="flex items-start gap-3">
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
@@ -98,28 +127,51 @@ export function PackageImagesEditor({
                 </p>
               </div>
             </div>
-            <ImageUploadField
-              label={`Foto — ${type.name}`}
+            <ImageMedia.Root
               value={value}
               onChange={(src) =>
                 setUrls((prev) => ({ ...prev, [type.id]: src }))
               }
               folder="packages"
-            />
+              onUploaded={async (url) => {
+                setUrls((prev) => ({ ...prev, [type.id]: url }));
+                await persistImage(type, url);
+                router.refresh();
+              }}
+            >
+              <ImageMedia.Label>{`Foto — ${type.name}`}</ImageMedia.Label>
+              <ImageMedia.Hint />
+              <ImageMedia.UrlField />
+              <ImageMedia.Preview />
+              <ImageMedia.Actions>
+                <ImageMedia.UploadButton />
+                <ImageMedia.ClearButton />
+              </ImageMedia.Actions>
+              <ImageMedia.Library />
+              <ImageMedia.StatusModal />
+            </ImageMedia.Root>
             <button
               type="button"
-              disabled={isPending && savingId === type.id}
+              disabled={(isPending && savingId === type.id) || modalOpen}
               onClick={() => saveOne(type)}
-              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              className="rounded-full border border-foreground/15 px-4 py-2 text-xs font-semibold hover:bg-muted/40 disabled:opacity-50"
             >
               {isPending && savingId === type.id
                 ? "Guardando…"
-                : "Guardar esta imagen"}
+                : "Volver a publicar esta URL"}
             </button>
           </div>
         );
       })}
-      {message ? <p className="text-sm text-foreground/70">{message}</p> : null}
+
+      <ProgressStatusModal
+        open={modalOpen}
+        phase={phase}
+        title={modalTitle}
+        description={modalDescription}
+        onClose={() => setModalOpen(false)}
+        closeLabel={phase === "success" ? "Perfecto" : "Cerrar"}
+      />
     </div>
   );
 }

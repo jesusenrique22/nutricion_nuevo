@@ -48,24 +48,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.message }, { status: 400 });
     }
 
-    // HEIC no se muestra en Chrome/Firefox: bloquear en assets públicos del sitio
-    const publicFolders = new Set(["site", "brand", "cv", "products"]);
-    if (
-      publicFolders.has(safeFolder) &&
-      (validation.mime === "image/heic" ||
-        validation.mime === "image/heif" ||
-        /\.heic$/i.test(file.name) ||
-        /\.heif$/i.test(file.name))
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Para imágenes del sitio usá JPG, PNG o WebP. HEIC no se ve en la mayoría de navegadores.",
-        },
-        { status: 400 },
-      );
-    }
-
     const stored = await storePublicFile(file, safeFolder, {
       ownerId: session.user.id,
     });

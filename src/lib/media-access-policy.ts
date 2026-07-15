@@ -1,5 +1,11 @@
 /** Carpetas de GridFS accesibles sin iniciar sesión (landing, CV, catálogo, etc.). */
-export const PUBLIC_MEDIA_FOLDERS = new Set(["site", "cv", "brand", "products"]);
+export const PUBLIC_MEDIA_FOLDERS = new Set([
+  "site",
+  "cv",
+  "brand",
+  "products",
+  "packages", // fotos de paquetes del lobby (Público)
+]);
 
 /** Carpetas visibles para cualquier usuario autenticado (plan semanal, chat…). */
 export const AUTHENTICATED_MEDIA_FOLDERS = new Set([
@@ -12,5 +18,10 @@ export function isPublicMediaFolder(folder: string | null | undefined): boolean 
 }
 
 export function isPublicUploadsFolder(folder: string | null): boolean {
-  return folder === "site" || folder === "brand";
+  return (
+    folder === "site" ||
+    folder === "brand" ||
+    folder === "packages" ||
+    folder === "products"
+  );
 }

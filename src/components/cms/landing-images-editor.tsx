@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { IconUploadField } from "@/components/cms/icon-upload-field";
 import { PackageImagesEditor } from "@/components/cms/package-images-editor";
 import { LANDING_IMAGE_SECTION_LABELS } from "@/lib/cms-labels";
 import { landingImagesToRecord } from "@/lib/landing-images-parse";
@@ -250,7 +251,6 @@ export function LandingImagesEditor({
           <div className="space-y-5">
             {[
               { key: "philosophyImage" as const, label: "Filosofía — receta para el éxito", hint: "Imagen decorativa de la sección filosófica." },
-              { key: "brandSectionImage" as const, label: "Sección «La marca»", hint: "Imagen de productos o identidad visual Anttova." },
               { key: "ctaBackground" as const, label: "Fondo del llamado a la acción final", hint: "Imagen de fondo del botón grande al final." },
             ].map(({ key, label, hint }) => (
               <div key={key} className="flex gap-4 rounded-xl border border-foreground/10 p-3">
@@ -266,6 +266,24 @@ export function LandingImagesEditor({
                 </div>
               </div>
             ))}
+            <div className="flex gap-4 rounded-xl border border-foreground/10 p-3">
+              {data.brandSectionImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={data.brandSectionImage} alt="La marca" className="h-20 w-20 shrink-0 rounded-xl object-contain bg-muted/40 p-1" />
+              ) : (
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-muted text-[10px] text-foreground/40 text-center p-1">Sin icono</div>
+              )}
+              <div className="flex-1">
+                <IconUploadField
+                  label="Sección «La marca»"
+                  hint="Identidad visual Anttova (logo o imagen de marca)."
+                  value={data.brandSectionImage}
+                  onChange={(src) => update({ ...data, brandSectionImage: src })}
+                  folder="site"
+                  objectFit="contain"
+                />
+              </div>
+            </div>
           </div>
         )}
 

@@ -10,16 +10,11 @@ export const UPLOAD_LIMITS = {
 
 export type UploadKind = "image" | "pdf" | "video" | "proof" | "any";
 
-const IMAGE_EXT = new Set([
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "gif",
-  "heic",
-  "heif",
-  "avif",
-]);
+/** Extensiones de imagen que se pueden subir una vez normalizadas a web. */
+const IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif"]);
+
+/** Formatos que el sitio puede mostrar en todos los navegadores modernos. */
+const WEB_SAFE_IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
 
 const PDF_EXT = new Set(["pdf"]);
 const VIDEO_EXT = new Set(["mp4", "webm", "mov", "m4v"]);
@@ -40,39 +35,32 @@ const MIME_BY_EXT: Record<string, string> = {
   m4v: "video/x-m4v",
 };
 
+/** Mime que se pueden guardar en disco/Mongo (después de normalizar en el cliente). */
+const WEB_SAFE_IMAGE_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/pjpeg",
+]);
+
+const UNSAFE_IMAGE_MIME = new Set([
+  "image/heic",
+  "image/heif",
+  "image/avif",
+]);
+
 const ALLOWED_MIME: Record<UploadKind, Set<string>> = {
-  image: new Set([
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-    "image/heic",
-    "image/heif",
-    "image/avif",
-    "image/pjpeg",
-  ]),
+  image: new Set([...WEB_SAFE_IMAGE_MIME]),
   pdf: new Set([
     "application/pdf",
     "application/x-pdf",
     "application/octet-stream",
   ]),
   video: new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]),
-  proof: new Set([
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/heic",
-    "image/heif",
-    "image/pjpeg",
-  ]),
+  proof: new Set([...WEB_SAFE_IMAGE_MIME]),
   any: new Set([
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-    "image/heic",
-    "image/heif",
-    "image/avif",
+    ...WEB_SAFE_IMAGE_MIME,
     "application/pdf",
     "application/x-pdf",
     "video/mp4",
@@ -85,6 +73,26 @@ function fileExtension(name: string): string {
   const base = name.split("/").pop() ?? name;
   const dot = base.lastIndexOf(".");
   return dot === -1 ? "" : base.slice(dot + 1).toLowerCase();
+}
+
+export function isUnsafeImageFormat(file: {
+  type?: string;
+  name: string;
+}): boolean {
+  const mime = (file.type ?? "").trim().toLowerCase();
+  const ext = fileExtension(file.name);
+  if (UNSAFE_IMAGE_MIME.has(mime)) return true;
+  if (ext === "heic" || ext === "heif" || ext === "avif") return true;
+  return false;
+}
+
+export function isImageUploadCandidate(file: {
+  type?: string;
+  name: string;
+}): boolean {
+  const mime = (file.type ?? "").trim().toLowerCase();
+  if (mime.startsWith("image/")) return true;
+  return IMAGE_EXT.has(fileExtension(file.name));
 }
 
 export function resolveUploadMime(file: File): string {
@@ -103,12 +111,14 @@ function kindFromMime(mime: string): UploadKind | null {
 }
 
 function extMatchesKind(ext: string, kind: UploadKind): boolean {
-  if (kind === "image") return IMAGE_EXT.has(ext);
+  if (kind === "image") return WEB_SAFE_IMAGE_EXT.has(ext);
   if (kind === "pdf") return PDF_EXT.has(ext);
   if (kind === "video") return VIDEO_EXT.has(ext);
-  if (kind === "proof") return IMAGE_EXT.has(ext);
+  if (kind === "proof") return WEB_SAFE_IMAGE_EXT.has(ext);
   if (kind === "any") {
-    return IMAGE_EXT.has(ext) || PDF_EXT.has(ext) || VIDEO_EXT.has(ext);
+    return (
+      WEB_SAFE_IMAGE_EXT.has(ext) || PDF_EXT.has(ext) || VIDEO_EXT.has(ext)
+    );
   }
   return false;
 }
@@ -147,17 +157,31 @@ export function validateUploadFile(
     };
   }
 
+  // HEIC/HEIF/AVIF no se ven igual en todos los navegadores: hay que convertir
+  // a JPG/PNG/WebP en el cliente antes de llegar acá.
+  if (
+    kind !== "pdf" &&
+    kind !== "video" &&
+    isUnsafeImageFormat({ type: mime, name: file.name })
+  ) {
+    return {
+      ok: false,
+      message:
+        "Ese formato de imagen (p. ej. HEIC de iPhone) no se ve en todos los navegadores. El sistema debería convertirlo a JPG automáticamente; si ves este mensaje, exportá la foto como JPG o PNG.",
+    };
+  }
+
   const allowed = ALLOWED_MIME[kind];
   const mimeOk = allowed.has(mime);
   const extOk = ext ? extMatchesKind(ext, kind) : false;
 
   if (!mimeOk && !extOk) {
     const labels: Record<UploadKind, string> = {
-      image: "imágenes (JPG, PNG, WebP, GIF, HEIC…)",
+      image: "imágenes (JPG, PNG o WebP)",
       pdf: "archivos PDF",
       video: "videos MP4 o WebM",
       proof: "capturas JPG, PNG o WebP",
-      any: "imágenes, PDF o video",
+      any: "imágenes web (JPG/PNG/WebP), PDF o video",
     };
     return {
       ok: false,

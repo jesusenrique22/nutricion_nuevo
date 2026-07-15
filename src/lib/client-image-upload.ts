@@ -77,22 +77,30 @@ async function canvasToJpeg(
 /**
  * Vercel rechaza cuerpos grandes antes de ejecutar la API. Normaliza fotos a
  * JPEG, limita su lado mayor y baja su peso a un tamaño seguro para la función.
+ *
+ * HEIC / HEIF / AVIF → siempre re-encodeados a JPG cuando el navegador puede
+ * decodificarlos (Safari sí con HEIC). Así el archivo final funciona en todos lados.
  */
 export async function prepareImageForUpload(file: File): Promise<File> {
-  const isImage = file.type.startsWith("image/");
-  const isAnimatedGif = file.type === "image/gif";
+  const isImage =
+    file.type.startsWith("image/") ||
+    /\.(jpe?g|png|webp|gif|hei[cf]|avif)$/i.test(file.name);
+  const isAnimatedGif = file.type === "image/gif" || /\.gif$/i.test(file.name);
+  const needsForcedJpeg =
+    /image\/(hei[cf]|avif)/i.test(file.type) ||
+    /\.(hei[cf]|avif)$/i.test(file.name);
 
   if (!isImage || isAnimatedGif) return file;
-  if (/image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) {
-    throw new Error(
-      "HEIC no se puede preparar en el navegador. Convertí la foto a JPG o PNG antes de subirla.",
-    );
-  }
 
   let source: Awaited<ReturnType<typeof decodeImage>>;
   try {
     source = await decodeImage(file);
   } catch {
+    if (needsForcedJpeg) {
+      throw new Error(
+        "Esta foto está en un formato que este navegador no puede convertir (p. ej. HEIC de iPhone). Usá Safari, o exportá la foto como JPG/PNG antes de subirla.",
+      );
+    }
     throw new Error(
       "No se pudo leer la imagen. Usá una foto JPG, PNG o WebP.",
     );
@@ -101,7 +109,9 @@ export async function prepareImageForUpload(file: File): Promise<File> {
   try {
     const needsResize =
       Math.max(source.width, source.height) > MAX_IMAGE_DIMENSION;
-    if (!needsResize && file.size <= VERCEL_SAFE_IMAGE_BYTES) return file;
+    if (!needsForcedJpeg && !needsResize && file.size <= VERCEL_SAFE_IMAGE_BYTES) {
+      return file;
+    }
 
     let maxDimension = MAX_IMAGE_DIMENSION;
     let quality = 0.86;

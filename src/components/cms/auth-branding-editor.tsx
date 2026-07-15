@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { IconUploadField } from "@/components/cms/icon-upload-field";
 import { authBrandingToRecord } from "@/lib/auth-branding-parse";
 import { updateSiteContent } from "@/server/actions/cms.actions";
 import { AUTH_BRANDING_SLUG, type AuthBrandingData } from "@/types/auth-branding";
@@ -52,12 +52,13 @@ export function AuthBrandingEditor({
       </div>
 
       <div className="rounded-2xl border border-foreground/10 bg-white p-4 space-y-4">
-        <ImageUploadField
+        <IconUploadField
           label="Foto en el login"
           value={data.photoUrl}
           onChange={(photoUrl) => update({ ...data, photoUrl })}
           folder="auth"
-          hint="Retrato que aparece junto al nombre en la pantalla de ingreso."
+          objectFit="cover"
+          hint="Retrato / avatar junto al nombre en la pantalla de ingreso (formato cuadrado)."
         />
         <label className="block text-sm">
           <span className="font-semibold">Nombre</span>

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ImageUploadField } from "@/components/cms/image-upload-field";
-import { PdfListUploadField } from "@/components/cms/pdf-list-upload-field";
+import { ImageMedia } from "@/components/media/image-media";
+import { PdfMedia } from "@/components/media/pdf-media";
 import { updateNutricionistaPage } from "@/server/actions/cms.actions";
 import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 
@@ -305,13 +305,23 @@ export function NutricionistaCvEditor({
             </SectionCard>
 
             <SectionCard title="Foto y nombre">
-              <ImageUploadField
-                label="Foto de perfil"
-                hint="Aparece en la página Sobre mí. Recomendado: retrato vertical, buena luz."
+              <ImageMedia.Root
                 value={data.cv.photoUrl ?? ""}
                 onChange={(photoUrl) => updateCv("photoUrl", photoUrl)}
                 folder="cv"
-              />
+                hint="Aparece en la página Sobre mí. Recomendado: retrato vertical, buena luz."
+              >
+                <ImageMedia.Label>Foto de perfil</ImageMedia.Label>
+                <ImageMedia.Hint />
+                <ImageMedia.UrlField />
+                <ImageMedia.Preview />
+                <ImageMedia.Actions>
+                  <ImageMedia.UploadButton />
+                  <ImageMedia.ClearButton />
+                </ImageMedia.Actions>
+                <ImageMedia.Library />
+                <ImageMedia.StatusModal />
+              </ImageMedia.Root>
               <Field label="Nombre completo">
                 <input
                   value={data.cv.name}
@@ -354,9 +364,7 @@ export function NutricionistaCvEditor({
             </SectionCard>
 
             <SectionCard title="Archivos PDF del CV">
-              <PdfListUploadField
-                label="CV en PDF"
-                hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 25 MB por archivo."
+              <PdfMedia.ListRoot
                 values={data.cvPdfUrls}
                 onChange={(cvPdfUrls) => {
                   setData((prev) => {
@@ -368,7 +376,16 @@ export function NutricionistaCvEditor({
                   setMessage(null);
                 }}
                 folder="cv"
-              />
+                hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 25 MB por archivo."
+              >
+                <PdfMedia.Label>CV en PDF</PdfMedia.Label>
+                <PdfMedia.Hint />
+                <PdfMedia.ListItems emptyMessage="Todavía no hay PDFs. Subí uno o más archivos del CV." />
+                <div className="mt-3">
+                  <PdfMedia.UploadButton list />
+                </div>
+                <PdfMedia.ErrorText />
+              </PdfMedia.ListRoot>
             </SectionCard>
           </>
         )}

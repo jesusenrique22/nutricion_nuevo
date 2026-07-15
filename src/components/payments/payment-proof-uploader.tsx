@@ -88,7 +88,7 @@ export function PaymentProofUploader({
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
+            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp,.heic,.heif"
             disabled={uploading}
             className="hidden"
             onChange={(e) => void handleFiles(e.target.files)}

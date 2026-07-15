@@ -1,4 +1,5 @@
 import { unstable_cache, revalidateTag } from "next/cache";
+import { PUBLIC_MEDIA_FOLDERS } from "@/lib/media-access-policy";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 import { PRODUCTS_SLUG } from "@/types/products";
@@ -15,7 +16,7 @@ function addPublicMediaUrl(out: Set<string>, normalized: string): void {
 
   // HTML cacheado puede seguir pidiendo /api/media/{id} tras migrar a /uploads/.
   const migrated = normalized.match(
-    /^\/uploads\/(site|brand|cv)\/([a-f0-9]{24})\.[^/]+$/i,
+    /^\/uploads\/(site|brand|cv|products|packages)\/([a-f0-9]{24})\.[^/]+$/i,
   );
   if (migrated) {
     out.add(`/api/media/${migrated[2]}`);
@@ -57,7 +58,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
   }
 
   const assets = await prisma.mediaAsset.findMany({
-    where: { folder: { in: ["site", "cv", "brand", "products"] } },
+    where: { folder: { in: [...PUBLIC_MEDIA_FOLDERS] } },
     select: { url: true },
   });
   for (const asset of assets) {
@@ -70,12 +71,21 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
     }
   }
 
+  // Fotos propias de paquetes publicados (no viven en SiteContent JSON).
+  const packageImages = await prisma.consultationType.findMany({
+    where: { isPublished: true, imageUrl: { not: null } },
+    select: { imageUrl: true },
+  });
+  for (const row of packageImages) {
+    if (row.imageUrl) collectMediaUrls(row.imageUrl, urls);
+  }
+
   return [...urls];
 }
 
 export const getPublicSiteMediaUrls = unstable_cache(
   loadPublicSiteMediaUrls,
-  ["public-site-media-urls", "v3"],
+  ["public-site-media-urls", "v5"],
   { revalidate: 300, tags: ["public-site-media"] },
 );
 

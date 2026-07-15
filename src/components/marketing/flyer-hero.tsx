@@ -61,8 +61,8 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/92 via-primary/55 to-primary/20" />
-      <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-primary/25" />
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/70 via-primary/35 to-primary/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/55 via-transparent to-primary/15" />
       <DarkSectionSparks />
 
       <motion.div

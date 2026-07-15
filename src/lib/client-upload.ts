@@ -1,5 +1,7 @@
 import {
   type UploadKind,
+  isImageUploadCandidate,
+  isUnsafeImageFormat,
   uploadLimitLabel,
   validateUploadFile,
 } from "@/lib/upload-policy";
@@ -8,6 +10,10 @@ import { parseUploadResponse } from "@/lib/upload-response";
 
 export type UploadEndpoint = "/api/resources/upload" | "/api/payments/upload-proof";
 
+/**
+ * Sube un archivo. Toda imagen (recursos, paquetes, sobre mí, comprobantes, etc.)
+ * se normaliza a un formato web seguro (JPG) antes de salir del navegador.
+ */
 export async function uploadFile(
   file: File,
   options: {
@@ -17,22 +23,29 @@ export async function uploadFile(
   } = {},
 ): Promise<{ url: string; id?: string; mimeType?: string }> {
   const kind = options.kind ?? "any";
-  const isImageLike =
+  const shouldNormalizeImage =
     kind === "image" ||
     kind === "proof" ||
-    (kind === "any" && file.type.startsWith("image/"));
-  // Comprimir en el navegador (incluye comprobantes de pago) para no exceder
-  // el límite de cuerpo de Vercel ni guardar capturas de teléfono enormes.
-  // Si no se puede comprimir (p. ej. HEIC), se sube el original: el servidor lo acepta.
+    (kind === "any" && isImageUploadCandidate(file));
+
   let uploadFile = file;
-  if (isImageLike && file.type.startsWith("image/")) {
+  if (shouldNormalizeImage) {
     try {
       uploadFile = await prepareImageForUpload(file);
     } catch (err) {
-      if (kind === "image") throw err;
+      // Nunca subir HEIC/AVIF crudos: rompen en Chrome/Firefox.
+      if (isUnsafeImageFormat(file)) throw err;
+      if (kind === "image" || kind === "proof") throw err;
       uploadFile = file;
     }
   }
+
+  if (isImageUploadCandidate(uploadFile) && isUnsafeImageFormat(uploadFile)) {
+    throw new Error(
+      "No se pudo convertir la imagen a un formato compatible. Exportala como JPG o PNG e intentá de nuevo.",
+    );
+  }
+
   const validation = validateUploadFile(uploadFile, kind);
   if (!validation.ok) {
     throw new Error(validation.message);
@@ -55,8 +68,8 @@ export async function uploadFile(
 }
 
 export function uploadHint(kind: UploadKind): string {
-  if (kind === "image") {
-    return "La imagen se adapta automáticamente al contenedor y se optimiza antes de subir.";
+  if (kind === "image" || kind === "proof") {
+    return "Se convierte sola a JPG si hace falta (p. ej. fotos HEIC de iPhone) para que se vea en todos los navegadores.";
   }
   return `Cualquier tamaño razonable — máx. ${uploadLimitLabel(kind)}.`;
 }

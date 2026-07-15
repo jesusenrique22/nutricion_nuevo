@@ -29,11 +29,18 @@ async function isPublicCmsMediaUrl(url: string): Promise<boolean> {
   const asset = await prisma.mediaAsset.findFirst({
     where: {
       url: normalized,
-      folder: { in: ["site", "cv", "brand", "products"] },
+      folder: { in: ["site", "cv", "brand", "products", "packages"] },
     },
     select: { id: true },
   });
   if (asset) return true;
+
+  // Foto de un paquete de consulta publicado en el lobby
+  const publishedPackage = await prisma.consultationType.findFirst({
+    where: { isPublished: true, imageUrl: normalized },
+    select: { id: true },
+  });
+  if (publishedPackage) return true;
 
   const rows = await prisma.siteContent.findMany({
     where: {
