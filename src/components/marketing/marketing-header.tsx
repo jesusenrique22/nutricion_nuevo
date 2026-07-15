@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -77,10 +77,58 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
   const navItems = resolveItems(items ?? DEFAULT_NAV_MENU.items);
   // false en SSR y 1er paint → sin mismatch de hidratación
   const [scrolled, setScrolled] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const lastY = useRef(0);
+  const shift = useRef(0);
+  const ticking = useRef(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
+    lastY.current = window.scrollY;
+    shift.current = 0;
+
+    const applyShift = (next: number) => {
+      shift.current = next;
+      const el = headerRef.current;
+      if (!el) return;
+      el.style.transform = next > 0.5 ? `translate3d(0, ${-next}px, 0)` : "";
+      el.style.pointerEvents = next > el.offsetHeight * 0.6 ? "none" : "";
+    };
+
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+
+      requestAnimationFrame(() => {
+        const y = Math.max(0, window.scrollY);
+        const delta = y - lastY.current;
+        lastY.current = y;
+
+        setScrolled((was) => {
+          const next = y > 12;
+          return was === next ? was : next;
+        });
+
+        // Tope / rubber-band: siempre visible, sin pelear animaciones
+        if (y <= 8) {
+          applyShift(0);
+          ticking.current = false;
+          return;
+        }
+
+        // Ignorar micro-movimientos (subpixel / layout) que hacen titilar
+        if (Math.abs(delta) < 0.5) {
+          ticking.current = false;
+          return;
+        }
+
+        const height = headerRef.current?.offsetHeight || 72;
+        // Ocultar/mostrar al ritmo del scroll (poco a poco)
+        const next = Math.min(height, Math.max(0, shift.current + delta));
+        applyShift(next);
+        ticking.current = false;
+      });
+    };
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -109,11 +157,16 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b transition-[background,box-shadow,border-color] duration-300 ${
+      ref={headerRef}
+      className={`sticky top-0 z-50 border-b will-change-transform ${
         scrolled
           ? "border-primary/10 bg-surface/85 shadow-[0_8px_30px_-12px_rgba(116,30,49,0.25)] backdrop-blur-xl"
           : "border-foreground/5 bg-surface/90 backdrop-blur-md"
       }`}
+      style={{
+        transition:
+          "background-color 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease",
+      }}
     >
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5">
         <BrandLogoLink href="/#inicio" priority />

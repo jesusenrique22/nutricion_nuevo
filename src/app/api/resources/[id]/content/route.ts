@@ -27,7 +27,14 @@ export async function GET(
 
     const file = await openStoredFileUrl(resource.contentUrl);
     if (!file) {
-      return new Response("Archivo no encontrado", { status: 404 });
+      console.warn(
+        "[resources/content] archivo no encontrado",
+        resource.contentUrl,
+      );
+      return new Response(
+        "Archivo no encontrado. Si el PDF se subió antes del almacenamiento en la nube, volvé a subirlo desde Recursos.",
+        { status: 404 },
+      );
     }
 
     return storedFileToResponse(file, { inline: true });

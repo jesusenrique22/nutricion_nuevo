@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLinkButton } from "@/components/brand/brand-link-button";
+import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
 import { RecaptchaNotice } from "@/components/security/recaptcha-notice";
 import { useCurrency } from "@/contexts/currency-context";
 import { FlowStep, FlowStepDots } from "@/components/motion/flow-step";
@@ -13,7 +14,11 @@ import { addAppointmentToCart } from "@/server/actions/cart.actions";
 import type { Slot } from "@/server/services/availability.service";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 type Step = "service" | "details" | "confirm";
@@ -177,12 +182,10 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
             </div>
 
             <label className="mt-5 block text-sm font-semibold">Fecha</label>
-            <input
-              type="date"
+            <BookingDateCalendar
               value={date}
-              min={todayStr()}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-foreground/15 px-4 py-3 outline-none focus:border-primary"
+              minDate={todayStr()}
+              onChange={setDate}
             />
 
             <div className="mt-5 flex flex-col gap-2">

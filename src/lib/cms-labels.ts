@@ -87,7 +87,8 @@ export function siteFieldHint(slug: string, key: string): string | undefined {
 export const LANDING_IMAGE_SECTION_LABELS = {
   hero: "Carrusel de portada",
   gallery: "Galería de fotos",
-  plans: "Imágenes de paquetes",
+  packages: "Fotos por paquete",
+  plans: "Imágenes genéricas de paquetes",
   services: "Imágenes de servicios",
   other: "Otras imágenes",
 } as const;

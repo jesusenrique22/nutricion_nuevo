@@ -25,7 +25,7 @@ async function revalidatePaymentPaths(patientId: string) {
   revalidatePath("/dashboard/admin/calendar");
   revalidatePath("/dashboard/admin/payments");
   revalidatePath("/dashboard/patient/appointments");
-  revalidatePath("/dashboard/patient/progress");
+  revalidatePath("/dashboard/patient/cart/historial");
   revalidatePath("/dashboard");
   await syncPatientAndAdmins(patientId, "appointments");
 }

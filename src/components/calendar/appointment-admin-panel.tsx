@@ -17,7 +17,6 @@ import {
   paymentPhaseLabels,
   paymentStatusLabels,
 } from "@/lib/appointment-labels";
-import { RegisterMeasurementForm } from "@/components/measurements/register-measurement-form";
 import { RescheduleAppointmentForm } from "@/components/booking/reschedule-appointment-form";
 import { DisplayPrice } from "@/components/currency/display-price";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
@@ -161,12 +160,6 @@ export function AppointmentAdminPanel({
           {overallStatus && (
             <span className="rounded-full bg-accent/15 px-3 py-1 font-semibold text-accent">
               {paymentStatusLabels[overallStatus] ?? overallStatus}
-              {appointment.price ? (
-                <>
-                  {" · "}
-                  <DisplayPrice amount={appointment.price} currency="ARS" />
-                </>
-              ) : null}
             </span>
           )}
           {appointment.status === "CANCELLED" && appointment.cancelledBy && (
@@ -176,6 +169,23 @@ export function AppointmentAdminPanel({
             </span>
           )}
         </div>
+
+        {appointment.price ? (
+          <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-foreground/50">
+              Total de la cita
+            </p>
+            <p className="mt-1 text-xl font-bold text-primary">
+              <DisplayPrice amount={appointment.price} currency="ARS" />
+            </p>
+            {phases && isTwoPhaseSplit(phases.advancePercent) ? (
+              <p className="mt-1 text-xs text-foreground/55">
+                Pago en 2 cuotas: adelanto {phases.advancePercent}% + saldo{" "}
+                {100 - phases.advancePercent}%
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {phases && (
           <div
@@ -356,24 +366,6 @@ export function AppointmentAdminPanel({
             </button>
           </div>
         )}
-
-        {appointment.consultationCode === "ANT_03" &&
-          appointment.patientId &&
-          ["CONFIRMED", "COMPLETED"].includes(appointment.status) && (
-            <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <h3 className="text-sm font-bold">Registrar medición ISAK</h3>
-              <p className="mt-1 text-xs text-foreground/50">
-                Vincula los resultados a esta cita de antropometría.
-              </p>
-              <div className="mt-3">
-                <RegisterMeasurementForm
-                  patientId={appointment.patientId}
-                  appointmentId={appointment.id}
-                  compact
-                />
-              </div>
-            </div>
-          )}
 
         {message && (
           <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-sm">{message}</p>

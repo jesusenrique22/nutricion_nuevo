@@ -1,20 +1,32 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import {
+  WEEKDAY_OPTIONS,
+  weekdayLabel,
+} from "@/lib/scheduling-dates";
 import type {
   BlockedDayDTO,
+  RecurringBlockedWeekdayDTO,
   ScheduleBlockDTO,
 } from "@/server/actions/schedule-block.actions";
 import {
   createBlockedDays,
+  createRecurringBlockedWeekdays,
   createScheduleBlock,
   deleteBlockedDay,
+  deleteRecurringBlockedWeekday,
   deleteScheduleBlock,
 } from "@/server/actions/schedule-block.actions";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha local (no UTC): toISOString() puede devolver el día equivocado según la zona.
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function fmtDay(date: string) {
@@ -37,22 +49,30 @@ function fmtBlock(iso: string) {
   });
 }
 
+type BlockMode = "dates" | "weekdays";
+
 export function ScheduleBlocksPanel({
   blockedDays: initialBlockedDays,
+  recurringWeekdays: initialRecurring,
   blocks: initialBlocks,
 }: {
   blockedDays: BlockedDayDTO[];
+  recurringWeekdays: RecurringBlockedWeekdayDTO[];
   blocks: ScheduleBlockDTO[];
 }) {
   const router = useRouter();
   const [blockedDays, setBlockedDays] = useState(initialBlockedDays);
+  const [recurringWeekdays, setRecurringWeekdays] = useState(initialRecurring);
   const [blocks, setBlocks] = useState(initialBlocks);
   const [expanded, setExpanded] = useState(false);
   const [showPartial, setShowPartial] = useState(false);
+  const [mode, setMode] = useState<BlockMode>("dates");
 
   const [fromDate, setFromDate] = useState(todayStr());
   const [toDate, setToDate] = useState(todayStr());
   const [dayReason, setDayReason] = useState("");
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
+  const [weekdayReason, setWeekdayReason] = useState("");
 
   const [date, setDate] = useState(todayStr());
   const [startTime, setStartTime] = useState("08:00");
@@ -67,10 +87,22 @@ export function ScheduleBlocksPanel({
   }, [initialBlockedDays]);
 
   useEffect(() => {
+    setRecurringWeekdays(initialRecurring);
+  }, [initialRecurring]);
+
+  useEffect(() => {
     setBlocks(initialBlocks);
   }, [initialBlocks]);
 
-  function handleBlockDays(e: React.FormEvent) {
+  function toggleWeekday(value: number) {
+    setSelectedWeekdays((prev) =>
+      prev.includes(value)
+        ? prev.filter((d) => d !== value)
+        : [...prev, value],
+    );
+  }
+
+  function handleBlockDays(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
     startTransition(async () => {
@@ -93,7 +125,34 @@ export function ScheduleBlocksPanel({
     });
   }
 
-  function handleCreatePartial(e: React.FormEvent) {
+  function handleBlockWeekdays(e: FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    if (selectedWeekdays.length === 0) {
+      setMessage("Elegí al menos un día de la semana.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await createRecurringBlockedWeekdays({
+        weekdays: selectedWeekdays,
+        reason: weekdayReason.trim() || undefined,
+      });
+      if (!res.ok) {
+        setMessage(res.message);
+        return;
+      }
+      setSelectedWeekdays([]);
+      setWeekdayReason("");
+      setMessage(
+        res.count && res.count > 1
+          ? `${res.count} días de la semana bloqueados de forma fija.`
+          : "Día de la semana bloqueado de forma fija.",
+      );
+      router.refresh();
+    });
+  }
+
+  function handleCreatePartial(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
     startTransition(async () => {
@@ -126,6 +185,19 @@ export function ScheduleBlocksPanel({
     });
   }
 
+  function handleDeleteRecurring(id: string) {
+    setMessage(null);
+    startTransition(async () => {
+      const res = await deleteRecurringBlockedWeekday({ id });
+      if (!res.ok) {
+        setMessage(res.message);
+        return;
+      }
+      setRecurringWeekdays((prev) => prev.filter((d) => d.id !== id));
+      router.refresh();
+    });
+  }
+
   function handleDeleteBlock(id: string) {
     setMessage(null);
     startTransition(async () => {
@@ -149,7 +221,8 @@ export function ScheduleBlocksPanel({
         <div>
           <p className="text-sm font-bold">Días sin atención</p>
           <p className="text-xs text-foreground/50">
-            Bloqueá fechas en las que no se pueden agendar citas
+            Bloqueá fechas puntuales o todos los días de una semana (ej. todos
+            los sábados)
           </p>
         </div>
         <span className="text-sm text-foreground/40">{expanded ? "▲" : "▼"}</span>
@@ -157,91 +230,215 @@ export function ScheduleBlocksPanel({
 
       {expanded && (
         <div className="border-t border-foreground/8 px-4 py-4 sm:px-5">
-          <form onSubmit={handleBlockDays} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label className="text-xs font-semibold text-foreground/60">
-                  Desde
-                </label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  min={todayStr()}
-                  onChange={(e) => {
-                    setFromDate(e.target.value);
-                    if (e.target.value > toDate) setToDate(e.target.value);
-                  }}
-                  className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                  required
-                />
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("dates")}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                mode === "dates"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-foreground/15 bg-white hover:bg-muted/40"
+              }`}
+            >
+              Fechas puntuales
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("weekdays")}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                mode === "weekdays"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-foreground/15 bg-white hover:bg-muted/40"
+              }`}
+            >
+              Todos los…
+            </button>
+          </div>
+
+          {mode === "dates" ? (
+            <form onSubmit={handleBlockDays} className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    min={todayStr()}
+                    onChange={(e) => {
+                      setFromDate(e.target.value);
+                      if (e.target.value > toDate) setToDate(e.target.value);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Hasta (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    min={fromDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                  <p className="mt-1 text-[11px] text-foreground/45">
+                    Dejalo igual al inicio para un solo día
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Motivo (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={dayReason}
+                    onChange={(e) => setDayReason(e.target.value)}
+                    placeholder="Ej. Vacaciones"
+                    maxLength={200}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-foreground/60">
-                  Hasta (opcional)
-                </label>
-                <input
-                  type="date"
-                  value={toDate}
-                  min={fromDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-                <p className="mt-1 text-[11px] text-foreground/45">
-                  Dejalo igual al inicio para un solo día
-                </p>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {isPending ? "Guardando…" : "Bloquear días"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleBlockWeekdays} className="space-y-3">
+              <p className="text-sm text-foreground/60">
+                Se bloquean <strong>todos</strong> esos días de la semana, de
+                forma permanente, hasta que los habilites.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAY_OPTIONS.map((day) => {
+                  const active = selectedWeekdays.includes(day.value);
+                  const already = recurringWeekdays.some(
+                    (r) => r.weekday === day.value,
+                  );
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => toggleWeekday(day.value)}
+                      className={`rounded-full px-3 py-1.5 text-sm font-semibold disabled:opacity-50 ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : already
+                            ? "border border-primary/40 bg-primary/5 text-primary"
+                            : "border border-foreground/15 bg-white hover:bg-muted/40"
+                      }`}
+                    >
+                      {day.short}
+                      {already && !active ? " ✓" : ""}
+                    </button>
+                  );
+                })}
               </div>
-              <div>
+              <div className="max-w-sm">
                 <label className="text-xs font-semibold text-foreground/60">
                   Motivo (opcional)
                 </label>
                 <input
                   type="text"
-                  value={dayReason}
-                  onChange={(e) => setDayReason(e.target.value)}
-                  placeholder="Ej. Vacaciones"
+                  value={weekdayReason}
+                  onChange={(e) => setWeekdayReason(e.target.value)}
+                  placeholder="Ej. No atiendo sábados"
                   maxLength={200}
                   className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
                 />
               </div>
-            </div>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {isPending ? "Guardando…" : "Bloquear días"}
-            </button>
-          </form>
-
-          {blockedDays.length > 0 && (
-            <ul className="mt-4 space-y-2">
-              {blockedDays.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-red-50/40 px-3 py-2 text-sm"
-                >
-                  <div>
-                    <span className="font-semibold capitalize">{fmtDay(d.date)}</span>
-                    {d.reason && (
-                      <span className="ml-2 text-foreground/50">· {d.reason}</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => handleDeleteDay(d.id)}
-                    className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                  >
-                    Habilitar
-                  </button>
-                </li>
-              ))}
-            </ul>
+              <button
+                type="submit"
+                disabled={isPending || selectedWeekdays.length === 0}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {isPending ? "Guardando…" : "Bloquear días elegidos"}
+              </button>
+            </form>
           )}
 
-          {blockedDays.length === 0 && (
+          {recurringWeekdays.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-foreground/55">
+                Todos los… (fijos)
+              </h3>
+              <ul className="mt-2 space-y-2">
+                {recurringWeekdays.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-amber-50/50 px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <span className="font-semibold">
+                        Todos los {weekdayLabel(r.weekday).toLowerCase()}
+                      </span>
+                      {r.reason && (
+                        <span className="ml-2 text-foreground/50">
+                          · {r.reason}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDeleteRecurring(r.id)}
+                      className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Habilitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {blockedDays.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-foreground/55">
+                Fechas puntuales
+              </h3>
+              <ul className="mt-2 space-y-2">
+                {blockedDays.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-red-50/40 px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <span className="font-semibold capitalize">
+                        {fmtDay(d.date)}
+                      </span>
+                      {d.reason && (
+                        <span className="ml-2 text-foreground/50">
+                          · {d.reason}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDeleteDay(d.id)}
+                      className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Habilitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {blockedDays.length === 0 && recurringWeekdays.length === 0 && (
             <p className="mt-4 text-sm text-foreground/50">
-              No hay días bloqueados próximos.
+              No hay días bloqueados.
             </p>
           )}
 
@@ -251,7 +448,9 @@ export function ScheduleBlocksPanel({
               onClick={() => setShowPartial((v) => !v)}
               className="text-sm font-semibold text-foreground/70 hover:text-primary"
             >
-              {showPartial ? "▲ Ocultar bloqueo por horario" : "▼ Bloqueo parcial (solo algunas horas)"}
+              {showPartial
+                ? "▲ Ocultar bloqueo por horario"
+                : "▼ Bloqueo parcial (solo algunas horas)"}
             </button>
 
             {showPartial && (

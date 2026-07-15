@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
+import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -131,7 +132,10 @@ async function sendVerificationEmailToUser(
 }
 
 export async function signOutAction(): Promise<void> {
-  await signOut({ redirectTo: "/" });
+  // Preferir redirect explícito de Next: el redirect de Auth.js dentro de
+  // server actions a veces provoca "Failed to fetch" con Turbopack.
+  await signOut({ redirect: false });
+  redirect("/");
 }
 
 export async function registerPatient(

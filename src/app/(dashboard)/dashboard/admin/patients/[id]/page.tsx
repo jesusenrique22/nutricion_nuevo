@@ -5,10 +5,6 @@ import { PatientAdminResourceEditor } from "@/components/admin/patient-admin-res
 import { PatientFichaSections } from "@/components/admin/patient-ficha-sections";
 import { ProfileEmojiBanner } from "@/components/brand/profile-emoji-banner";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
-import {
-  formatPatientGender,
-  formatPatientHeight,
-} from "@/lib/patient-ficha-format";
 import { getConsultationTypes } from "@/server/actions/booking.queries";
 import { getPatientPendingPayments } from "@/server/actions/payment-admin.queries";
 import {
@@ -76,35 +72,6 @@ export default async function PatientDetailPage({
           className="shrink-0 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
         />
       </div>
-
-      {patient.profile ? (
-        <section className="mt-8 w-full rounded-2xl border border-foreground/10 bg-white p-6">
-          <h2 className="text-lg font-bold">Datos personales</h2>
-          <p className="mt-1 text-sm text-foreground/50">
-            Se completan al enviar un formulario de consulta o ingreso.
-          </p>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-            <div className="rounded-xl border border-foreground/8 bg-surface/50 px-4 py-3">
-              <dt className="text-foreground/50">Género</dt>
-              <dd className="mt-1 text-base font-semibold">
-                {formatPatientGender(patient.profile.gender)}
-              </dd>
-            </div>
-            <div className="rounded-xl border border-foreground/8 bg-surface/50 px-4 py-3">
-              <dt className="text-foreground/50">Estatura</dt>
-              <dd className="mt-1 text-base font-semibold">
-                {formatPatientHeight(patient.profile.height)}
-              </dd>
-            </div>
-          </dl>
-        </section>
-      ) : (
-        <section className="mt-8 w-full rounded-2xl border border-foreground/10 bg-white p-6">
-          <p className="text-sm text-foreground/50">
-            Este paciente aún no completó su perfil.
-          </p>
-        </section>
-      )}
 
       <PatientAdminResourceEditor
         patientId={patient.id}

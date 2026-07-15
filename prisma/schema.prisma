@@ -96,6 +96,16 @@ enum ReviewTopic {
   CARE
 }
 
+enum CouponDuration {
+  ONE_DAY
+  ONE_WEEK
+  ONE_MONTH
+  THREE_MONTHS
+  SIX_MONTHS
+  ONE_YEAR
+  PERMANENT
+}
+
 // ──────────────────────────────────────────────
 // AUTENTICACIÓN Y USUARIOS
 // ──────────────────────────────────────────────
@@ -121,6 +131,8 @@ model User {
   weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
   notifications  Notification[]
   reviews        Review[]
+  couponsCreated Coupon[]            @relation("CouponsCreated")
+  couponRedemptions CouponRedemption[]
 
   accounts Account[]
   sessions Session[]
@@ -247,6 +259,18 @@ model BlockedDay {
   updatedAt DateTime @updatedAt
 
   @@index([date])
+}
+
+/**
+ * Bloqueo recurrente por día de la semana (0=domingo … 6=sábado, como Date.getDay()).
+ * Ej.: weekday=6 → todos los sábados sin atención.
+ */
+model RecurringBlockedWeekday {
+  id        String   @id @default(cuid())
+  weekday   Int      @unique // 0–6
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ──────────────────────────────────────────────
@@ -588,6 +612,40 @@ model CartItem {
 
   @@unique([userId, resourceId])
   @@unique([userId, productId])
+  @@index([userId])
+}
+
+// ──────────────────────────────────────────────
+// CUPONES DE DESCUENTO
+// ──────────────────────────────────────────────
+
+model Coupon {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  percentOff  Int
+  duration    CouponDuration
+  startsAt    DateTime       @default(now())
+  expiresAt   DateTime?
+  active      Boolean        @default(true)
+  createdById String?
+  createdBy   User?          @relation("CouponsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  redemptions CouponRedemption[]
+
+  @@index([active, expiresAt])
+}
+
+model CouponRedemption {
+  id               String   @id @default(cuid())
+  couponId         String
+  coupon           Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  percentOff       Int
+  createdAt        DateTime @default(now())
+
+  @@unique([couponId, userId])
   @@index([userId])
 }
 

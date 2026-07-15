@@ -4,7 +4,7 @@ import { GoogleCalendarConnect } from "@/components/calendar/google-calendar-con
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
 import { auth } from "@/lib/auth";
 import { getAllAppointments } from "@/server/actions/booking.queries";
-import { getBlockedDays, getScheduleBlocks } from "@/server/actions/schedule-block.actions";
+import { getBlockedDays, getRecurringBlockedWeekdays, getScheduleBlocks } from "@/server/actions/schedule-block.actions";
 import {
   getCalendarAdminStatus,
   getGoogleCalendarConnectionSummary,
@@ -16,8 +16,14 @@ export default async function CalendarPage() {
   const session = await auth();
   const adminUserId = session?.user?.id;
 
-  const [appointments, connection, adminStatus, scheduleBlocks, blockedDays] =
-    await Promise.all([
+  const [
+    appointments,
+    connection,
+    adminStatus,
+    scheduleBlocks,
+    blockedDays,
+    recurringWeekdays,
+  ] = await Promise.all([
     getAllAppointments(),
     adminUserId
       ? getGoogleCalendarConnectionSummary(adminUserId)
@@ -27,6 +33,7 @@ export default async function CalendarPage() {
       : Promise.resolve({ isDefaultCalendarAdmin: false }),
     getScheduleBlocks(),
     getBlockedDays(),
+    getRecurringBlockedWeekdays(),
   ]);
 
   return (
@@ -53,6 +60,7 @@ export default async function CalendarPage() {
 
       <ScheduleBlocksPanel
         blockedDays={blockedDays}
+        recurringWeekdays={recurringWeekdays}
         blocks={scheduleBlocks}
       />
 

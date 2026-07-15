@@ -802,10 +802,17 @@ type PreviewTab =
   | "imagenes"
   | "otros"
   | "web"
+  | "login"
   | "conocerme"
   | "pagos"
   | "recursos";
-type ImageSection = "hero" | "gallery" | "plans" | "services" | "other";
+type ImageSection =
+  | "hero"
+  | "gallery"
+  | "packages"
+  | "plans"
+  | "services"
+  | "other";
 
 export function PageSectionPreview({
   tab,
@@ -834,6 +841,7 @@ export function PageSectionPreview({
     imagenes: "anttova.com",
     otros: "anttova.com",
     web: "anttova.com",
+    login: "anttova.com/login",
     conocerme: "anttova.com/nutricionista",
     pagos: "carrito del paciente",
     recursos: "anttova.com/resources",
@@ -861,6 +869,18 @@ export function PageSectionPreview({
         return <BlocksPreview data={blocks} />;
       case "web":
         return <TextsPreview blocks={textBlocks} />;
+      case "login":
+        return (
+          <div className="rounded-xl border border-foreground/10 bg-[#3a0f1a] p-4 text-center text-white">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-accent-soft">
+              Pantalla de login
+            </p>
+            <p className="mt-2 text-xs text-white/70">
+              Editá foto y nombre en la pestaña Login. Se ve al tocar Iniciar
+              sesión.
+            </p>
+          </div>
+        );
       case "conocerme":
         return <ProfilePreview data={nutricionista} />;
       case "pagos":

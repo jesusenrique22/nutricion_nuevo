@@ -122,7 +122,9 @@ export function CartLineItem({
           <div className="space-y-1">
             {unit > 0 ? (
               <p className="text-xs text-foreground/50">
-                Precio unitario:{" "}
+                {item.type === "APPOINTMENT" && item.fullPrice
+                  ? "Cuota de esta etapa: "
+                  : "Precio unitario: "}
                 <DisplayPrice amount={item.price!} currency={currency} />
               </p>
             ) : (
@@ -165,7 +167,11 @@ export function CartLineItem({
 
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/40">
-              Subtotal
+              {item.type === "APPOINTMENT" && item.fullPrice
+                ? item.advancePercent != null && item.advancePercent > 0
+                  ? `A pagar ahora (${item.advancePercent}%)`
+                  : "A pagar ahora"
+                : "Subtotal"}
             </p>
             <p className="text-xl font-bold tabular-nums text-primary">
               {lineTotal > 0 ? (
@@ -174,6 +180,12 @@ export function CartLineItem({
                 "Gratis"
               )}
             </p>
+            {item.type === "APPOINTMENT" && item.fullPrice ? (
+              <p className="mt-1 text-xs text-foreground/50">
+                Total de la cita:{" "}
+                <DisplayPrice amount={item.fullPrice} currency={currency} />
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -185,7 +197,14 @@ export function cartItemsTotal(
   items: CartItemDTO[],
   convert: (amount: string | number, from: SupportedCurrency) => number,
   displayCurrency: SupportedCurrency,
-): { label: string; units: number; hasPriced: boolean } {
+  discountPercent?: number | null,
+): {
+  label: string;
+  units: number;
+  hasPriced: boolean;
+  rawSum: number;
+  discountLabel?: string;
+} {
   let sum = 0;
   let hasPriced = false;
   let units = 0;
@@ -195,9 +214,24 @@ export function cartItemsTotal(
     if (line > 0) hasPriced = true;
     sum += convert(line, itemCurrency(item));
   }
+  const pct =
+    discountPercent && discountPercent > 0
+      ? Math.min(100, Math.max(0, Math.round(discountPercent)))
+      : 0;
+  const after =
+    pct > 0
+      ? Math.round(sum * (100 - pct)) / 100
+      : sum;
   return {
     units,
     hasPriced,
-    label: !hasPriced ? "Gratis" : formatMoney(sum, displayCurrency),
+    rawSum: sum,
+    discountLabel:
+      pct > 0 && hasPriced
+        ? `−${pct}% (${formatMoney(sum - after, displayCurrency)})`
+        : undefined,
+    label: !hasPriced
+      ? "Gratis"
+      : formatMoney(after, displayCurrency),
   };
 }

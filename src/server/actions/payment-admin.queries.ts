@@ -23,7 +23,10 @@ export interface AdminPendingPaymentItem {
   patientEmail: string;
   title: string;
   subtitle: string;
+  /** Monto de esta cuota / ítem pendiente. */
   amount: string;
+  /** Precio total de la cita (solo pagos de citas en etapas). */
+  totalAmount?: string | null;
   createdAt: string;
   trashedAt?: string | null;
   resourceId?: string;
@@ -195,6 +198,7 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
         title: appt.consultationType.name,
         subtitle: `Adelanto · Cita ${dateLabel}`,
         amount: phases.advanceAmount,
+        totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
         trashedAt: payment.advanceInboxTrashedAt?.toISOString() ?? null,
         appointmentId: appt.id,
@@ -216,6 +220,7 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
         title: appt.consultationType.name,
         subtitle: `Saldo final · Cita ${dateLabel}`,
         amount: phases.remainderAmount,
+        totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
         trashedAt: payment.remainderInboxTrashedAt?.toISOString() ?? null,
         appointmentId: appt.id,

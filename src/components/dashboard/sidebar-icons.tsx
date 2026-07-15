@@ -162,6 +162,7 @@ export function iconForHref(href: string) {
   if (href.includes("/calendar")) return IconCalendar;
   if (href.includes("/patients")) return IconUsers;
   if (href.includes("/precios")) return IconTag;
+  if (href.includes("/cupones")) return IconTag;
   if (href.includes("/payments")) return IconWallet;
   if (href.includes("/analytics")) return IconChart;
   if (href.includes("/resources") || href.includes("/library")) return IconBook;

@@ -10,7 +10,13 @@ import {
 } from "@/components/cart/cart-line-item";
 import { PaymentMethodsCard } from "@/components/cart/payment-methods-card";
 import { useDisplayPrice } from "@/components/currency/display-price";
+import { formatMoney } from "@/lib/currency/format";
+import { normalizeCouponCode } from "@/lib/coupons";
 import { submitCart, type CartItemDTO } from "@/server/actions/cart.actions";
+import {
+  validateCouponForCart,
+  type AppliedCouponDTO,
+} from "@/server/actions/coupon.actions";
 import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
 import type { PaymentMethodId } from "@/lib/payment-methods";
 
@@ -62,6 +68,11 @@ export function PatientCartPanel({
   const [proofUrls, setProofUrls] = useState<string[]>([]);
   const [paymentNote, setPaymentNote] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCouponDTO | null>(
+    null,
+  );
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   const grouped = useMemo(() => groupItems(items), [items]);
 
@@ -71,24 +82,51 @@ export function PatientCartPanel({
   );
 
   const totals = useMemo(
-    () => cartItemsTotal(items, convert, displayCurrency),
-    [items, convert, displayCurrency],
+    () =>
+      cartItemsTotal(
+        items,
+        convert,
+        displayCurrency,
+        appliedCoupon?.percentOff,
+      ),
+    [items, convert, displayCurrency, appliedCoupon?.percentOff],
   );
 
+  const needsPaymentFields =
+    hasPaidItems && !(appliedCoupon && appliedCoupon.percentOff >= 100);
+
+  const appointmentTotalHint = useMemo(() => {
+    const splitAppts = items.filter(
+      (i) => i.type === "APPOINTMENT" && i.fullPrice,
+    );
+    if (splitAppts.length === 0) return undefined;
+    let fullSum = 0;
+    for (const item of splitAppts) {
+      fullSum += convert(
+        Number(item.fullPrice),
+        item.currency === "USD" ? "USD" : "ARS",
+      );
+    }
+    const pct = appliedCoupon?.percentOff ?? 0;
+    const discounted =
+      pct > 0 ? Math.round(fullSum * (100 - pct)) / 100 : fullSum;
+    const totalLabel = formatMoney(discounted, displayCurrency);
+    return `Total de la cita: ${totalLabel} · acá pagás solo la cuota de esta etapa`;
+  }, [items, convert, displayCurrency, appliedCoupon?.percentOff]);
+
   const missingFields = useMemo(() => {
-    if (!hasPaidItems) return [];
+    if (!needsPaymentFields) return [];
     const missing: string[] = [];
     if (!paymentMethod) missing.push("modo de pago");
-    if (!paymentReference.trim()) {
+    if (checkoutPolicy.referenceRequired && !paymentReference.trim()) {
       missing.push(checkoutPolicy.referenceLabel.toLowerCase());
     }
-    if (proofUrls.length === 0) missing.push("captura del comprobante");
     return missing;
   }, [
-    hasPaidItems,
+    needsPaymentFields,
     paymentMethod,
     paymentReference,
-    proofUrls,
+    checkoutPolicy.referenceRequired,
     checkoutPolicy.referenceLabel,
   ]);
 
@@ -116,6 +154,12 @@ export function PatientCartPanel({
           >
             Agendar cita
           </Link>
+          <Link
+            href="/dashboard/patient/cart/historial"
+            className="rounded-full border border-foreground/15 px-5 py-2 text-sm font-semibold hover:bg-muted/50"
+          >
+            Historial de compras
+          </Link>
         </div>
       </div>
     );
@@ -132,7 +176,7 @@ export function PatientCartPanel({
   function handleConfirmPurchase() {
     setSubmitError(null);
 
-    if (hasPaidItems && missingFields.length > 0) {
+    if (needsPaymentFields && missingFields.length > 0) {
       setSubmitError(`Falta completar: ${missingFields.join(", ")}.`);
       return;
     }
@@ -144,9 +188,10 @@ export function PatientCartPanel({
           paymentReference: paymentReference.trim() || undefined,
           paymentProofUrls: proofUrls.length > 0 ? proofUrls : undefined,
           paymentNote: paymentNote.trim() || undefined,
+          couponCode: appliedCoupon?.code,
         });
         if (res.ok) {
-          router.push("/dashboard/patient/progress?pedido=ok");
+          router.push("/dashboard/patient/cart/historial?pedido=ok");
           router.refresh();
         } else {
           setSubmitError(res.message);
@@ -159,6 +204,27 @@ export function PatientCartPanel({
         );
       }
     });
+  }
+
+  function handleApplyCoupon() {
+    setCouponError(null);
+    startTransition(async () => {
+      const res = await validateCouponForCart(couponInput);
+      if (!res.ok) {
+        setAppliedCoupon(null);
+        setCouponError(res.message);
+        return;
+      }
+      setAppliedCoupon(res.coupon);
+      setCouponInput(res.coupon.code);
+      setCouponError(null);
+    });
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
   }
 
   return (
@@ -235,12 +301,70 @@ export function PatientCartPanel({
               </div>
             )}
             <div className="flex justify-between gap-4 border-t border-foreground/10 pt-3">
-              <dt className="font-semibold text-foreground">Total</dt>
+              <dt className="font-semibold text-foreground">
+                {appointmentTotalHint ? "A pagar ahora" : "Total"}
+              </dt>
               <dd className="text-2xl font-bold tabular-nums text-primary">
                 {totals.label}
               </dd>
             </div>
           </dl>
+
+          {totals.discountLabel ? (
+            <p className="text-xs font-medium text-emerald-700">
+              Cupón {appliedCoupon?.code}: {totals.discountLabel}
+            </p>
+          ) : null}
+
+          {appointmentTotalHint ? (
+            <p className="text-xs text-foreground/55">{appointmentTotalHint}</p>
+          ) : null}
+
+          <div className="space-y-2 border-t border-foreground/8 pt-3">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-foreground/55">
+              Cupón de descuento
+            </label>
+            {appliedCoupon ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2">
+                <p className="text-sm font-semibold text-emerald-900">
+                  <span className="font-mono">{appliedCoupon.code}</span>
+                  {" · "}
+                  {appliedCoupon.percentOff}% off
+                </p>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={handleRemoveCoupon}
+                  className="text-xs font-semibold text-emerald-800 underline disabled:opacity-50"
+                >
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(e) =>
+                    setCouponInput(normalizeCouponCode(e.target.value))
+                  }
+                  placeholder="Código"
+                  maxLength={32}
+                  className="min-w-0 flex-1 rounded-xl border border-foreground/15 bg-white px-3 py-2 text-sm font-mono uppercase outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  disabled={isPending || !couponInput.trim()}
+                  onClick={handleApplyCoupon}
+                  className="shrink-0 rounded-full border border-foreground/15 px-4 py-2 text-sm font-semibold hover:bg-muted/50 disabled:opacity-50"
+                >
+                  Aplicar
+                </button>
+              </div>
+            )}
+            {couponError ? (
+              <p className="text-xs text-red-600">{couponError}</p>
+            ) : null}
+          </div>
 
           <p className="text-xs text-foreground/45">
             {totals.units} {totals.units === 1 ? "unidad" : "unidades"} · en{" "}
@@ -257,6 +381,12 @@ export function PatientCartPanel({
               >
                 Proceder al pago
               </button>
+              <Link
+                href="/dashboard/patient/cart/historial"
+                className="flex w-full items-center justify-center rounded-full border border-foreground/15 py-2.5 text-sm font-semibold hover:bg-muted/50"
+              >
+                Ver historial de compras
+              </Link>
               <p className="text-center text-xs text-foreground/50">
                 Verás los métodos de pago antes de confirmar.
               </p>
@@ -295,7 +425,8 @@ export function PatientCartPanel({
                 note={paymentNote}
                 onNoteChange={setPaymentNote}
                 totalLabel={totals.label}
-                requireAllFields={hasPaidItems}
+                totalHint={appointmentTotalHint}
+                requireAllFields={needsPaymentFields}
               />
 
               <button
@@ -317,7 +448,7 @@ export function PatientCartPanel({
                 Volver
               </button>
 
-              {hasPaidItems && !isCheckoutComplete && (
+              {needsPaymentFields && !isCheckoutComplete && (
                 <p className="text-xs text-foreground/55">
                   Para confirmar necesitás: {missingFields.join(", ")}.
                 </p>

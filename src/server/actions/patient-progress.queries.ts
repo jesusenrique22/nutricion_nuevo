@@ -6,7 +6,7 @@ import { parseProofUrls } from "@/lib/payment-checkout-policy";
 import { prisma } from "@/server/db/prisma";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 
-export type PatientProgressItemKind = "APPOINTMENT" | "RESOURCE";
+export type PatientProgressItemKind = "APPOINTMENT" | "RESOURCE" | "PRODUCT";
 
 export interface PatientProgressItem {
   id: string;
@@ -37,7 +37,7 @@ function resourceStatusLabel(status: string, refundStatus: string): string {
   if (refundStatus === "REQUESTED") return "Reembolso en revisión";
   if (refundStatus === "APPROVED" || status === "REFUNDED") return "Reembolsado";
   if (refundStatus === "DENIED") return "Reembolso no aceptado";
-  if (status === "PENDING") return "Pago en revisión";
+  if (status === "PENDING") return "Procesando pago";
   if (status === "GRANTED") return "Acceso activo";
   return status;
 }
@@ -47,38 +47,37 @@ function appointmentStatusLabel(
   refundStatus: string,
   appointmentStatus: string,
 ): string {
+  if (appointmentStatus === "CANCELLED") return "Cancelada";
   if (refundStatus === "REQUESTED") return "Reembolso en revisión";
   if (refundStatus === "APPROVED" || paymentStatus === "REFUNDED") {
     return "Reembolsado";
   }
   if (refundStatus === "DENIED") return "Reembolso no aceptado";
-  if (paymentStatus === "PENDING") return "Pago en revisión";
-  if (paymentStatus === "PARTIAL") return "Adelanto en revisión";
+  if (paymentStatus === "PENDING") return "Procesando pago";
+  if (paymentStatus === "PARTIAL") return "Procesando adelanto";
   if (paymentStatus === "PAID") return "Pagado";
   if (appointmentStatus === "CONFIRMED") return "Cita confirmada";
   if (appointmentStatus === "COMPLETED") return "Consulta completada";
   return "Cita agendada";
 }
 
-/** Compras y citas pagadas del paciente para Mi progreso. */
+function productStatusLabel(status: string): string {
+  if (status === "PENDING") return "Procesando pago";
+  if (status === "GRANTED") return "Compra confirmada";
+  if (status === "REFUNDED") return "Reembolsado";
+  return status;
+}
+
+/** Historial de compras, citas y pagos del paciente. */
 export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
 
-  const [appointments, purchases] = await Promise.all([
+  const [appointments, purchases, products] = await Promise.all([
     prisma.appointment.findMany({
       where: {
         patientId: session.user.id,
         payment: { isNot: null },
-        OR: [
-          { status: { not: "CANCELLED" } },
-          { payment: { status: "REFUNDED" } },
-          {
-            payment: {
-              refundStatus: { in: ["REQUESTED", "APPROVED", "DENIED"] },
-            },
-          },
-        ],
       },
       include: { consultationType: true, payment: true },
       orderBy: { createdAt: "desc" },
@@ -89,6 +88,13 @@ export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
         pricePaid: { gt: 0 },
       },
       include: { resource: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.productPurchase.findMany({
+      where: {
+        userId: session.user.id,
+        pricePaid: { gt: 0 },
+      },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -142,6 +148,23 @@ export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
     });
   }
 
+  for (const row of products) {
+    items.push({
+      id: `product-${row.id}`,
+      kind: "PRODUCT",
+      entityId: row.id,
+      title: row.productName,
+      subtitle: `Cantidad · ${row.quantity}`,
+      amount: row.pricePaid.toString(),
+      purchasedAt: row.createdAt.toISOString(),
+      statusLabel: productStatusLabel(row.status),
+      paymentStatus: row.status,
+      refundStatus: "NONE",
+      refundAdminNote: null,
+      canRequestRefund: false,
+    });
+  }
+
   items.sort(
     (a, b) =>
       new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime(),
@@ -161,6 +184,7 @@ export interface PatientPendingPaymentItem {
   title: string;
   subtitle: string;
   amount: string;
+  totalAmount?: string | null;
   createdAt: string;
   paymentMethod: string | null;
   patientReference: string | null;
@@ -253,6 +277,7 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
         title: appt.consultationType.name,
         subtitle: `Adelanto · Cita ${dateLabel}`,
         amount: phases.advanceAmount,
+        totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
         paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),
         patientReference: payment.patientPaymentReference,
@@ -272,6 +297,7 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
         title: appt.consultationType.name,
         subtitle: `Saldo final · Cita ${dateLabel}`,
         amount: phases.remainderAmount,
+        totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
         paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),
         patientReference: payment.patientPaymentReference,

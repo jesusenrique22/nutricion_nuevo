@@ -6,11 +6,16 @@ import { formatActionError } from "@/lib/db-errors";
 import { dateRangeKeys, todayDateKey } from "@/lib/scheduling-dates";
 import {
   createBlockedDaysSchema,
+  createRecurringBlockedWeekdaysSchema,
   createScheduleBlockSchema,
   deleteBlockedDaySchema,
+  deleteRecurringBlockedWeekdaySchema,
   deleteScheduleBlockSchema,
 } from "@/lib/validators/appointment-status";
-import { prisma } from "@/server/db/prisma";
+import {
+  isPrismaRecurringBlockedWeekdayReady,
+  prisma,
+} from "@/server/db/prisma";
 
 export interface ScheduleBlockDTO {
   id: string;
@@ -22,6 +27,12 @@ export interface ScheduleBlockDTO {
 export interface BlockedDayDTO {
   id: string;
   date: string;
+  reason: string | null;
+}
+
+export interface RecurringBlockedWeekdayDTO {
+  id: string;
+  weekday: number;
   reason: string | null;
 }
 
@@ -70,6 +81,33 @@ export async function getBlockedDays(): Promise<BlockedDayDTO[]> {
     date: d.date,
     reason: d.reason,
   }));
+}
+
+export async function getRecurringBlockedWeekdays(): Promise<
+  RecurringBlockedWeekdayDTO[]
+> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return [];
+  if (!isPrismaRecurringBlockedWeekdayReady()) {
+    console.warn(
+      "[getRecurringBlockedWeekdays] Prisma Client sin recurringBlockedWeekday — corré pnpm db:generate && pnpm run dev:clean",
+    );
+    return [];
+  }
+
+  const rows = await prisma.recurringBlockedWeekday.findMany({
+    orderBy: { weekday: "asc" },
+  });
+
+  // Orden Lun→Dom para la UI
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return [...rows]
+    .sort((a, b) => order.indexOf(a.weekday) - order.indexOf(b.weekday))
+    .map((r) => ({
+      id: r.id,
+      weekday: r.weekday,
+      reason: r.reason,
+    }));
 }
 
 export async function createBlockedDays(
@@ -122,6 +160,57 @@ export async function createBlockedDays(
   }
 }
 
+export async function createRecurringBlockedWeekdays(
+  formData: unknown,
+): Promise<BlockActionResult> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") {
+      return { ok: false, message: "No autorizado." };
+    }
+    if (!isPrismaRecurringBlockedWeekdayReady()) {
+      return {
+        ok: false,
+        message:
+          "Prisma Client desactualizado. Reiniciá con: pnpm db:generate && pnpm run dev:clean",
+      };
+    }
+
+    const parsed = createRecurringBlockedWeekdaysSchema.safeParse(formData);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        message: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+      };
+    }
+
+    const unique = [...new Set(parsed.data.weekdays)];
+    const reason = parsed.data.reason?.trim() || null;
+
+    await prisma.$transaction(
+      unique.map((weekday) =>
+        prisma.recurringBlockedWeekday.upsert({
+          where: { weekday },
+          create: { weekday, reason },
+          update: reason ? { reason } : {},
+        }),
+      ),
+    );
+
+    revalidatePath("/dashboard/admin/calendar");
+    return { ok: true, count: unique.length };
+  } catch (err) {
+    console.error("[createRecurringBlockedWeekdays]", err);
+    return {
+      ok: false,
+      message: formatActionError(
+        err,
+        "No se pudieron bloquear los días de la semana.",
+      ),
+    };
+  }
+}
+
 export async function deleteBlockedDay(
   formData: unknown,
 ): Promise<BlockActionResult> {
@@ -143,6 +232,43 @@ export async function deleteBlockedDay(
     return {
       ok: false,
       message: formatActionError(err, "No se pudo desbloquear el día."),
+    };
+  }
+}
+
+export async function deleteRecurringBlockedWeekday(
+  formData: unknown,
+): Promise<BlockActionResult> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") {
+      return { ok: false, message: "No autorizado." };
+    }
+    if (!isPrismaRecurringBlockedWeekdayReady()) {
+      return {
+        ok: false,
+        message:
+          "Prisma Client desactualizado. Reiniciá con: pnpm db:generate && pnpm run dev:clean",
+      };
+    }
+
+    const parsed = deleteRecurringBlockedWeekdaySchema.safeParse(formData);
+    if (!parsed.success) return { ok: false, message: "Datos inválidos." };
+
+    await prisma.recurringBlockedWeekday.delete({
+      where: { id: parsed.data.id },
+    });
+
+    revalidatePath("/dashboard/admin/calendar");
+    return { ok: true };
+  } catch (err) {
+    console.error("[deleteRecurringBlockedWeekday]", err);
+    return {
+      ok: false,
+      message: formatActionError(
+        err,
+        "No se pudo quitar el bloqueo semanal.",
+      ),
     };
   }
 }

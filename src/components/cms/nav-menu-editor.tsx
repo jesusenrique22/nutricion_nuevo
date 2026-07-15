@@ -280,7 +280,7 @@ export function NavMenuEditor({
         <p className="mt-0.5 text-xs text-foreground/55">
           Estas son las opciones que ve el visitante arriba del sitio. Podés
           renombrarlas, reordenarlas, ocultarlas o crear nuevas que lleven a una
-          sección, a una página (como Productos) o a un enlace externo.
+          sección, a una página (como Tienda) o a un enlace externo.
         </p>
       </div>
 

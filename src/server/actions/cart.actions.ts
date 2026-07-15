@@ -5,6 +5,12 @@ import { auth } from "@/lib/auth";
 import { assertBookingRequestAllowed } from "@/lib/booking-guard";
 import { prisma } from "@/server/db/prisma";
 import { getPaymentCheckoutPolicy } from "@/lib/payment-checkout-policy";
+import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
+import {
+  isTwoPhaseSplit,
+  resolvePaymentSplit,
+} from "@/lib/payment-policy-resolve";
+import { splitPaymentAmount } from "@/lib/payment-split";
 import { findProductById } from "@/lib/products-parse";
 import { getProductPrimaryImage } from "@/lib/product-images";
 import { getProducts } from "@/server/queries/landing.queries";
@@ -13,6 +19,7 @@ import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { fulfillCartCheckout, findReusableCartAppointment } from "@/server/services/cart-checkout.service";
 import { formatActionError } from "@/lib/db-errors";
 import { modalityLabels } from "@/lib/appointment-labels";
+import { Prisma } from "@prisma/client";
 
 export type CartActionResult =
   | { ok: true }
@@ -23,8 +30,12 @@ export interface CartItemDTO {
   type: "RESOURCE" | "APPOINTMENT" | "PRODUCT";
   title: string;
   subtitle: string;
-  /** Precio unitario */
+  /** Precio cobrado ahora (unidad). En citas a 2 cuotas, es el adelanto. */
   price: string | null;
+  /** Precio total de la cita (solo citas con pago en etapas). */
+  fullPrice?: string | null;
+  /** Porcentaje de adelanto cuando aplica pago en 2 partes. */
+  advancePercent?: number | null;
   currency?: string;
   quantity: number;
   imageUrl?: string | null;
@@ -75,6 +86,10 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
         ? await getProducts()
         : null;
 
+    const paymentPolicy = items.some((item) => item.type === "APPOINTMENT")
+      ? await getPaymentChatPolicy()
+      : null;
+
     const result: CartItemDTO[] = [];
     for (const item of items) {
       if (item.type === "RESOURCE" && item.resource) {
@@ -112,6 +127,30 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
         continue;
       }
       if (item.type === "APPOINTMENT") {
+        const fullPrice = item.consultationType?.price ?? null;
+        let duePrice = fullPrice?.toString() ?? null;
+        let advancePercent: number | null = null;
+        let catalogFullPrice: string | null = null;
+
+        if (fullPrice && paymentPolicy && item.consultationType?.code) {
+          const split = resolvePaymentSplit(
+            paymentPolicy,
+            item.consultationType.code,
+          );
+          if (isTwoPhaseSplit(split.advancePercent)) {
+            const { advanceAmount } = splitPaymentAmount(
+              fullPrice,
+              split.advancePercent,
+            );
+            duePrice = advanceAmount.toString();
+            advancePercent = split.advancePercent;
+            catalogFullPrice = fullPrice.toString();
+          } else if (split.advancePercent <= 0) {
+            duePrice = new Prisma.Decimal(0).toString();
+            catalogFullPrice = fullPrice.toString();
+          }
+        }
+
         result.push({
           id: item.id,
           type: "APPOINTMENT",
@@ -122,7 +161,9 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
                 item.modality,
               )
             : "",
-          price: item.consultationType?.price.toString() ?? null,
+          price: duePrice,
+          fullPrice: catalogFullPrice,
+          advancePercent,
           currency: "ARS",
           quantity: 1,
           imageUrl: item.consultationType?.imageUrl ?? null,
@@ -366,6 +407,7 @@ export async function submitCart(options?: {
   paymentReference?: string;
   paymentProofUrls?: string[];
   paymentNote?: string;
+  couponCode?: string;
 }): Promise<CartActionResult> {
   try {
     const session = await requirePatient();
@@ -378,6 +420,19 @@ export async function submitCart(options?: {
     if (items.length === 0) {
       return { ok: false, message: "Tu carrito está vacío." };
     }
+
+    const { resolveCouponForCheckout, recordCouponRedemption } = await import(
+      "@/server/actions/coupon.actions"
+    );
+    const couponResult = await resolveCouponForCheckout({
+      userId: session.user.id,
+      rawCode: options?.couponCode,
+    });
+    if (!couponResult.ok) {
+      return { ok: false, message: couponResult.message };
+    }
+    const appliedCoupon = couponResult.coupon;
+    const couponPercentOff = appliedCoupon?.percentOff ?? 0;
 
     const productsCatalog = items.some((i) => i.type === "PRODUCT")
       ? await getProducts()
@@ -402,33 +457,39 @@ export async function submitCart(options?: {
         };
       });
 
+    const { applyPercentOff } = await import("@/lib/coupon-math");
+    const discountedAmount = (amount: number) =>
+      couponPercentOff > 0
+        ? applyPercentOff(amount, couponPercentOff).toNumber()
+        : amount;
+
     const requiresPayment =
       items.some(
         (i) =>
-          (i.type === "RESOURCE" && i.resource && i.resource.price.toNumber() > 0) ||
+          (i.type === "RESOURCE" &&
+            i.resource &&
+            discountedAmount(i.resource.price.toNumber()) > 0) ||
           (i.type === "APPOINTMENT" &&
             i.consultationType &&
-            i.consultationType.price.toNumber() > 0),
-      ) || productItems.some((item) => item.product.price * (item.quantity ?? 1) > 0);
+            discountedAmount(i.consultationType.price.toNumber()) > 0),
+      ) ||
+      productItems.some(
+        (item) =>
+          discountedAmount(item.product.price * (item.quantity ?? 1)) > 0,
+      );
 
     if (requiresPayment) {
       const policy = await getPaymentCheckoutPolicy();
       if (!options?.paymentMethod) {
         return { ok: false, message: "Selecciona un modo de pago." };
       }
-      if (!options?.paymentReference?.trim()) {
+      if (policy.referenceRequired && !options?.paymentReference?.trim()) {
         return {
           ok: false,
           message: `Indica ${policy.referenceLabel.toLowerCase()}.`,
         };
       }
       const proofs = options?.paymentProofUrls ?? [];
-      if (proofs.length === 0) {
-        return {
-          ok: false,
-          message: "Sube la captura del comprobante de pago.",
-        };
-      }
       if (proofs.length > policy.maxProofFiles) {
         return {
           ok: false,
@@ -505,10 +566,23 @@ export async function submitCart(options?: {
       })),
       productItems,
       paymentPayload,
+      couponPercentOff: couponPercentOff > 0 ? couponPercentOff : null,
     });
 
     if (!result.ok) {
       return { ok: false, message: result.message };
+    }
+
+    if (appliedCoupon) {
+      try {
+        await recordCouponRedemption({
+          couponId: appliedCoupon.id,
+          userId: session.user.id,
+          percentOff: appliedCoupon.percentOff,
+        });
+      } catch {
+        // Ya usado en carrera; el pedido igual se cumplió con el descuento.
+      }
     }
 
     for (const item of resourceItems) {
@@ -534,7 +608,7 @@ export async function submitCart(options?: {
     revalidatePath("/dashboard/patient/appointments");
     revalidatePath("/dashboard/patient/library");
     revalidatePath("/dashboard/patient/products");
-    revalidatePath("/dashboard/patient/progress");
+    revalidatePath("/dashboard/patient/cart/historial");
     revalidatePath("/dashboard/notifications");
     revalidatePath("/dashboard/admin/payments");
     return { ok: true };

@@ -3,20 +3,29 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploadField } from "@/components/cms/image-upload-field";
+import { PackageImagesEditor } from "@/components/cms/package-images-editor";
 import { LANDING_IMAGE_SECTION_LABELS } from "@/lib/cms-labels";
 import { landingImagesToRecord } from "@/lib/landing-images-parse";
-import { updateSiteContent } from "@/server/actions/cms.actions";
+import {
+  updateSiteContent,
+  type ConsultationAdminDTO,
+} from "@/server/actions/cms.actions";
 import type { LandingImagesData } from "@/types/landing-images";
 import { LANDING_IMAGES_SLUG, MAX_HERO_SLIDES } from "@/types/landing-images";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
 
-type SectionId = "hero" | "plans" | "services" | "other";
+type SectionId = "hero" | "packages" | "plans" | "services" | "other";
 
 const sections: { id: SectionId; label: string; hint: string }[] = [
   { id: "hero", label: LANDING_IMAGE_SECTION_LABELS.hero, hint: "Imágenes grandes que rotan en la portada." },
-  { id: "plans", label: LANDING_IMAGE_SECTION_LABELS.plans, hint: "Una imagen por tipo de consulta." },
+  {
+    id: "packages",
+    label: LANDING_IMAGE_SECTION_LABELS.packages,
+    hint: "Foto de cada paquete del lobby. Los paquetes nuevos también se editan acá.",
+  },
+  { id: "plans", label: LANDING_IMAGE_SECTION_LABELS.plans, hint: "Fallback genérico si un paquete no tiene foto propia." },
   { id: "services", label: LANDING_IMAGE_SECTION_LABELS.services, hint: "Imágenes de cada servicio." },
   { id: "other", label: LANDING_IMAGE_SECTION_LABELS.other, hint: "Imagen de filosofía, marca y CTA final." },
 ];
@@ -46,9 +55,11 @@ function UnsavedBanner({
 
 export function LandingImagesEditor({
   initial,
+  packageTypes = [],
   onLiveChange,
 }: {
   initial: LandingImagesData;
+  packageTypes?: ConsultationAdminDTO[];
   onLiveChange?: (data: LandingImagesData, section: SectionId) => void;
 }) {
   const router = useRouter();
@@ -98,7 +109,9 @@ export function LandingImagesEditor({
 
   return (
     <div className="space-y-4">
-      <UnsavedBanner dirty={dirty} isPending={isPending} onSave={save} message={message} />
+      {section !== "packages" && (
+        <UnsavedBanner dirty={dirty} isPending={isPending} onSave={save} message={message} />
+      )}
 
       {/* Selector de sección */}
       <div className="flex flex-wrap gap-2">
@@ -116,6 +129,9 @@ export function LandingImagesEditor({
         <span className="font-semibold">{activeSection.label}:</span> {activeSection.hint}
       </p>
 
+      {section === "packages" ? (
+        <PackageImagesEditor types={packageTypes} />
+      ) : (
       <div className="space-y-4 rounded-2xl border border-foreground/10 bg-white p-4">
         {/* ── Hero ── */}
         {section === "hero" && (
@@ -258,6 +274,7 @@ export function LandingImagesEditor({
           {isPending ? "Guardando…" : "Guardar imágenes"}
         </button>
       </div>
+      )}
     </div>
   );
 }

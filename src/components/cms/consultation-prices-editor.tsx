@@ -11,6 +11,7 @@ import type { ConsultationAdminDTO } from "@/server/actions/cms.actions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { IntegerInput } from "@/components/ui/integer-input";
+import { ImageUploadField } from "@/components/cms/image-upload-field";
 
 const inputClass =
   "mt-1.5 w-full rounded-xl border border-foreground/15 px-4 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10";
@@ -38,9 +39,11 @@ export function ConsultationPricesEditor({
   const [isPending, startTransition] = useTransition();
   const [newPrice, setNewPrice] = useState(0);
   const [newDuration, setNewDuration] = useState(60);
+  const [newImageUrl, setNewImageUrl] = useState("");
   const [editPrice, setEditPrice] = useState(0);
   const [editDuration, setEditDuration] = useState(60);
   const [editSortOrder, setEditSortOrder] = useState(0);
+  const [editImageUrl, setEditImageUrl] = useState("");
 
   const active = types.find((t) => t.id === activeId);
 
@@ -49,8 +52,9 @@ export function ConsultationPricesEditor({
       setEditPrice(Number(active.price) || 0);
       setEditDuration(active.durationMinutes);
       setEditSortOrder(active.sortOrder);
+      setEditImageUrl(active.imageUrl ?? "");
     }
-  }, [active?.id, active?.price, active?.durationMinutes, active?.sortOrder]);
+  }, [active]);
 
   useEffect(() => {
     if (types.length === 0) {
@@ -96,6 +100,7 @@ export function ConsultationPricesEditor({
             if (!showCreate) {
               setNewPrice(0);
               setNewDuration(60);
+              setNewImageUrl("");
             }
           }}
           className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
@@ -124,6 +129,7 @@ export function ConsultationPricesEditor({
               });
               if (res.ok) {
                 setShowCreate(false);
+                setNewImageUrl("");
                 setMessage(
                   res.code
                     ? `Paquete ${formatCode(res.code)} creado y publicado en el lobby.`
@@ -181,12 +187,17 @@ export function ConsultationPricesEditor({
               />
             </label>
             <label className="block text-sm sm:col-span-2">
-              <span className="font-semibold">Imagen (URL opcional)</span>
-              <input
-                name="imageUrl"
-                className={inputClass}
-                placeholder="/uploads/... o URL pública"
-              />
+              <span className="font-semibold">Imagen del paquete</span>
+              <input type="hidden" name="imageUrl" value={newImageUrl} />
+              <div className="mt-1.5">
+                <ImageUploadField
+                  label="Foto del paquete"
+                  value={newImageUrl}
+                  onChange={setNewImageUrl}
+                  folder="packages"
+                  hint="Si no subís foto, el lobby usará una imagen genérica."
+                />
+              </div>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input name="allowsOnline" type="checkbox" defaultChecked />
@@ -337,15 +348,16 @@ export function ConsultationPricesEditor({
                   className={inputClass}
                 />
               </label>
-              <label className="block text-sm sm:col-span-2">
-                <span className="font-semibold">Imagen del paquete (URL)</span>
-                <input
-                  name="imageUrl"
-                  defaultValue={active.imageUrl ?? ""}
-                  className={inputClass}
-                  placeholder="Opcional. Si está vacío, usa imagen por defecto."
+              <div className="sm:col-span-2">
+                <input type="hidden" name="imageUrl" value={editImageUrl} />
+                <ImageUploadField
+                  label="Imagen del paquete en el lobby"
+                  value={editImageUrl}
+                  onChange={setEditImageUrl}
+                  folder="packages"
+                  hint="Recomendado al crear paquetes nuevos: sin foto se usa una imagen genérica."
                 />
-              </label>
+              </div>
               <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input
                   name="isPublished"

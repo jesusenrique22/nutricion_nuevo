@@ -44,6 +44,17 @@ export const deleteBlockedDaySchema = z.object({
   id: z.string().min(1),
 });
 
+export const createRecurringBlockedWeekdaysSchema = z.object({
+  weekdays: z
+    .array(z.number().int().min(0).max(6))
+    .min(1, "Elegí al menos un día"),
+  reason: z.string().max(200).optional(),
+});
+
+export const deleteRecurringBlockedWeekdaySchema = z.object({
+  id: z.string().min(1),
+});
+
 export const markPaymentSchema = z.object({
   appointmentId: z.string().min(1),
   adminNote: z.string().max(300).optional(),

@@ -32,7 +32,7 @@ export const NAV_SECTION_OPTIONS: { id: string; label: string }[] = [
 export const NAV_PAGE_OPTIONS: { id: string; label: string }[] = [
   { id: "/nutricionista", label: "Sobre mí" },
   { id: "/resources", label: "Recursos" },
-  { id: "/productos", label: "Productos" },
+  { id: "/productos", label: "Tienda" },
 ];
 
 export const NAV_ITEM_TYPE_LABELS: Record<NavItemType, string> = {

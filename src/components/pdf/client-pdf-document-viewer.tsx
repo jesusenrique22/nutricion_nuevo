@@ -116,10 +116,11 @@ export function ClientPdfDocumentViewer({
       try {
         const res = await fetch(pdfUrl, { credentials: "include" });
         if (!res.ok) {
+          const detail = (await res.text().catch(() => "")).trim();
           throw new Error(
             res.status === 403 || res.status === 401
               ? "No autorizado para ver este documento."
-              : `No se pudo cargar el PDF (${res.status}).`,
+              : detail || `No se pudo cargar el PDF (${res.status}).`,
           );
         }
         const buffer = await res.arrayBuffer();

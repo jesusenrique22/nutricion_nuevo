@@ -10,7 +10,8 @@ export function BrandSocialFooter() {
   return (
     <footer
       id="contacto"
-      className="scroll-mt-20 border-t border-primary/10 bg-gradient-to-b from-muted/40 to-background"
+      data-lobby-contact
+      className="scroll-mt-24 border-t border-primary/10 bg-gradient-to-b from-muted/40 to-background"
     >
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:items-start md:py-20">
         <motion.div

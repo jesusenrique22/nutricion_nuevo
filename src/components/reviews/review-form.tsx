@@ -43,10 +43,9 @@ export function ReviewForm({
 
   if (hasPending) {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/60 px-6 py-8 text-center">
+      <div className="rounded-2xl border border-primary/15 bg-primary/5 px-6 py-8 text-center">
         <p className="text-sm text-foreground/70">
-          Tu reseña está en revisión. Cuando la nutricionista la apruebe, se va a
-          mostrar en la página de inicio.
+          ¡Gracias! Ya recibimos tu reseña.
         </p>
       </div>
     );
@@ -73,7 +72,7 @@ export function ReviewForm({
       if (res.ok) {
         setMessage({
           type: "success",
-          text: "¡Gracias! Tu reseña quedó en revisión.",
+          text: "¡Gracias! Ya recibimos tu reseña.",
         });
         setRating(0);
         setBody("");

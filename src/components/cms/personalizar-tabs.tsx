@@ -8,9 +8,13 @@ import { LandingBlocksEditor } from "@/components/cms/landing-blocks-editor";
 import { NavMenuEditor } from "@/components/cms/nav-menu-editor";
 import { ProductsEditor } from "@/components/cms/products-editor";
 import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
+import { AuthBrandingEditor } from "@/components/cms/auth-branding-editor";
 import { SiteContentEditor } from "@/components/cms/site-content-editor";
 import { PageSectionPreview } from "@/components/cms/page-section-preview";
-import type { SiteContentDTO } from "@/server/actions/cms.actions";
+import type {
+  ConsultationAdminDTO,
+  SiteContentDTO,
+} from "@/server/actions/cms.actions";
 import type { LandingBlocksData } from "@/types/landing-blocks";
 import { CURRENCY_POLICY_SLUG } from "@/types/currency-policy";
 import type { LandingImagesData } from "@/types/landing-images";
@@ -25,12 +29,14 @@ import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 import { PAYMENT_CHECKOUT_POLICY_SLUG } from "@/types/payment-checkout-policy";
 import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
 import { PAYMENT_CHAT_POLICY_SLUG } from "@/types/payment-chat-policy";
+import { AUTH_BRANDING_SLUG } from "@/types/auth-branding";
+import type { AuthBrandingData } from "@/types/auth-branding";
 
 const tabs = [
   {
     id: "imagenes",
     label: "Imágenes",
-    description: "Portada, galería, paquetes y servicios",
+    description: "Portada, paquetes y servicios",
     affects: "Página de inicio",
   },
   {
@@ -38,6 +44,12 @@ const tabs = [
     label: "Textos",
     description: "Títulos, subtítulos y párrafos",
     affects: "Textos de la landing",
+  },
+  {
+    id: "login",
+    label: "Login",
+    description: "Foto y texto de Iniciar sesión",
+    affects: "/login y registro",
   },
   {
     id: "conocerme",
@@ -90,7 +102,7 @@ const otrosSections: { id: OtrosSection; label: string; hint: string }[] = [
 function PreviewPanel(props: {
   tab: TabId;
   otrosSection: OtrosSection;
-  imageSection: "hero" | "gallery" | "plans" | "services" | "other";
+  imageSection: "hero" | "gallery" | "packages" | "plans" | "services" | "other";
   images: LandingImagesData;
   blocks: LandingBlocksData;
   navMenu: NavMenuData;
@@ -111,6 +123,8 @@ export function PersonalizarTabs({
   products,
   nutricionistaPage,
   paymentCheckoutPolicy,
+  packageTypes,
+  authBranding,
 }: {
   siteBlocks: SiteContentDTO[];
   resourceCount: number;
@@ -120,6 +134,8 @@ export function PersonalizarTabs({
   products: ProductsData;
   nutricionistaPage: NutricionistaPageData;
   paymentCheckoutPolicy: PaymentCheckoutPolicy;
+  packageTypes: ConsultationAdminDTO[];
+  authBranding: AuthBrandingData;
 }) {
   const [tab, setTab] = useState<TabId>("imagenes");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("edit");
@@ -139,7 +155,7 @@ export function PersonalizarTabs({
   const [liveNutricionista, setLiveNutricionista] = useState(nutricionistaPage);
   const [livePaymentPolicy, setLivePaymentPolicy] = useState(paymentCheckoutPolicy);
   const [liveImageSection, setLiveImageSection] = useState<
-    "hero" | "gallery" | "plans" | "services" | "other"
+    "hero" | "gallery" | "packages" | "plans" | "services" | "other"
   >("hero");
 
   const textBlocks = siteBlocks.filter(
@@ -151,7 +167,8 @@ export function PersonalizarTabs({
       b.slug !== NUTRICIONISTA_PAGE_SLUG &&
       b.slug !== PAYMENT_CHAT_POLICY_SLUG &&
       b.slug !== PAYMENT_CHECKOUT_POLICY_SLUG &&
-      b.slug !== CURRENCY_POLICY_SLUG,
+      b.slug !== CURRENCY_POLICY_SLUG &&
+      b.slug !== AUTH_BRANDING_SLUG,
   );
 
   const activeTab = tabs.find((t) => t.id === tab)!;
@@ -174,12 +191,15 @@ export function PersonalizarTabs({
       {tab === "imagenes" && (
         <LandingImagesEditor
           initial={landingImages}
+          packageTypes={packageTypes}
           onLiveChange={(data, section) => {
             setLiveImages(data);
             if (section) setLiveImageSection(section);
           }}
         />
       )}
+
+      {tab === "login" && <AuthBrandingEditor initial={authBranding} />}
 
       {tab === "otros" && (
         <div className="space-y-4">

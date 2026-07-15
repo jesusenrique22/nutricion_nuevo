@@ -19,6 +19,8 @@ import {
   isTimeSlotConflictError,
   TIME_SLOT_TAKEN_MESSAGE,
 } from "@/lib/scheduling-errors";
+import { applyPercentOff } from "@/lib/coupon-math";
+import { clampPercentOff } from "@/lib/coupons";
 
 export type CartPaymentPayload = {
   patientPaymentMethod: string;
@@ -101,6 +103,8 @@ async function createCartAppointment(params: {
   patientId: string;
   item: CartAppointmentItem;
   excludeAppointmentId?: string;
+  /** Precio total ya con descuento de cupón (si aplica). */
+  totalPrice?: Prisma.Decimal;
 }) {
   const validation = await validateAppointmentSlot({
     consultationType: params.item.consultationType,
@@ -119,6 +123,8 @@ async function createCartAppointment(params: {
   const flow = profile?.hasCompletedIntake ? "FOLLOW_UP" : "INTAKE";
   const paymentPolicy = await getPaymentChatPolicy();
   const calendarAdminId = await resolveCalendarAdminIdForNewAppointment();
+  const totalPrice =
+    params.totalPrice ?? params.item.consultationType.price;
 
   try {
     const appointment = await prisma.$transaction(async (tx) => {
@@ -146,7 +152,7 @@ async function createCartAppointment(params: {
         data: {
           appointmentId: created.id,
           ...buildPaymentCreateData({
-            totalPrice: params.item.consultationType.price,
+            totalPrice,
             consultationCode: params.item.consultationType.code,
             policy: paymentPolicy,
           }),
@@ -172,11 +178,18 @@ export async function fulfillCartCheckout(params: {
   resourceItems: CartResourceItem[];
   productItems: CartProductItem[];
   paymentPayload: CartPaymentPayload | null;
+  /** Porcentaje de descuento del cupón (1–100). */
+  couponPercentOff?: number | null;
 }): Promise<
   | { ok: true; newAppointmentIds: string[] }
   | { ok: false; message: string }
 > {
   const newAppointmentIds: string[] = [];
+  const percentOff = params.couponPercentOff
+    ? clampPercentOff(params.couponPercentOff)
+    : 0;
+  const withDiscount = <T extends Prisma.Decimal | number>(amount: T) =>
+    percentOff > 0 ? applyPercentOff(amount, percentOff) : amount;
 
   for (const item of params.appointmentItems) {
     const reusable = await findReusableCartAppointment({
@@ -185,14 +198,43 @@ export async function fulfillCartCheckout(params: {
       startTime: item.appointmentStart,
     });
 
+    const discountedPrice = withDiscount(item.consultationType.price);
+    const discountedDec =
+      discountedPrice instanceof Prisma.Decimal
+        ? discountedPrice
+        : new Prisma.Decimal(discountedPrice);
+
     let appointmentId: string;
 
     if (reusable) {
       appointmentId = reusable.id;
+      // Recalcular pago pendiente con el descuento actual si aún no se pagó.
+      if (
+        reusable.payment &&
+        reusable.payment.advanceStatus === "PENDING" &&
+        percentOff > 0
+      ) {
+        const paymentPolicy = await getPaymentChatPolicy();
+        const data = buildPaymentCreateData({
+          totalPrice: discountedDec,
+          consultationCode: item.consultationType.code,
+          policy: paymentPolicy,
+        });
+        await prisma.payment.update({
+          where: { appointmentId },
+          data: {
+            amount: data.amount,
+            advanceAmount: data.advanceAmount,
+            remainderAmount: data.remainderAmount,
+            advancePercent: data.advancePercent,
+          },
+        });
+      }
     } else {
       const created = await createCartAppointment({
         patientId: params.patientId,
         item,
+        totalPrice: discountedDec,
       });
       if (!created.ok) {
         return {
@@ -206,17 +248,19 @@ export async function fulfillCartCheckout(params: {
       }
     }
 
-    if (
-      params.paymentPayload &&
-      item.consultationType.price.toNumber() > 0
-    ) {
+    if (params.paymentPayload && discountedDec.toNumber() > 0) {
       await applyAppointmentPayment(appointmentId, params.paymentPayload);
     }
   }
 
   await prisma.$transaction(async (tx) => {
     for (const item of params.resourceItems) {
-      const isFree = item.resource.price.toNumber() === 0;
+      const pricePaid = withDiscount(item.resource.price);
+      const priceDec =
+        pricePaid instanceof Prisma.Decimal
+          ? pricePaid
+          : new Prisma.Decimal(pricePaid);
+      const isFree = priceDec.toNumber() === 0;
       const paidPayload =
         !isFree && params.paymentPayload
           ? {
@@ -244,12 +288,13 @@ export async function fulfillCartCheckout(params: {
         create: {
           userId: params.patientId,
           resourceId: item.resourceId,
-          pricePaid: item.resource.price,
+          pricePaid: priceDec,
           status: isFree ? "GRANTED" : "PENDING",
           grantedAt: isFree ? new Date() : null,
           ...paidPayload,
         },
         update: {
+          pricePaid: priceDec,
           status: isFree ? "GRANTED" : "PENDING",
           ...(isFree ? {} : paidPayload),
         },
@@ -259,8 +304,12 @@ export async function fulfillCartCheckout(params: {
     for (const item of params.productItems) {
       const qty = Math.max(1, item.quantity ?? 1);
       const unitPrice = item.product.price;
-      const lineTotal = unitPrice * qty;
-      const isFree = lineTotal <= 0;
+      const lineTotal = withDiscount(unitPrice * qty);
+      const lineDec =
+        lineTotal instanceof Prisma.Decimal
+          ? lineTotal
+          : new Prisma.Decimal(lineTotal);
+      const isFree = lineDec.toNumber() <= 0;
       const paidPayload =
         !isFree && params.paymentPayload
           ? {
@@ -290,7 +339,7 @@ export async function fulfillCartCheckout(params: {
           productId: item.productId,
           productName: item.product.name,
           quantity: qty,
-          pricePaid: new Prisma.Decimal(lineTotal),
+          pricePaid: lineDec,
           currency: item.product.currency,
           status: isFree ? "GRANTED" : "PENDING",
           grantedAt: isFree ? new Date() : null,
@@ -299,7 +348,7 @@ export async function fulfillCartCheckout(params: {
         update: {
           productName: item.product.name,
           quantity: qty,
-          pricePaid: new Prisma.Decimal(lineTotal),
+          pricePaid: lineDec,
           currency: item.product.currency,
           status: isFree ? "GRANTED" : "PENDING",
           ...(isFree ? { grantedAt: new Date() } : paidPayload),
@@ -311,7 +360,12 @@ export async function fulfillCartCheckout(params: {
   });
 
   for (const item of params.resourceItems) {
-    if (item.resource.price.toNumber() === 0) {
+    const pricePaid = withDiscount(item.resource.price);
+    const priceNum =
+      pricePaid instanceof Prisma.Decimal
+        ? pricePaid.toNumber()
+        : Number(pricePaid);
+    if (priceNum === 0) {
       await notifyReviewRequested({
         patientId: params.patientId,
         itemTitle: item.resource.title,
@@ -323,7 +377,10 @@ export async function fulfillCartCheckout(params: {
 
   for (const item of params.productItems) {
     const qty = Math.max(1, item.quantity ?? 1);
-    if (item.product.price * qty <= 0) {
+    const line = withDiscount(item.product.price * qty);
+    const lineNum =
+      line instanceof Prisma.Decimal ? line.toNumber() : Number(line);
+    if (lineNum <= 0) {
       await notifyReviewRequested({
         patientId: params.patientId,
         itemTitle: item.product.name,

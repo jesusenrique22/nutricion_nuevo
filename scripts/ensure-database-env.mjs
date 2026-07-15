@@ -7,24 +7,43 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export function loadEnvFile() {
-  const path = resolve(process.cwd(), ".env");
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    if (process.env[key] !== undefined) continue;
-    let val = trimmed.slice(eq + 1).trim();
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
-      val = val.slice(1, -1);
+function parseEnvLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+  const eq = trimmed.indexOf("=");
+  if (eq === -1) return null;
+  const key = trimmed.slice(0, eq).trim();
+  let val = trimmed.slice(eq + 1).trim();
+  if (
+    (val.startsWith('"') && val.endsWith('"')) ||
+    (val.startsWith("'") && val.endsWith("'"))
+  ) {
+    val = val.slice(1, -1);
+  }
+  return { key, val };
+}
+
+/**
+ * Carga .env y luego .env.local (override), estilo Next.js.
+ * @param {{ override?: boolean }} [opts] — si true, .env.local pisa process.env
+ */
+export function loadEnvFile(opts = {}) {
+  const files = [".env", ".env.local"];
+  for (const name of files) {
+    const path = resolve(process.cwd(), name);
+    if (!existsSync(path)) continue;
+    const isLocal = name === ".env.local";
+    for (const line of readFileSync(path, "utf8").split("\n")) {
+      const parsed = parseEnvLine(line);
+      if (!parsed) continue;
+      const { key, val } = parsed;
+      if (isLocal || opts.override) {
+        process.env[key] = val;
+        continue;
+      }
+      if (process.env[key] !== undefined) continue;
+      process.env[key] = val;
     }
-    process.env[key] = val;
   }
 }
 

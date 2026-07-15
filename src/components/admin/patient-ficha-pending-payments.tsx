@@ -92,9 +92,18 @@ export function PatientFichaPendingPayments({
               </div>
             </div>
             <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/45">
+                {item.totalAmount ? "Cuota" : "Monto"}
+              </p>
               <p className="text-lg font-bold text-primary">
                 <DisplayPrice amount={item.amount} currency="ARS" />
               </p>
+              {item.totalAmount ? (
+                <p className="mt-1 text-xs text-foreground/50">
+                  Total cita:{" "}
+                  <DisplayPrice amount={item.totalAmount} currency="ARS" />
+                </p>
+              ) : null}
               <p className="text-xs text-foreground/45">
                 {fmtDateTime(item.createdAt)}
               </p>

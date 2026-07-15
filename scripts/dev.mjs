@@ -72,17 +72,21 @@ if (process.env.DATABASE_URL?.includes("neon.tech")) {
   }
 }
 
-const authUrl = process.env.NEXTAUTH_URL?.trim() ?? "";
 const expectedOrigin = `http://localhost:${APP_PORT}`;
-
-if (authUrl && authUrl !== expectedOrigin && authUrl.includes("localhost")) {
-  console.warn(`
-⚠️  NEXTAUTH_URL="${authUrl}" no coincide con el puerto ${APP_PORT}.
-   En .env usá:
-   AUTH_URL="${expectedOrigin}"
-   NEXTAUTH_URL="${expectedOrigin}"
-   (El socket sigue en NEXT_PUBLIC_SOCKET_URL=http://localhost:3001)
-`);
+// Auth.js usa AUTH_URL/NEXTAUTH_URL para redirects. En local siempre forzá
+// localhost; en Vercel (pnpm build / runtime) no corre este script y se
+// mantienen las URLs de producción del panel.
+const prevAuth = process.env.AUTH_URL?.trim() ?? "";
+const prevNextAuth = process.env.NEXTAUTH_URL?.trim() ?? "";
+process.env.AUTH_URL = expectedOrigin;
+process.env.NEXTAUTH_URL = expectedOrigin;
+if (
+  (prevAuth && prevAuth !== expectedOrigin) ||
+  (prevNextAuth && prevNextAuth !== expectedOrigin)
+) {
+  console.log(
+    `→ Auth local: AUTH_URL/NEXTAUTH_URL → ${expectedOrigin} (antes: ${prevAuth || prevNextAuth})`,
+  );
 }
 
 const blocked = portListeners(APP_PORT);

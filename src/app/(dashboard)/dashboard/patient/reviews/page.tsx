@@ -46,7 +46,7 @@ export default async function PatientReviewsPage({
       <BrandDashboardHeader
         eyebrow="Panel paciente"
         title="Dejá tu reseña"
-        description="Compartí tu experiencia. Tras la aprobación de la nutricionista, se mostrará en la página de inicio."
+        description="Compartí tu experiencia con Anttova."
       />
 
       <section>
@@ -75,11 +75,13 @@ export default async function PatientReviewsPage({
                       {REVIEW_TOPIC_LABELS[review.topic]}
                     </span>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[review.status]}`}
-                  >
-                    {REVIEW_STATUS_LABELS[review.status]}
-                  </span>
+                  {review.status !== "PENDING" ? (
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[review.status]}`}
+                    >
+                      {REVIEW_STATUS_LABELS[review.status]}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-3 text-sm text-foreground/80">{review.body}</p>
                 <p className="mt-2 text-xs text-foreground/45">

@@ -4,8 +4,8 @@ import {
   ConsultationModality,
   type PrismaClient,
 } from "@prisma/client";
-import { prisma } from "@/server/db/prisma";
-import { toDateKey } from "@/lib/scheduling-dates";
+import { prisma, isPrismaRecurringBlockedWeekdayReady } from "@/server/db/prisma";
+import { toDateKey, weekdayFromDateKey } from "@/lib/scheduling-dates";
 import { TimeSlotTakenError } from "@/lib/scheduling-errors";
 
 export type SchedulingError =
@@ -162,6 +162,21 @@ export async function validateAppointmentSlot(params: {
       error: "BLOCKED_TIME",
       message: "Ese día no hay atención.",
     };
+  }
+
+  if (isPrismaRecurringBlockedWeekdayReady()) {
+    const weekday = weekdayFromDateKey(toDateKey(startTime));
+    const recurring = await prisma.recurringBlockedWeekday.findUnique({
+      where: { weekday },
+      select: { id: true },
+    });
+    if (recurring) {
+      return {
+        ok: false,
+        error: "BLOCKED_TIME",
+        message: "Ese día de la semana no hay atención.",
+      };
+    }
   }
 
   const overlap = await findOverlappingAppointment(prisma, {

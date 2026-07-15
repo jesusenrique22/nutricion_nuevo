@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Reveal, RevealScale } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { LandingImagesData } from "@/types/landing-images";
 
 const SERVICES = [
@@ -53,8 +54,8 @@ export function BrandServicesDetail({
                   className="h-auto w-full transition duration-300 group-hover:brightness-[1.02]"
                   sizes="(max-width: 768px) 100vw, 768px"
                   priority={i === 0}
-                  unoptimized={serviceImages[service.key].startsWith(
-                    "/uploads/",
+                  unoptimized={shouldUnoptimizeImage(
+                    serviceImages[service.key],
                   )}
                 />
               </Link>

@@ -40,7 +40,8 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.div
           key={slide.src}
-          initial={{ opacity: 0, scale: 1.04 }}
+          // La 1ª slide no empieza invisible: así el LCP es el hero, no otra imagen
+          initial={index === 0 ? false : { opacity: 0, scale: 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}

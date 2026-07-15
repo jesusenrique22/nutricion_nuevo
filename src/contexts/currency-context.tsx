@@ -59,11 +59,16 @@ function readStoredCurrency(): SupportedCurrency {
 }
 
 async function fetchRates(): Promise<ExchangeRateSnapshot | null> {
-  const res = await fetch(`/api/currency/rates?t=${Date.now()}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as ExchangeRateSnapshot;
+  try {
+    const res = await fetch(`/api/currency/rates?t=${Date.now()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as ExchangeRateSnapshot;
+  } catch {
+    // Red caída, HMR o tab en background: no tumbar la UI.
+    return null;
+  }
 }
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {

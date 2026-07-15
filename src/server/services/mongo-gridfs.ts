@@ -40,9 +40,15 @@ export async function uploadToMongo(
   return { fileId: id, url: mediaUrl(id) };
 }
 
+async function resolveMongoDb() {
+  const fast = await tryGetMongoDbFast();
+  if (fast) return fast;
+  return tryGetMongoDb();
+}
+
 export async function getMongoFileMeta(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await tryGetMongoDbFast();
+  const db = await resolveMongoDb();
   if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
@@ -54,7 +60,7 @@ export async function getMongoFileMeta(fileId: string) {
 
 export async function openGridFsDownloadStream(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await tryGetMongoDbFast();
+  const db = await resolveMongoDb();
   if (!db) return null;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket

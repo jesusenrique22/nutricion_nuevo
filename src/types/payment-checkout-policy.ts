@@ -54,10 +54,10 @@ export const DEFAULT_PAYMENT_CHECKOUT_POLICY: PaymentCheckoutPolicy = {
   ],
   referenceLabel: "Número de referencia / comprobante",
   referencePlaceholder: "Ej. 1234567890 o ID de operación",
-  referenceRequired: true,
-  proofsLabel: "Captura del pago",
+  referenceRequired: false,
+  proofsLabel: "Captura del pago (opcional)",
   proofsHint:
-    "Sube una captura de pantalla del comprobante (JPG, PNG o WebP).",
+    "Podés subir una captura del comprobante (JPG, PNG o WebP). No es obligatoria.",
   maxProofFiles: 1,
   showOptionalNote: true,
   optionalNoteLabel: "Nota adicional (opcional)",

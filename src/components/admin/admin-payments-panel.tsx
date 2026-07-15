@@ -187,9 +187,18 @@ export function AdminPaymentsPanel({
                   <p className="text-sm text-foreground/60">{item.subtitle}</p>
                 </div>
                 <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/45">
+                    {item.totalAmount ? "Cuota a pagar" : "Monto"}
+                  </p>
                   <p className="text-xl font-bold text-primary">
                     <DisplayPrice amount={item.amount} currency="ARS" />
                   </p>
+                  {item.totalAmount ? (
+                    <p className="mt-1 text-xs text-foreground/50">
+                      Total de la cita:{" "}
+                      <DisplayPrice amount={item.totalAmount} currency="ARS" />
+                    </p>
+                  ) : null}
                   <p className="text-xs text-foreground/45">
                     {fmt(item.createdAt)}
                   </p>

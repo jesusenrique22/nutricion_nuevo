@@ -14,6 +14,10 @@ function hasMongoUri(): boolean {
   return isMongoConfigured();
 }
 
+function requiresPersistentStorage(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+}
+
 async function storeLocalFile(
   file: File,
   folder: string,
@@ -52,17 +56,17 @@ export async function storePublicFile(
         fileId: uploaded.fileId,
       };
     } catch (err) {
-      if (process.env.VERCEL === "1") throw err;
+      if (requiresPersistentStorage()) throw err;
       console.warn(
         "[storage] MongoDB no disponible, usando almacenamiento local:",
         err instanceof Error ? err.message : err,
       );
     }
-  } else if (hasMongoUri() && process.env.VERCEL === "1") {
+  } else if (hasMongoUri() && requiresPersistentStorage()) {
     throw new Error(
-      "MongoDB no está disponible. Revisá MONGODB_URI en Vercel o Atlas.",
+      "MongoDB no está disponible. Revisá MONGODB_URI y Atlas.",
     );
-  } else if (process.env.VERCEL === "1") {
+  } else if (requiresPersistentStorage()) {
     throw new Error(
       "MONGODB_URI no está configurado. Es necesario para subir archivos en producción.",
     );

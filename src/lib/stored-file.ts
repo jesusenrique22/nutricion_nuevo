@@ -7,6 +7,11 @@ import {
   getMongoFileMeta,
   openMongoFileStream,
 } from "@/server/services/mongo-storage";
+import { tryGetMongoDb } from "@/server/db/mongo";
+import {
+  gridFileMimeType as gridMime,
+  openGridFsDownloadStream,
+} from "@/server/services/mongo-gridfs";
 
 export type StoredFileOpenResult = {
   stream: Readable;
@@ -25,13 +30,29 @@ const MIME_BY_EXT: Record<string, string> = {
   ".webm": "video/webm",
 };
 
+/** Normaliza URLs absolutas del deploy a path relativo (`/api/media/...`). */
+export function normalizeStoredUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  try {
+    if (/^https?:\/\//i.test(trimmed)) {
+      const parsed = new URL(trimmed);
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    // keep as-is
+  }
+  return trimmed;
+}
+
 export function parseMediaIdFromUrl(url: string): string | null {
-  const match = url.match(/^\/api\/media\/([^/?#]+)$/);
+  const normalized = normalizeStoredUrl(url).split("?")[0] ?? "";
+  const match = normalized.match(/^\/api\/media\/([^/?#]+)$/);
   return match?.[1] ?? null;
 }
 
 export function isUploadsPath(url: string): boolean {
-  return url.startsWith("/uploads/");
+  return normalizeStoredUrl(url).startsWith("/uploads/");
 }
 
 function mimeFromPath(filePath: string): string {
@@ -44,7 +65,7 @@ export function guessContentKindFromUrl(
   resourceType?: string,
 ): "pdf" | "image" | "video" | "unknown" {
   if (!url) return "unknown";
-  const lower = url.toLowerCase();
+  const lower = normalizeStoredUrl(url).toLowerCase();
   if (/\.(jpe?g|png|webp|gif)(\?|$)/.test(lower)) return "image";
   if (/\.(mp4|webm)(\?|$)/.test(lower)) return "video";
   if (/\.pdf(\?|$)/.test(lower)) return "pdf";
@@ -74,35 +95,79 @@ export async function guessContentKindFromStoredUrl(
   return "unknown";
 }
 
+async function openGridFsWithRetry(fileId: string) {
+  const fast = await openMongoFileStream(fileId);
+  if (fast) return fast;
+
+  // Second pass with the slow/retry Mongo path (Atlas cold start).
+  const db = await tryGetMongoDb();
+  if (!db) return null;
+  return openGridFsDownloadStream(fileId);
+}
+
+async function resolveUploadsFallbackFromMediaAsset(
+  fileId: string,
+): Promise<StoredFileOpenResult | null> {
+  try {
+    const { prisma } = await import("@/server/db/prisma");
+    const asset = await prisma.mediaAsset.findFirst({
+      where: {
+        OR: [
+          { fileId },
+          { url: `/api/media/${fileId}` },
+          { url: { contains: fileId } },
+        ],
+      },
+      select: { url: true },
+    });
+    if (!asset?.url) return null;
+    const pathUrl = normalizeStoredUrl(asset.url);
+    if (!pathUrl.startsWith("/uploads/")) return null;
+    return openLocalUploadsPath(pathUrl);
+  } catch {
+    return null;
+  }
+}
+
+async function openLocalUploadsPath(
+  url: string,
+): Promise<StoredFileOpenResult | null> {
+  const rel = normalizeStoredUrl(url).replace(/^\//, "").split("?")[0] ?? "";
+  const abs = path.join(process.cwd(), "public", rel);
+  try {
+    await stat(abs);
+  } catch {
+    return null;
+  }
+  return {
+    stream: createReadStream(abs),
+    mimeType: mimeFromPath(abs),
+    fileName: path.basename(abs),
+  };
+}
+
 export async function openStoredFileUrl(
   url: string,
 ): Promise<StoredFileOpenResult | null> {
-  const mediaId = parseMediaIdFromUrl(url);
+  const normalized = normalizeStoredUrl(url);
+  const mediaId = parseMediaIdFromUrl(normalized);
   if (mediaId) {
-    const result = await openMongoFileStream(mediaId);
-    if (!result) return null;
-    return {
-      stream: result.stream,
-      mimeType: gridFileMimeType(
-        result.meta.metadata as Record<string, unknown> | undefined,
-      ),
-      fileName: result.meta.filename,
-    };
+    const result = await openGridFsWithRetry(mediaId);
+    if (result) {
+      return {
+        stream: result.stream,
+        mimeType: gridMime(
+          result.meta.metadata as Record<string, unknown> | undefined,
+        ),
+        fileName: result.meta.filename,
+      };
+    }
+    // Legacy: media id apunta a un archivo solo local.
+    return resolveUploadsFallbackFromMediaAsset(mediaId);
   }
 
-  if (isUploadsPath(url)) {
-    const rel = url.replace(/^\//, "");
-    const abs = path.join(process.cwd(), "public", rel);
-    try {
-      await stat(abs);
-    } catch {
-      return null;
-    }
-    return {
-      stream: createReadStream(abs),
-      mimeType: mimeFromPath(abs),
-      fileName: path.basename(abs),
-    };
+  if (isUploadsPath(normalized)) {
+    return openLocalUploadsPath(normalized);
   }
 
   return null;
@@ -133,7 +198,7 @@ export function storedFileToResponse(
     "X-Content-Type-Options": "nosniff",
   };
   if (file.fileName) {
-    const safeName = file.fileName.replace(/[^\w.\-() ]/g, "_");
+    const safeName = file.fileName.replace(/[^\w.\-() ]+/g, "_");
     headers["Content-Disposition"] = `${inline ? "inline" : "attachment"}; filename="${safeName}"`;
   }
   return new Response(webStream, { headers });

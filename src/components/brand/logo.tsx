@@ -36,6 +36,7 @@ export function BrandLogo({
         height={height}
         priority={eager}
         loading={eager ? "eager" : undefined}
+        unoptimized
         className="h-auto w-auto"
         style={{ height, width: "auto", maxWidth: width }}
       />

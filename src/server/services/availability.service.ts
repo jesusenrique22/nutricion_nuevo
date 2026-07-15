@@ -1,5 +1,9 @@
 import { ConsultationType } from "@prisma/client";
-import { prisma } from "@/server/db/prisma";
+import { weekdayFromDateKey } from "@/lib/scheduling-dates";
+import {
+  isPrismaRecurringBlockedWeekdayReady,
+  prisma,
+} from "@/server/db/prisma";
 
 // Horario general de la clínica (para consultas no matutinas)
 const CLINIC_OPEN = "08:00";
@@ -39,6 +43,15 @@ export async function getAvailableSlots(
     select: { id: true },
   });
   if (blockedDay) return [];
+
+  if (isPrismaRecurringBlockedWeekdayReady()) {
+    const weekday = weekdayFromDateKey(dateStr);
+    const recurring = await prisma.recurringBlockedWeekday.findUnique({
+      where: { weekday },
+      select: { id: true },
+    });
+    if (recurring) return [];
+  }
 
   const windowStart = consultationType.morningOnly
     ? toMinutes(consultationType.morningStart ?? "08:00")

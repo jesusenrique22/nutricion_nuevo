@@ -39,15 +39,6 @@ html {
   scroll-behavior: smooth;
 }
 
-html.landing-lobby {
-  scroll-snap-type: y proximity;
-}
-
-.lobby-panel {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-}
-
 ::selection {
   background: var(--accent-soft);
   color: var(--foreground);

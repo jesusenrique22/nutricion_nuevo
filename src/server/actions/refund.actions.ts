@@ -14,7 +14,7 @@ export type RefundActionResult =
   | { ok: false; message: string };
 
 function revalidateRefundPaths(patientId: string) {
-  revalidatePath("/dashboard/patient/progress");
+  revalidatePath("/dashboard/patient/cart/historial");
   revalidatePath("/dashboard/patient/library");
   revalidatePath("/dashboard/patient/appointments");
   revalidatePath("/dashboard/admin/payments");

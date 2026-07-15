@@ -60,12 +60,6 @@ export const SOCIAL_ICON_ORDER: SocialIconId[] = [
 export function getPatientAppLinks(): BrandLinkItem[] {
   return [
     {
-      id: "progress",
-      label: "Mi progreso",
-      href: "/dashboard/patient/progress",
-      subtitle: "Compras, citas y mediciones",
-    },
-    {
       id: "appointments",
       label: "Agendar cita",
       href: "/dashboard/patient/appointments",
@@ -81,7 +75,7 @@ export function getPatientAppLinks(): BrandLinkItem[] {
       id: "cart",
       label: "Carrito",
       href: "/dashboard/patient/cart",
-      subtitle: "Solicita recursos y citas",
+      subtitle: "Pedido e historial de compras",
     },
   ];
 }

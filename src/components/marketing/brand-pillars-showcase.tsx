@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { Reveal, RevealScale, StaggerReveal, StaggerRevealItem } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { LandingImagesData } from "@/types/landing-images";
 
 const PILLARS = [
@@ -161,8 +162,9 @@ export function BrandPillarsShowcase({
                   height={DETAIL_SIZE.height}
                   className="h-auto w-full"
                   sizes="(max-width: 1024px) 100vw, 1024px"
-                  priority={active === "nutrition"}
-                  unoptimized={detailSrc.startsWith("/uploads/")}
+                  priority={false}
+                  loading="lazy"
+                  unoptimized={shouldUnoptimizeImage(detailSrc)}
                 />
               </motion.div>
             </AnimatePresence>

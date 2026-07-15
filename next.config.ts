@@ -85,7 +85,9 @@ const nextConfig: NextConfig = {
   // Imports estáticos en neon-prisma-factory.ts; incluir en el trace de cada función.
   transpilePackages: ["@neondatabase/serverless", "@prisma/adapter-neon", "ws"],
 
-  // Sin canvas/pdfjs en el servidor: el render PDF es en el cliente.
+  // Mantener funciones Vercel < 250 MB: pdfjs/canvas nativo solo en el navegador.
+  // googleapis/google-auth-library pesan mucho; se excluyen del trace de las rutas
+  // de medios y subidas, que nunca sincronizan con Google Calendar.
   outputFileTracingExcludes: {
     "*": [
       "./node_modules/pdfjs-dist/**",
@@ -95,12 +97,27 @@ const nextConfig: NextConfig = {
       "./node_modules/googleapis/**",
       "./node_modules/google-auth-library/**",
     ],
+    "/api/resources/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+    ],
+    "/api/payments/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+    ],
+    "/api/secure-file/**": [
+      "./node_modules/googleapis/**",
+      "./node_modules/google-auth-library/**",
+    ],
   },
 
   serverExternalPackages: [
     "@prisma/client",
     "prisma",
     "mongodb",
+    "googleapis",
+    "google-auth-library",
+    "nodemailer",
   ],
 
   images: {

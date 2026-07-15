@@ -26,7 +26,9 @@ export function ResourceCoverImage({
         fill
         className={className}
         sizes={sizes}
-        unoptimized={isMongoMediaUrl(src)}
+        unoptimized={
+          isMongoMediaUrl(src) || src.startsWith("/uploads/")
+        }
       />
     );
   }

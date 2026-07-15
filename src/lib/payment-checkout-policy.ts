@@ -74,7 +74,7 @@ export function parsePaymentCheckoutPolicy(
       data.referencePlaceholder,
       fb.referencePlaceholder,
     ),
-    referenceRequired: bool(data.referenceRequired, fb.referenceRequired),
+    referenceRequired: false,
     proofsLabel: str(data.proofsLabel, fb.proofsLabel),
     proofsHint: str(data.proofsHint, fb.proofsHint),
     maxProofFiles: clampInt(data.maxProofFiles, 1, 1, fb.maxProofFiles),

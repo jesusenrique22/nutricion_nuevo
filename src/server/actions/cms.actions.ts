@@ -304,6 +304,8 @@ export async function updateSiteContent(
   });
 
   revalidatePath("/");
+  revalidatePath("/login");
+  revalidatePath("/register");
   revalidatePath("/dashboard/admin/personalizar");
   revalidateTag(CMS_CACHE_TAG, "max");
   revalidatePublicSiteMediaCache();

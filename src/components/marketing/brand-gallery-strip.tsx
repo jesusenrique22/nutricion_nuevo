@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Reveal } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_BLOCKS } from "@/lib/landing-blocks-defaults";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { CarouselItem, CarouselSize } from "@/types/landing-blocks";
 
 const SIZE_CLASSES: Record<CarouselSize, string> = {
@@ -64,7 +65,7 @@ export function BrandGalleryStrip({
                 fill
                 className="object-cover transition duration-500 hover:scale-105"
                 sizes={SIZE_IMAGE_SIZES[size]}
-                unoptimized={item.src.startsWith("/uploads/")}
+                unoptimized={shouldUnoptimizeImage(item.src)}
               />
               {item.caption ? (
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent px-4 pb-4 pt-10">

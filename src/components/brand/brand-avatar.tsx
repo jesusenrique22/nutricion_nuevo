@@ -29,6 +29,7 @@ export function BrandAvatar({
         height={size}
         className="relative rounded-full ring-4 ring-white/80 shadow-lg"
         priority
+        unoptimized
       />
     </motion.div>
   );

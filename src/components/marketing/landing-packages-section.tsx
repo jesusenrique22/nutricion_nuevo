@@ -6,6 +6,7 @@ import { PackageCarousel } from "@/components/marketing/package-carousel";
 import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
 import { DisplayPrice } from "@/components/currency/display-price";
 import { Reveal, RevealScale } from "@/components/motion/reveal";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import type { LandingImagesData } from "@/types/landing-images";
 
@@ -48,7 +49,8 @@ function ConsultationPackageCard({
           fill
           className="object-cover object-top"
           sizes="380px"
-          unoptimized={imageSrc.startsWith("/uploads/")}
+          loading="lazy"
+          unoptimized={shouldUnoptimizeImage(imageSrc)}
         />
         {!highlight && <div className="absolute inset-0 bg-primary/25" />}
       </div>

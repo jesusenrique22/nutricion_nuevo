@@ -5,9 +5,11 @@ import Link from "next/link";
 import { BrandLogoLink } from "@/components/brand/logo";
 import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
+import { useAuthBrand } from "@/components/auth/auth-brand-context";
 
 export const authInputClass =
-  "mt-2 w-full rounded-xl border-0 border-b-2 border-primary/20 bg-transparent px-0 py-3.5 text-base text-primary outline-none transition placeholder:text-primary/30 focus:border-primary";
+  "mt-2 w-full rounded-xl border-0 border-b-2 border-primary/20 bg-transparent px-2.5 py-3.5 text-base text-primary outline-none transition placeholder:text-primary/30 focus:border-primary";
 
 export const authButtonClass =
   "flex w-full items-center justify-center rounded-full bg-primary px-6 py-4 text-base font-semibold tracking-wide text-primary-foreground transition hover:bg-[#5a1728] active:scale-[0.98] disabled:opacity-50 sm:text-lg";
@@ -45,10 +47,20 @@ export function AuthFooterLink({
 function AuthBrandCopy({
   title,
   subtitle,
+  professionalPhoto,
+  professionalName,
+  professionalRole,
 }: {
   title: string;
   subtitle: string;
+  professionalPhoto: string;
+  professionalName: string;
+  professionalRole: string;
 }) {
+  const displayName = professionalName.startsWith("Lic.")
+    ? professionalName
+    : `Lic. ${professionalName}`;
+
   return (
     <div className="relative z-10 flex max-w-xl flex-col justify-between gap-10 text-white">
       <div className="flex items-center justify-between gap-4">
@@ -72,19 +84,18 @@ function AuthBrandCopy({
         <div className="mt-10 flex items-center gap-4">
           <div className="relative h-[4.25rem] w-[4.25rem] overflow-hidden rounded-full ring-2 ring-accent-soft/50">
             <Image
-              src={BRAND_PROFILE.professional}
+              src={professionalPhoto}
               alt=""
               fill
               className="object-cover object-top"
               sizes="68px"
+              unoptimized={shouldUnoptimizeImage(professionalPhoto)}
             />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-wide">
-              Lic. María Antonieta Lanza
-            </p>
+            <p className="text-sm font-semibold tracking-wide">{displayName}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-accent-soft">
-              Nutrición · Fitness · Wellness
+              {professionalRole || "Nutrición · Fitness · Wellness"}
             </p>
           </div>
         </div>
@@ -114,6 +125,11 @@ export function AuthShell({
   formTitle?: string;
   formHint?: string;
 }) {
+  const brand = useAuthBrand();
+  const professionalPhoto = brand.photoUrl || BRAND_PROFILE.professional;
+  const professionalName = brand.name || "Lic. María Antonieta Lanza";
+  const professionalRole = brand.role || "Nutrición · Fitness · Wellness";
+
   return (
     <div className="relative isolate min-h-dvh overflow-hidden bg-[#3a0f1a] lg:min-h-screen">
       {/* Atmosfera de marca — sin foto de capture */}
@@ -138,7 +154,13 @@ export function AuthShell({
       <div className="relative z-10 mx-auto grid min-h-dvh w-full max-w-[1400px] lg:min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
         {/* Columna marca — desktop */}
         <section className="hidden flex-col justify-between px-10 py-12 lg:flex xl:px-16 xl:py-14">
-          <AuthBrandCopy title={title} subtitle={subtitle} />
+          <AuthBrandCopy
+            title={title}
+            subtitle={subtitle}
+            professionalPhoto={professionalPhoto}
+            professionalName={professionalName}
+            professionalRole={professionalRole}
+          />
         </section>
 
         {/* Columna formulario */}

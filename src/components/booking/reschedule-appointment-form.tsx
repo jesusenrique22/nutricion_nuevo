@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
 import { getRescheduleSlots } from "@/server/actions/booking.queries";
 import { rescheduleAppointment } from "@/server/actions/appointment-status.actions";
 import type { Slot } from "@/server/services/availability.service";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function RescheduleAppointmentForm({
@@ -52,12 +57,10 @@ export function RescheduleAppointmentForm({
   return (
     <div className="space-y-4">
       <label className="block text-sm font-semibold">Nueva fecha</label>
-      <input
-        type="date"
+      <BookingDateCalendar
         value={date}
-        min={todayStr()}
-        onChange={(e) => setDate(e.target.value)}
-        className="w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+        minDate={todayStr()}
+        onChange={setDate}
       />
 
       <div>

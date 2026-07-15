@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import { getSlotsForDay } from "@/server/actions/booking.queries";
 import { createAppointmentForPatient } from "@/server/actions/appointment.actions";
@@ -9,7 +10,11 @@ import type { Slot } from "@/server/services/availability.service";
 import { LoadingInline } from "@/components/ui/loading-indicator";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function AdminBookAppointmentForm({
@@ -150,12 +155,10 @@ export function AdminBookAppointmentForm({
             <label className="text-xs font-semibold text-foreground/60">
               Fecha
             </label>
-            <input
-              type="date"
+            <BookingDateCalendar
               value={date}
-              min={todayStr()}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+              minDate={todayStr()}
+              onChange={setDate}
             />
           </div>
 

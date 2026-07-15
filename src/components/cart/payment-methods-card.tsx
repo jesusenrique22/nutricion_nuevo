@@ -15,6 +15,7 @@ export function PaymentMethodsCard({
   note,
   onNoteChange,
   totalLabel,
+  totalHint,
   requireAllFields = false,
 }: {
   policy: PaymentCheckoutPolicy;
@@ -27,6 +28,8 @@ export function PaymentMethodsCard({
   note: string;
   onNoteChange: (value: string) => void;
   totalLabel?: string;
+  /** Texto secundario p.ej. total de la cita vs cuota a pagar ahora. */
+  totalHint?: string;
   requireAllFields?: boolean;
 }) {
   const { contact, methods } = policy;
@@ -36,9 +39,12 @@ export function PaymentMethodsCard({
       {totalLabel && (
         <div className="rounded-2xl bg-primary/5 px-4 py-3 text-center">
           <p className="text-xs font-bold uppercase tracking-wider text-foreground/50">
-            Total a pagar
+            {totalHint ? "A pagar ahora" : "Total a pagar"}
           </p>
           <p className="mt-1 text-2xl font-bold text-primary">{totalLabel}</p>
+          {totalHint ? (
+            <p className="mt-1 text-xs text-foreground/55">{totalHint}</p>
+          ) : null}
         </div>
       )}
 
@@ -85,7 +91,7 @@ export function PaymentMethodsCard({
           {requireAllFields && <span className="text-red-600"> *</span>}
         </h3>
         <p className="mt-1 text-xs text-foreground/55">
-          Elige cómo vas a pagar, indica la referencia y sube tu comprobante.
+          Elige cómo vas a pagar. La captura del comprobante es opcional.
           {requireAllFields && " Los campos con * son obligatorios."}
         </p>
         <fieldset className="mt-4 space-y-2">
@@ -121,29 +127,26 @@ export function PaymentMethodsCard({
         </fieldset>
       </div>
 
-      <label className="block text-sm">
-        <span className="font-semibold text-primary">
-          {policy.referenceLabel}
-          {(policy.referenceRequired || requireAllFields) && (
+      {policy.referenceRequired && (
+        <label className="block text-sm">
+          <span className="font-semibold text-primary">
+            {policy.referenceLabel}
             <span className="text-red-600"> *</span>
-          )}
-        </span>
-        <input
-          type="text"
-          inputMode="text"
-          autoComplete="off"
-          value={reference}
-          onChange={(e) => onReferenceChange(e.target.value)}
-          placeholder={policy.referencePlaceholder}
-          className={fieldClass}
-        />
-      </label>
+          </span>
+          <input
+            type="text"
+            inputMode="text"
+            autoComplete="off"
+            value={reference}
+            onChange={(e) => onReferenceChange(e.target.value)}
+            placeholder={policy.referencePlaceholder}
+            className={fieldClass}
+          />
+        </label>
+      )}
 
       <div className="text-sm">
-        <span className="font-semibold text-primary">
-          {policy.proofsLabel}
-          {requireAllFields && <span className="text-red-600"> *</span>}
-        </span>
+        <span className="font-semibold text-primary">{policy.proofsLabel}</span>
         <p className="mt-0.5 text-xs text-foreground/55">{policy.proofsHint}</p>
         <div className="mt-2">
           <PaymentProofUploader

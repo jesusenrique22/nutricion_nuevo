@@ -17,7 +17,11 @@ const REQUIRED_DELEGATES = [
 ] as const;
 
 /** Modelos nuevos: no bloquean el arranque si Turbopack aún tiene un bundle viejo. */
-const OPTIONAL_DELEGATES = ["review"] as const;
+const OPTIONAL_DELEGATES = [
+  "review",
+  "coupon",
+  "recurringBlockedWeekday",
+] as const;
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -49,6 +53,14 @@ export function isPrismaReviewReady(): boolean {
   return prismaHasDelegate("review");
 }
 
+export function isPrismaCouponReady(): boolean {
+  return prismaHasDelegate("coupon");
+}
+
+export function isPrismaRecurringBlockedWeekdayReady(): boolean {
+  return prismaHasDelegate("recurringBlockedWeekday");
+}
+
 /** Campos recientes del schema; si faltan, el bundle de Turbopack sigue con client viejo. */
 function clientHasExpectedSchema(): boolean {
   const purchase = Prisma.ResourcePurchaseScalarFieldEnum;
@@ -56,6 +68,15 @@ function clientHasExpectedSchema(): boolean {
   const consultation = (
     Prisma as { ConsultationTypeScalarFieldEnum?: Record<string, string> }
   ).ConsultationTypeScalarFieldEnum;
+  const recurring = (
+    Prisma as {
+      RecurringBlockedWeekdayScalarFieldEnum?: Record<string, string>;
+    }
+  ).RecurringBlockedWeekdayScalarFieldEnum;
+
+  // Si el module de Prisma ya se regeneró, exigí el modelo nuevo.
+  // Si aún no está en el bundle, no tiramos el client entero (OPTIONAL_DELEGATES).
+  if (recurring && !("weekday" in recurring)) return false;
 
   if (consultation) {
     const hasLobbyFields =

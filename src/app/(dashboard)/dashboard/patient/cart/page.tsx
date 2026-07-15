@@ -19,6 +19,10 @@ export default async function PatientCartPage() {
         eyebrow="Tu pedido"
         title="Carrito"
         description="Revisá cada producto con su foto y cantidad antes de confirmar tu compra."
+        action={{
+          href: "/dashboard/patient/cart/historial",
+          label: "Historial de compras",
+        }}
       />
       <Suspense
         fallback={

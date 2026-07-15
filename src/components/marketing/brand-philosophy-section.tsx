@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Reveal } from "@/components/motion/reveal";
 import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
 
 const RECIPE = [
   { label: "Alimentación", pct: 50, className: "bg-primary" },
@@ -78,7 +79,7 @@ export function BrandPhilosophySection({
               height={800}
               className="h-auto w-full object-contain"
               sizes="(max-width: 1024px) 100vw, 50vw"
-              unoptimized={src.startsWith("/uploads/")}
+              unoptimized={shouldUnoptimizeImage(src)}
             />
           </div>
         </Reveal>

@@ -292,29 +292,6 @@ export interface PatientFichaPurchase {
   grantedAt: string | null;
 }
 
-/** Mediciones del paciente autenticado. */
-export async function getMyMeasurements() {
-  const session = await auth();
-  if (!session?.user?.id) return [];
-
-  const profile = await prisma.patientProfile.findUnique({
-    where: { userId: session.user.id },
-    include: {
-      measurements: { orderBy: { measuredAt: "desc" }, take: 20 },
-    },
-  });
-
-  return (profile?.measurements ?? []).map((m) => ({
-    id: m.id,
-    measuredAt: m.measuredAt.toISOString(),
-    weight: m.weight,
-    bodyFatPct: m.bodyFatPct,
-    muscleMass: m.muscleMass,
-    waist: m.waist,
-    hip: m.hip,
-  }));
-}
-
 /** Ficha de un paciente — datos básicos (solo ADMIN). */
 export async function getPatientDetail(
   patientId: string,

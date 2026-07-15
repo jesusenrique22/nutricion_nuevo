@@ -16,6 +16,7 @@ export function shouldUnoptimizeImage(src: string): boolean {
   return (
     src.startsWith("/uploads/") ||
     isMongoMediaUrl(src) ||
+    /\.svg(\?|$)/i.test(src) ||
     (src.startsWith("http") && !src.includes("res.cloudinary.com"))
   );
 }

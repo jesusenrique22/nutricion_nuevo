@@ -58,7 +58,7 @@ export async function notifyRefundResolved(params: {
       title: params.approved ? "Reembolso aceptado" : "Reembolso no aceptado",
       body,
       payload: {
-        deepLink: "/dashboard/patient/progress",
+        deepLink: "/dashboard/patient/cart/historial",
         approved: params.approved,
       },
     });

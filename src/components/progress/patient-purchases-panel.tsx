@@ -12,9 +12,15 @@ import {
 const statusStyles: Record<string, string> = {
   "Pago en revisión": "bg-amber-100 text-amber-800",
   "Adelanto en revisión": "bg-amber-100 text-amber-800",
+  "Procesando pago": "bg-amber-100 text-amber-800",
+  "Procesando adelanto": "bg-amber-100 text-amber-800",
   "Reembolso en revisión": "bg-orange-100 text-orange-800",
   Pagado: "bg-emerald-100 text-emerald-800",
   "Acceso activo": "bg-emerald-100 text-emerald-800",
+  "Compra confirmada": "bg-emerald-100 text-emerald-800",
+  "Cita confirmada": "bg-emerald-100 text-emerald-800",
+  "Consulta completada": "bg-emerald-100 text-emerald-800",
+  Cancelada: "bg-red-100 text-red-700",
   Reembolsado: "bg-red-100 text-red-700",
   "Reembolso no aceptado": "bg-muted text-foreground/70",
 };
@@ -83,7 +89,11 @@ export function PatientPurchasesPanel({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  {item.kind === "APPOINTMENT" ? "Cita" : "Recurso"}
+                  {item.kind === "APPOINTMENT"
+                    ? "Cita"
+                    : item.kind === "PRODUCT"
+                      ? "Producto"
+                      : "Recurso"}
                 </p>
                 <h3 className="mt-1 font-semibold">{item.title}</h3>
                 <p className="mt-1 text-sm text-foreground/60">{item.subtitle}</p>

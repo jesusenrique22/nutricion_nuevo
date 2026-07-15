@@ -4,6 +4,7 @@ import { PersonalizarTabs } from "@/components/cms/personalizar-tabs";
 import {
   getPaymentCheckoutPolicyAdmin,
   getSiteContents,
+  getConsultationTypesAdmin,
 } from "@/server/actions/cms.actions";
 import { getAllResourcesAdmin } from "@/server/actions/resource.queries";
 import {
@@ -13,6 +14,7 @@ import {
   getProducts,
 } from "@/server/queries/landing.queries";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
+import { getAuthBranding } from "@/server/queries/auth-branding.queries";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,8 @@ export default async function PersonalizarPage() {
     products,
     nutricionistaPage,
     paymentCheckoutPolicy,
+    packageTypes,
+    authBranding,
   ] = await Promise.all([
     getSiteContents(),
     getAllResourcesAdmin(),
@@ -35,6 +39,8 @@ export default async function PersonalizarPage() {
     getProducts(),
     getNutricionistaPage(),
     getPaymentCheckoutPolicyAdmin(),
+    getConsultationTypesAdmin(),
+    getAuthBranding(),
   ]);
 
   return (
@@ -44,15 +50,17 @@ export default async function PersonalizarPage() {
         description="Edita imágenes, contenido de la página, CV y recursos digitales."
       >
         <PersonalizarTabs
-        siteBlocks={siteBlocks}
-        resourceCount={resources.length}
-        landingImages={landingImages}
-        landingBlocks={landingBlocks}
-        navMenu={navMenu}
-        products={products}
-        nutricionistaPage={nutricionistaPage}
-        paymentCheckoutPolicy={paymentCheckoutPolicy}
-      />
+          siteBlocks={siteBlocks}
+          resourceCount={resources.length}
+          landingImages={landingImages}
+          landingBlocks={landingBlocks}
+          navMenu={navMenu}
+          products={products}
+          nutricionistaPage={nutricionistaPage}
+          paymentCheckoutPolicy={paymentCheckoutPolicy}
+          packageTypes={packageTypes}
+          authBranding={authBranding}
+        />
       </ContentLobbyShell>
     </DashboardPage>
   );

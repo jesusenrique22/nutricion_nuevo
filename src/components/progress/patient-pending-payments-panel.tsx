@@ -64,6 +64,12 @@ export function PatientPendingPaymentsPanel({
             <p className="text-lg font-bold text-primary">
               <DisplayPrice amount={item.amount} currency="ARS" />
             </p>
+            {item.totalAmount ? (
+              <p className="mt-1 text-right text-xs text-foreground/50">
+                Total cita:{" "}
+                <DisplayPrice amount={item.totalAmount} currency="ARS" />
+              </p>
+            ) : null}
           </div>
           <p className="mt-4 text-xs text-amber-900/75">
             Anttova está revisando tu comprobante. Te avisaremos cuando se

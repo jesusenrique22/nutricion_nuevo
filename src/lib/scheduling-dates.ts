@@ -26,3 +26,25 @@ export function dateRangeKeys(from: string, to: string): string[] {
 export function todayDateKey(): string {
   return toDateKey(new Date());
 }
+
+/** Día de la semana 0–6 (domingo–sábado) para una clave YYYY-MM-DD local. */
+export function weekdayFromDateKey(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+/** Etiquetas en español, orden Lun→Dom para la UI. */
+export const WEEKDAY_OPTIONS: { value: number; label: string; short: string }[] =
+  [
+    { value: 1, label: "Lunes", short: "Lun" },
+    { value: 2, label: "Martes", short: "Mar" },
+    { value: 3, label: "Miércoles", short: "Mié" },
+    { value: 4, label: "Jueves", short: "Jue" },
+    { value: 5, label: "Viernes", short: "Vie" },
+    { value: 6, label: "Sábados", short: "Sáb" },
+    { value: 0, label: "Domingos", short: "Dom" },
+  ];
+
+export function weekdayLabel(weekday: number): string {
+  return WEEKDAY_OPTIONS.find((w) => w.value === weekday)?.label ?? `Día ${weekday}`;
+}

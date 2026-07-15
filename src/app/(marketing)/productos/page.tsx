@@ -1,15 +1,22 @@
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ContentLobbyShell } from "@/components/brand/content-lobby-shell";
 import { ProductCatalog } from "@/components/products/product-catalog";
 import { auth } from "@/lib/auth";
-import { getProducts } from "@/server/queries/landing.queries";
+import { isStoreVisible } from "@/lib/store-visibility";
+import { getNavMenu, getProducts } from "@/server/queries/landing.queries";
 import { getMyProductPurchaseStatuses } from "@/server/actions/cart.actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductosPage() {
   const session = await auth();
-  const products = await getProducts();
+  const [products, navMenu] = await Promise.all([getProducts(), getNavMenu()]);
+
+  if (!isStoreVisible(navMenu, products)) {
+    notFound();
+  }
+
   const isPatient = session?.user?.role === "PATIENT";
   const purchaseStatuses = isPatient ? await getMyProductPurchaseStatuses() : {};
 
@@ -17,7 +24,7 @@ export default async function ProductosPage() {
     <div className="px-6 py-16">
       <div className="mx-auto max-w-6xl">
         <ContentLobbyShell
-          title={products.heading || "Productos"}
+          title={products.heading || "Tienda"}
           description={products.subheading || undefined}
         >
           {!isPatient && (

@@ -56,6 +56,63 @@ export async function getSlotsForDay(
   return getAvailableSlots(type, dateStr, excludeAppointmentId);
 }
 
+/**
+ * Fechas YYYY-MM-DD sin atención en un rango (días puntuales + días de la semana fijos).
+ * Usado por el calendario de reserva del paciente.
+ */
+export async function getUnavailableBookingDates(params: {
+  from: string;
+  to: string;
+}): Promise<string[]> {
+  const from = params.from?.trim();
+  const to = params.to?.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return [];
+  }
+  if (to < from) return [];
+
+  const { dateRangeKeys, weekdayFromDateKey } = await import(
+    "@/lib/scheduling-dates"
+  );
+  const {
+    isPrismaRecurringBlockedWeekdayReady,
+    prisma: db,
+  } = await import("@/server/db/prisma");
+
+  const keys = dateRangeKeys(from, to);
+  if (keys.length === 0) return [];
+
+  const blocked = new Set<string>();
+
+  try {
+    const specific = await db.blockedDay.findMany({
+      where: { date: { gte: from, lte: to } },
+      select: { date: true },
+    });
+    for (const row of specific) blocked.add(row.date);
+  } catch {
+    // ignore
+  }
+
+  if (isPrismaRecurringBlockedWeekdayReady()) {
+    try {
+      const recurring = await db.recurringBlockedWeekday.findMany({
+        select: { weekday: true },
+      });
+      const weekdays = new Set(recurring.map((r) => r.weekday));
+      if (weekdays.size > 0) {
+        for (const key of keys) {
+          if (weekdays.has(weekdayFromDateKey(key))) blocked.add(key);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return [...blocked].sort();
+}
+
 /** Slots disponibles para reagendar una cita existente. */
 export async function getRescheduleSlots(
   appointmentId: string,

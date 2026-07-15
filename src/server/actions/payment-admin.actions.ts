@@ -25,7 +25,7 @@ function revalidateAll(patientId?: string) {
   revalidatePath("/dashboard/patient/library");
   revalidatePath("/dashboard/patient/products");
   revalidatePath("/dashboard/patient/appointments");
-  revalidatePath("/dashboard/patient/progress");
+  revalidatePath("/dashboard/patient/cart/historial");
   if (patientId) {
     revalidatePath(`/dashboard/admin/patients/${patientId}`);
   }

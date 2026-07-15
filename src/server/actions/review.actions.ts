@@ -54,7 +54,7 @@ export async function submitReview(input: {
     if (pending) {
       return {
         ok: false,
-        message: "Ya tenés una reseña en revisión. Esperá a que se apruebe.",
+        message: "Ya enviaste una reseña. ¡Gracias!",
       };
     }
 
