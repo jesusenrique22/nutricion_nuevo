@@ -18,7 +18,7 @@ function addPublicMediaUrl(out: Set<string>, normalized: string): void {
 
   // HTML cacheado puede seguir pidiendo /api/media/{id} tras migrar a /uploads/.
   const migrated = normalized.match(
-    /^\/uploads\/(site|brand|auth|cv|products|packages)\/([a-f0-9]{24})\.[^/]+$/i,
+    /^\/uploads\/(site|brand|login|auth|cv|products|packages)\/([a-f0-9]{24})\.[^/]+$/i,
   );
   if (migrated) {
     out.add(`/api/media/${migrated[2]}`);
@@ -87,7 +87,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
 
 export const getPublicSiteMediaUrls = unstable_cache(
   loadPublicSiteMediaUrls,
-  ["public-site-media-urls", "v6"],
+  ["public-site-media-urls", "v7"],
   { revalidate: 300, tags: ["public-site-media"] },
 );
 

@@ -1,7 +1,14 @@
 "use server";
 
+import { cache } from "react";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/server/db/prisma";
+import type { BookingAvailabilitySnapshot } from "@/lib/booking-slots";
+import { toPaymentPhaseView } from "@/lib/payment-split";
+import { dateRangeKeys, weekdayFromDateKey } from "@/lib/scheduling-dates";
+import {
+  isPrismaRecurringBlockedWeekdayReady,
+  prisma,
+} from "@/server/db/prisma";
 import { getAvailableSlots, type Slot } from "@/server/services/availability.service";
 
 export interface ConsultationTypeDTO {
@@ -19,30 +26,49 @@ export interface ConsultationTypeDTO {
   morningEnd: string | null;
 }
 
-export async function getConsultationTypes(): Promise<ConsultationTypeDTO[]> {
-  try {
-    const types = await prisma.consultationType.findMany({
-      where: { isPublished: true },
-      orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-    });
-    return types.map((t) => ({
-      id: t.id,
-      code: t.code,
-      name: t.name,
-      description: t.description,
-      durationMinutes: t.durationMinutes,
-      price: t.price.toString(),
-      imageUrl: t.imageUrl,
-      allowsOnline: t.allowsOnline,
-      allowsPresencial: t.allowsPresencial,
-      morningOnly: t.morningOnly,
-      morningStart: t.morningStart,
-      morningEnd: t.morningEnd,
-    }));
-  } catch {
-    return [];
-  }
+function mapConsultationType(t: {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  price: { toString(): string };
+  imageUrl: string | null;
+  allowsOnline: boolean;
+  allowsPresencial: boolean;
+  morningOnly: boolean;
+  morningStart: string | null;
+  morningEnd: string | null;
+}): ConsultationTypeDTO {
+  return {
+    id: t.id,
+    code: t.code,
+    name: t.name,
+    description: t.description,
+    durationMinutes: t.durationMinutes,
+    price: t.price.toString(),
+    imageUrl: t.imageUrl,
+    allowsOnline: t.allowsOnline,
+    allowsPresencial: t.allowsPresencial,
+    morningOnly: t.morningOnly,
+    morningStart: t.morningStart,
+    morningEnd: t.morningEnd,
+  };
 }
+
+export const getConsultationTypes = cache(
+  async (): Promise<ConsultationTypeDTO[]> => {
+    try {
+      const types = await prisma.consultationType.findMany({
+        where: { isPublished: true },
+        orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+      });
+      return types.map(mapConsultationType);
+    } catch {
+      return [];
+    }
+  },
+);
 
 export async function getSlotsForDay(
   consultationTypeId: string,
@@ -71,21 +97,13 @@ export async function getUnavailableBookingDates(params: {
   }
   if (to < from) return [];
 
-  const { dateRangeKeys, weekdayFromDateKey } = await import(
-    "@/lib/scheduling-dates"
-  );
-  const {
-    isPrismaRecurringBlockedWeekdayReady,
-    prisma: db,
-  } = await import("@/server/db/prisma");
-
   const keys = dateRangeKeys(from, to);
   if (keys.length === 0) return [];
 
   const blocked = new Set<string>();
 
   try {
-    const specific = await db.blockedDay.findMany({
+    const specific = await prisma.blockedDay.findMany({
       where: { date: { gte: from, lte: to } },
       select: { date: true },
     });
@@ -96,7 +114,7 @@ export async function getUnavailableBookingDates(params: {
 
   if (isPrismaRecurringBlockedWeekdayReady()) {
     try {
-      const recurring = await db.recurringBlockedWeekday.findMany({
+      const recurring = await prisma.recurringBlockedWeekday.findMany({
         select: { weekday: true },
       });
       const weekdays = new Set(recurring.map((r) => r.weekday));
@@ -111,6 +129,94 @@ export async function getUnavailableBookingDates(params: {
   }
 
   return [...blocked].sort();
+}
+
+function addDaysKey(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function todayKey(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Una sola carga de agenda para el cliente: días bloqueados + intervalos ocupados.
+ * Los slots se calculan en memoria al cambiar tipo/fecha (sin más trips a la DB).
+ */
+export async function getBookingAvailabilitySnapshot(params?: {
+  from?: string;
+  to?: string;
+}): Promise<BookingAvailabilitySnapshot> {
+  const from = params?.from?.trim() || todayKey();
+  const to = params?.to?.trim() || addDaysKey(from, 92);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return { from, to, blockedDates: [], busy: [] };
+  }
+
+  const rangeStart = new Date(
+    Number(from.slice(0, 4)),
+    Number(from.slice(5, 7)) - 1,
+    Number(from.slice(8, 10)),
+    0,
+    0,
+    0,
+    0,
+  );
+  const rangeEnd = new Date(
+    Number(to.slice(0, 4)),
+    Number(to.slice(5, 7)) - 1,
+    Number(to.slice(8, 10)) + 1,
+    0,
+    0,
+    0,
+    0,
+  );
+
+  const [blockedDates, appointments, blocks] = await Promise.all([
+    getUnavailableBookingDates({ from, to }),
+    prisma.appointment.findMany({
+      where: {
+        status: { in: ["PENDING", "CONFIRMED"] },
+        startTime: { lt: rangeEnd },
+        endTime: { gt: rangeStart },
+      },
+      select: { startTime: true, endTime: true },
+    }),
+    prisma.scheduleBlock.findMany({
+      where: {
+        startTime: { lt: rangeEnd },
+        endTime: { gt: rangeStart },
+      },
+      select: { startTime: true, endTime: true },
+    }),
+  ]);
+
+  return {
+    from,
+    to,
+    blockedDates,
+    busy: [
+      ...appointments.map((a) => ({
+        start: a.startTime.toISOString(),
+        end: a.endTime.toISOString(),
+      })),
+      ...blocks.map((b) => ({
+        start: b.startTime.toISOString(),
+        end: b.endTime.toISOString(),
+      })),
+    ],
+  };
 }
 
 /** Slots disponibles para reagendar una cita existente. */
@@ -134,8 +240,6 @@ export async function getRescheduleSlots(
 
   return getAvailableSlots(appt.consultationType, dateStr, appt.id);
 }
-
-import { toPaymentPhaseView } from "@/lib/payment-split";
 
 export interface PaymentPhaseDTO {
   advanceAmount: string;

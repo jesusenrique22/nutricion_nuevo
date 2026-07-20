@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconUploadField } from "@/components/cms/icon-upload-field";
 import { authBrandingToRecord } from "@/lib/auth-branding-parse";
+import { LOGIN_BRANDING_MEDIA_FOLDER } from "@/lib/media-access-policy";
 import { updateSiteContent } from "@/server/actions/cms.actions";
 import { AUTH_BRANDING_SLUG, type AuthBrandingData } from "@/types/auth-branding";
 
@@ -56,9 +57,9 @@ export function AuthBrandingEditor({
           label="Foto en el login"
           value={data.photoUrl}
           onChange={(photoUrl) => update({ ...data, photoUrl })}
-          folder="auth"
+          folder={LOGIN_BRANDING_MEDIA_FOLDER}
           objectFit="cover"
-          hint="Retrato / avatar junto al nombre en la pantalla de ingreso (formato cuadrado)."
+          hint="Retrato / avatar junto al nombre en la pantalla de ingreso (formato cuadrado). Se guarda en la carpeta pública «login»."
         />
         <label className="block text-sm">
           <span className="font-semibold">Nombre</span>

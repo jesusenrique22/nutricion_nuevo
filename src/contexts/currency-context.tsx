@@ -71,11 +71,18 @@ async function fetchRates(): Promise<ExchangeRateSnapshot | null> {
   }
 }
 
-export function CurrencyProvider({ children }: { children: ReactNode }) {
+export function CurrencyProvider({
+  children,
+  initialRates = null,
+}: {
+  children: ReactNode;
+  /** Snapshot SSR: evita el fetch /api/currency/rates en el primer paint. */
+  initialRates?: ExchangeRateSnapshot | null;
+}) {
   const [displayCurrency, setDisplayCurrencyState] =
     useState<SupportedCurrency>(DEFAULT_DISPLAY_CURRENCY);
-  const [rates, setRates] = useState<ExchangeRateSnapshot | null>(null);
-  const [ratesLoading, setRatesLoading] = useState(true);
+  const [rates, setRates] = useState<ExchangeRateSnapshot | null>(initialRates);
+  const [ratesLoading, setRatesLoading] = useState(!initialRates);
   const [previewMarkupPercent, setPreviewMarkupPercent] = useState<
     number | null
   >(null);
@@ -102,12 +109,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setDisplayCurrencyState(readStoredCurrency());
-    void loadRates();
+    if (!initialRates) {
+      void loadRates();
+    }
     const timer = window.setInterval(() => {
       void loadRates();
     }, CLIENT_RATE_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [loadRates]);
+  }, [loadRates, initialRates]);
 
   const setDisplayCurrency = useCallback((currency: SupportedCurrency) => {
     setDisplayCurrencyState(currency);

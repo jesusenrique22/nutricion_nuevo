@@ -1,14 +1,7 @@
 import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-
-const PUBLIC_UPLOAD_FOLDERS = [
-  "site",
-  "brand",
-  "cv",
-  "products",
-  "packages",
-] as const;
+import { PUBLIC_MEDIA_FOLDER_LIST } from "@/lib/media-access-policy";
 
 const MIME_FROM_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -24,7 +17,7 @@ export async function findLocalUploadByFileId(fileId: string): Promise<{
   url: string;
   folder: string;
 } | null> {
-  for (const folder of PUBLIC_UPLOAD_FOLDERS) {
+  for (const folder of PUBLIC_MEDIA_FOLDER_LIST) {
     const dir = path.join(process.cwd(), "public", "uploads", folder);
     let files: string[];
     try {

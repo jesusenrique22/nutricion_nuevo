@@ -2,6 +2,7 @@ import { Inter } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { getPublicExchangeRates } from "@/server/actions/currency.actions";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -20,11 +21,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const initialRates = await getPublicExchangeRates();
+
   return (
     <html
       lang="es"
@@ -32,7 +35,7 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
+        <Providers initialRates={initialRates}>{children}</Providers>
       </body>
     </html>
   );

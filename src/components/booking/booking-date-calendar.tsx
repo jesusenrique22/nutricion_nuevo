@@ -34,10 +34,19 @@ export function BookingDateCalendar({
   value,
   onChange,
   minDate,
+  blockedDates: blockedFromParent,
+  coverageFrom,
+  coverageTo,
+  onNeedRange,
 }: {
   value: string;
   onChange: (dateKey: string) => void;
   minDate?: string;
+  /** Set precargado — si falta, el calendario pide el mes al abrir. */
+  blockedDates?: ReadonlySet<string>;
+  coverageFrom?: string;
+  coverageTo?: string;
+  onNeedRange?: (from: string, to: string) => void;
 }) {
   const selected = useMemo(() => parseKey(value), [value]);
   const min = useMemo(
@@ -46,10 +55,15 @@ export function BookingDateCalendar({
   );
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfMonth(selected));
-  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  const [fetchedBlocked, setFetchedBlocked] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [loading, setLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const requestedRef = useRef<string | null>(null);
+  const seeded = blockedFromParent !== undefined;
 
+  const blocked = blockedFromParent ?? fetchedBlocked;
   const label = format(selected, "EEEE d 'de' MMMM yyyy", { locale: es });
 
   useEffect(() => {
@@ -79,7 +93,23 @@ export function BookingDateCalendar({
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !onNeedRange || !coverageFrom || !coverageTo) return;
+    const start = startOfWeek(startOfMonth(month), {
+      locale: es,
+      weekStartsOn: 1,
+    });
+    const end = endOfWeek(endOfMonth(month), { locale: es, weekStartsOn: 1 });
+    const from = toKey(start);
+    const to = toKey(end);
+    if (from >= coverageFrom && to <= coverageTo) return;
+    const key = `${from}:${to}`;
+    if (requestedRef.current === key) return;
+    requestedRef.current = key;
+    onNeedRange(from, to);
+  }, [month, open, coverageFrom, coverageTo, onNeedRange]);
+
+  useEffect(() => {
+    if (!open || seeded) return;
     const start = startOfWeek(startOfMonth(month), {
       locale: es,
       weekStartsOn: 1,
@@ -93,19 +123,7 @@ export function BookingDateCalendar({
     })
       .then((dates) => {
         if (cancelled) return;
-        const next = new Set(dates);
-        setBlocked(next);
-        if (next.has(value)) {
-          const cursor = parseKey(value);
-          for (let i = 0; i < 60; i++) {
-            cursor.setDate(cursor.getDate() + 1);
-            const key = toKey(cursor);
-            if (!next.has(key) && !isBefore(startOfDay(cursor), min)) {
-              onChange(key);
-              break;
-            }
-          }
-        }
+        setFetchedBlocked(new Set(dates));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -113,7 +131,20 @@ export function BookingDateCalendar({
     return () => {
       cancelled = true;
     };
-  }, [month, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [month, open, seeded]);
+
+  useEffect(() => {
+    if (!blocked.has(value)) return;
+    const cursor = parseKey(value);
+    for (let i = 0; i < 60; i++) {
+      cursor.setDate(cursor.getDate() + 1);
+      const key = toKey(cursor);
+      if (!blocked.has(key) && !isBefore(startOfDay(cursor), min)) {
+        onChange(key);
+        break;
+      }
+    }
+  }, [blocked, value, min, onChange]);
 
   const weeks = getMonthWeeks(month);
 

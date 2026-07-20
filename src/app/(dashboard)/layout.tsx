@@ -6,7 +6,7 @@ import { DashboardMain } from "@/components/dashboard/dashboard-main";
 import { RealtimeSync } from "@/components/realtime/realtime-sync";
 import { SocketProvider } from "@/contexts/socket-context";
 import { isSocketClientEnabled } from "@/lib/socket-config";
-import { getSession } from "@/server/queries/cached-dashboard";
+import { getSession, getDashboardBadges } from "@/server/queries/cached-dashboard";
 import { isPatientDeactivated } from "@/server/queries/patient-profile";
 import { getCartCount } from "@/server/actions/cart.actions";
 import { getNavMenu, getProducts } from "@/server/queries/landing.queries";
@@ -45,23 +45,29 @@ export default async function DashboardLayout({
     { href: "/dashboard/patient/cart", label: "Carrito" },
   ];
 
-  if (!isAdmin) {
-    const [navMenu, products] = await Promise.all([getNavMenu(), getProducts()]);
-    if (isStoreVisible(navMenu, products)) {
-      patientLinks = [
-        patientLinks[0]!,
-        patientLinks[1]!,
-        {
-          href: "/dashboard/patient/products",
-          label: storeNavLabel(navMenu),
-        },
-        ...patientLinks.slice(2),
-      ];
-    }
+  const storePromise = isAdmin
+    ? Promise.resolve(null as null)
+    : Promise.all([getNavMenu(), getProducts()]);
+
+  const [storeData, cartCount, badges] = await Promise.all([
+    storePromise,
+    isAdmin ? Promise.resolve(0) : getCartCount(),
+    getDashboardBadges(),
+  ]);
+
+  if (storeData && isStoreVisible(storeData[0], storeData[1])) {
+    patientLinks = [
+      patientLinks[0]!,
+      patientLinks[1]!,
+      {
+        href: "/dashboard/patient/products",
+        label: storeNavLabel(storeData[0]),
+      },
+      ...patientLinks.slice(2),
+    ];
   }
 
   const links = isAdmin ? adminLinks : patientLinks;
-  const cartCount = isAdmin ? 0 : await getCartCount();
 
   const signOutButton = (
     <SignOutButton
@@ -79,6 +85,7 @@ export default async function DashboardLayout({
         links={links}
         footer={signOutButton}
         cartCount={cartCount}
+        initialUnreadNotifications={badges.notifications}
       />
       <main className="scrollbar-stable relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background/70 backdrop-blur-[1px]">
         <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">

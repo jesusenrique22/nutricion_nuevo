@@ -3,7 +3,7 @@
 export const BRAND_FLYERS = {
   jump: "/brand/flyers/jump.jpg",
   medical: "/brand/flyers/medical.jpg",
-  training: "/brand/flyers/training.png",
+  training: "/brand/flyers/training.jpg",
 } as const;
 
 export const BRAND_PORTADAS = {
@@ -13,23 +13,23 @@ export const BRAND_PORTADAS = {
 } as const;
 
 export const BRAND_PLANS = {
-  nutrition: "/brand/plans/nutrition.png",
-  training: "/brand/plans/training.png",
-  anthropometry: "/brand/plans/anthropometry.png",
+  nutrition: "/brand/plans/nutrition.jpg",
+  training: "/brand/plans/training.jpg",
+  anthropometry: "/brand/plans/anthropometry.jpg",
 } as const;
 
 export const BRAND_SERVICES = {
-  nutrition: "/brand/services/nutrition-detail.png",
-  training: "/brand/services/training-detail.png",
-  anthropometry: "/brand/services/anthropometry-detail.png",
+  nutrition: "/brand/services/nutrition-detail.jpg",
+  training: "/brand/services/training-detail.jpg",
+  anthropometry: "/brand/services/anthropometry-detail.jpg",
 } as const;
 
 export const BRAND_LIFESTYLE = {
-  community: "/brand/lifestyle/community.png",
-  yogaSky: "/brand/lifestyle/yoga-sky.png",
-  running: "/brand/lifestyle/running.png",
-  nutritionBowl: "/brand/lifestyle/nutrition-bowl.png",
-  stretch: "/brand/lifestyle/stretch.png",
+  community: "/brand/lifestyle/community.jpg",
+  yogaSky: "/brand/lifestyle/yoga-sky.jpg",
+  running: "/brand/lifestyle/running.jpg",
+  nutritionBowl: "/brand/lifestyle/nutrition-bowl.jpg",
+  stretch: "/brand/lifestyle/stretch.jpg",
 } as const;
 
 export const BRAND_PRESENTATION = {

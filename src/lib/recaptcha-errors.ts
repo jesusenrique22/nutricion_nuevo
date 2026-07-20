@@ -22,8 +22,16 @@ export function recaptchaFailureMessage(
     codes.includes("invalid-domain") ||
     codes.includes("hostname-mismatch")
   ) {
+    if (codes.includes("browser-error")) {
+      return (
+        "reCAPTCHA no pudo completarse en el navegador (bloqueador de anuncios, " +
+        "red, o DevTools en modo iPhone). Desactivá bloqueadores en localhost, " +
+        "cerrá el emulador móvil de Chrome e intentá de nuevo. " +
+        "El 401 en /api2/pat es normal y se puede ignorar."
+      );
+    }
     const host = data.hostname ?? hostname ?? "localhost";
-    return `reCAPTCHA no pudo validar «${host}». Agregá localhost y 127.0.0.1 en Dominios, desactivá bloqueadores de anuncios e intentá de nuevo.`;
+    return `reCAPTCHA no pudo validar «${host}». Agregá ese dominio en Google reCAPTCHA → Dominios e intentá de nuevo.`;
   }
 
   if (codes.includes("timeout-or-duplicate")) {

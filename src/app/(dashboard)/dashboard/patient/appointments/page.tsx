@@ -3,16 +3,18 @@ import { PatientAppointmentHistory } from "@/components/appointments/patient-app
 import { BookingForm } from "@/components/booking/booking-form";
 import { PatientCartPendingBanner } from "@/components/cart/patient-cart-pending-banner";
 import {
+  getBookingAvailabilitySnapshot,
   getConsultationTypes,
   getMyAppointments,
 } from "@/server/actions/booking.queries";
 import { getCartItems } from "@/server/actions/cart.actions";
 
 export default async function PatientAppointmentsPage() {
-  const [types, appointments, cartItems] = await Promise.all([
+  const [types, appointments, cartItems, availability] = await Promise.all([
     getConsultationTypes(),
     getMyAppointments(),
     getCartItems(),
+    getBookingAvailabilitySnapshot(),
   ]);
 
   return (
@@ -24,7 +26,7 @@ export default async function PatientAppointmentsPage() {
         compact: true,
       }}
     >
-      <BookingForm types={types} />
+      <BookingForm types={types} availability={availability} />
       <PatientCartPendingBanner items={cartItems} />
       <PatientAppointmentHistory appointments={appointments} />
     </BrandFlowShell>

@@ -1,5 +1,14 @@
 /** Site key pública (cliente + servidor). */
+export function isRecaptchaBypassInDev(): boolean {
+  return (
+    process.env.NODE_ENV === "development" &&
+    (process.env.RECAPTCHA_BYPASS_IN_DEV === "true" ||
+      process.env.NEXT_PUBLIC_RECAPTCHA_BYPASS_IN_DEV === "true")
+  );
+}
+
 export function getPublicRecaptchaSite(): string {
+  if (isRecaptchaBypassInDev()) return "";
   return (
     process.env.NEXT_PUBLIC_RECAPTCHA_SITE?.trim() ||
     process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() ||

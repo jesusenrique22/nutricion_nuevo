@@ -1,0 +1,139 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
+import { shouldUnoptimizeImage } from "@/lib/media-url";
+import type { HeroSlide } from "@/types/landing-images";
+
+/**
+ * Carrusel client: la 1ª foto la pinta el Server Component (LCP).
+ * Acá solo rotamos slides 2+ y el copy.
+ */
+export function FlyerHeroClient({ slides }: { slides: HeroSlide[] }) {
+  const [index, setIndex] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const timer = setInterval(() => {
+      setIndex((i) => (i + 1) % slides.length);
+    }, 5500);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  useEffect(() => {
+    const next = slides[(index + 1) % slides.length];
+    if (!next) return;
+    const img = new window.Image();
+    img.src = next.src;
+  }, [index, slides]);
+
+  const slide = slides[index] ?? slides[0];
+  if (!slide) return null;
+
+  return (
+    <>
+      {/* Slides siguientes encima del LCP SSR (index 0 = no tapar la foto del server) */}
+      {mounted && index > 0 && (
+        <AnimatePresence mode="popLayout">
+          <motion.div
+            key={slide.src}
+            initial={{ opacity: 0, scale: 1.04 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute inset-0"
+          >
+            <Image
+              src={slide.src}
+              alt={slide.alt}
+              fill
+              className="object-cover object-center"
+              sizes="100vw"
+              unoptimized={shouldUnoptimizeImage(slide.src)}
+            />
+          </motion.div>
+        </AnimatePresence>
+      )}
+
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/70 via-primary/35 to-primary/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/55 via-transparent to-primary/15" />
+      <DarkSectionSparks />
+
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 top-1/4 h-[420px] w-[420px] rounded-full bg-accent-soft/25 blur-3xl"
+        animate={{ x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.06, 1] }}
+        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -left-16 bottom-0 h-64 w-64 rounded-full bg-accent/20 blur-3xl"
+        animate={{ x: [0, -20, 0], y: [0, 15, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <div className="relative z-10 mx-auto flex min-h-[min(100svh,920px)] max-w-6xl flex-col justify-between px-6 pb-10 pt-24 sm:px-10 sm:pb-12 sm:pt-28">
+        <div className="my-auto max-w-2xl py-8 sm:py-12">
+          <p className="text-xs font-semibold uppercase tracking-[0.32em] text-accent-soft">
+            Est. 2025 · Buenos Aires
+          </p>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={slide.src}
+              initial={mounted ? { opacity: 0, y: 28 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-6"
+            >
+              <h1 className="text-4xl font-extralight uppercase leading-[1.05] tracking-tight text-primary-foreground sm:text-5xl md:text-6xl">
+                {slide.line1}
+              </h1>
+              <p className="mt-3 text-lg font-medium text-primary-foreground/90 sm:text-xl md:text-2xl">
+                {slide.line2}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
+          <p className="mt-8 max-w-lg text-base leading-relaxed text-primary-foreground/80 sm:text-lg">
+            Acompañamiento profesional con la Lic. Ma Antonieta Lanza.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-2">
+            {slides.map((s, i) => (
+              <button
+                key={`${s.src}-dot-${i}`}
+                type="button"
+                aria-label={`Ir a slide ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === index
+                    ? "w-10 bg-primary-foreground"
+                    : "w-4 bg-primary-foreground/35 hover:bg-primary-foreground/55"
+                }`}
+              />
+            ))}
+          </div>
+
+          <Link
+            href="#paquetes"
+            className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/55 transition hover:text-primary-foreground"
+          >
+            Ver paquetes ↓
+          </Link>
+        </div>
+      </div>
+    </>
+  );
+}

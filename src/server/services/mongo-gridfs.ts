@@ -182,6 +182,7 @@ export function gridFileMimeType(
   if (
     folder === "site" ||
     folder === "brand" ||
+    folder === "login" ||
     folder === "auth" ||
     folder === "cv" ||
     folder === "products" ||

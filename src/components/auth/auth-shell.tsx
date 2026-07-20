@@ -90,6 +90,9 @@ function AuthBrandCopy({
               className="object-cover object-top"
               sizes="68px"
               unoptimized={shouldUnoptimizeImage(professionalPhoto)}
+              priority
+              fetchPriority="high"
+              loading="eager"
             />
           </div>
           <div>

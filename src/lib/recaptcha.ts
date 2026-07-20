@@ -8,6 +8,7 @@ import {
 import {
   getPublicRecaptchaSite,
   getRecaptchaSecret,
+  isRecaptchaBypassInDev,
   isRecaptchaEnterprise,
 } from "@/lib/recaptcha-env";
 import {
@@ -76,6 +77,11 @@ export async function verifyRecaptchaToken(
   token: string | undefined | null,
   expectedAction: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
+  // Local: dominios ok no alcanzan si hay bloqueador / PAT 401 / browser-error.
+  if (isRecaptchaBypassInDev()) {
+    return { ok: true };
+  }
+
   if (!isRecaptchaEnabled()) {
     return { ok: true };
   }

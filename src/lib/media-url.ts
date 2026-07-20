@@ -11,10 +11,9 @@ export function isCloudinaryUrl(url: string): boolean {
   }
 }
 
-/** Rutas que Next/Image no debe optimizar. */
+/** Rutas que Next/Image no debe optimizar (API dinámica o SVG). */
 export function shouldUnoptimizeImage(src: string): boolean {
   return (
-    src.startsWith("/uploads/") ||
     isMongoMediaUrl(src) ||
     /\.svg(\?|$)/i.test(src) ||
     (src.startsWith("http") && !src.includes("res.cloudinary.com"))

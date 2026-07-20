@@ -49,6 +49,8 @@ export function NutricionistaAboutSection({
             sizes="(max-width: 1024px) 90vw, 480px"
             unoptimized={shouldUnoptimizeImage(photoSrc)}
             priority
+            fetchPriority="high"
+            loading="eager"
           />
         </div>
         <p className="mt-4 text-center text-sm font-semibold text-primary lg:text-left">

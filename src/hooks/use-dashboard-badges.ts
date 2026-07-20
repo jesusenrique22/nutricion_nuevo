@@ -3,10 +3,21 @@
 import { useEffect, useState } from "react";
 import { useLiveCounter } from "@/hooks/use-live-counter";
 
-export function useDashboardBadges() {
-  const [seed, setSeed] = useState({ notifications: 0 });
+/** Si pasás initialNotifications (aunque sea 0), no se llama a /api/dashboard/badges. */
+export function useDashboardBadges(initialNotifications?: number) {
+  const seeded = initialNotifications !== undefined;
+  const [seed, setSeed] = useState({
+    notifications: initialNotifications ?? 0,
+  });
 
   useEffect(() => {
+    if (!seeded) return;
+    setSeed({ notifications: initialNotifications });
+  }, [seeded, initialNotifications]);
+
+  useEffect(() => {
+    if (seeded) return;
+
     let cancelled = false;
 
     fetch("/api/dashboard/badges", { cache: "no-store" })
@@ -20,7 +31,7 @@ export function useDashboardBadges() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [seeded]);
 
   const unreadNotifications = useLiveCounter(seed.notifications, {
     onNotificationEvents: true,

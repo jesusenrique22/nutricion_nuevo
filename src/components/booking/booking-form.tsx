@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLinkButton } from "@/components/brand/brand-link-button";
 import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
@@ -8,10 +8,15 @@ import { RecaptchaNotice } from "@/components/security/recaptcha-notice";
 import { useCurrency } from "@/contexts/currency-context";
 import { FlowStep, FlowStepDots } from "@/components/motion/flow-step";
 import { useRecaptcha } from "@/hooks/use-recaptcha";
+import {
+  computeSlotsForDay,
+  snapshotCoversDate,
+  type BookingAvailabilitySnapshot,
+  type ComputedSlot,
+} from "@/lib/booking-slots";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
-import { getSlotsForDay } from "@/server/actions/booking.queries";
+import { getBookingAvailabilitySnapshot } from "@/server/actions/booking.queries";
 import { addAppointmentToCart } from "@/server/actions/cart.actions";
-import type { Slot } from "@/server/services/availability.service";
 
 function todayStr() {
   const d = new Date();
@@ -23,9 +28,16 @@ function todayStr() {
 
 type Step = "service" | "details" | "confirm";
 
-export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
+export function BookingForm({
+  types,
+  availability,
+}: {
+  types: ConsultationTypeDTO[];
+  availability: BookingAvailabilitySnapshot;
+}) {
   const router = useRouter();
   const { formatPrice } = useCurrency();
+  const [snapshot, setSnapshot] = useState(availability);
   const [step, setStep] = useState<Step>("service");
   const [direction, setDirection] = useState<1 | -1>(1);
   const [typeId, setTypeId] = useState(types[0]?.id ?? "");
@@ -33,9 +45,8 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
     "PRESENCIAL",
   );
   const [date, setDate] = useState(todayStr());
-  const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [extending, setExtending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const { enabled: recaptchaEnabled, ready: recaptchaReady, loadFailed: recaptchaLoadFailed, getToken } =
@@ -44,10 +55,30 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   const selectedType = types.find((t) => t.id === typeId);
   const stepIndex = step === "service" ? 0 : step === "details" ? 1 : 2;
 
+  const blockedSet = useMemo(
+    () => new Set(snapshot.blockedDates),
+    [snapshot.blockedDates],
+  );
+
+  const slots: ComputedSlot[] = useMemo(() => {
+    if (!selectedType || step !== "confirm") return [];
+    if (!snapshotCoversDate(snapshot, date)) return [];
+    return computeSlotsForDay({
+      dateStr: date,
+      type: selectedType,
+      busy: snapshot.busy,
+      blockedDates: blockedSet,
+    });
+  }, [selectedType, step, date, snapshot, blockedSet]);
+
   function go(next: Step) {
     setDirection(next === "service" ? -1 : 1);
     setStep(next);
   }
+
+  useEffect(() => {
+    setSnapshot(availability);
+  }, [availability]);
 
   useEffect(() => {
     if (!selectedType) return;
@@ -59,13 +90,36 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
   }, [typeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!typeId || !date || step !== "confirm") return;
-    setLoadingSlots(true);
     setSelectedSlot(null);
-    getSlotsForDay(typeId, date)
-      .then(setSlots)
-      .finally(() => setLoadingSlots(false));
   }, [typeId, date, step]);
+
+  /** Si el usuario navega fuera del rango precargado, extiende el snapshot una sola vez. */
+  useEffect(() => {
+    if (step !== "confirm" && step !== "details") return;
+    if (snapshotCoversDate(snapshot, date)) return;
+
+    let cancelled = false;
+    setExtending(true);
+    getBookingAvailabilitySnapshot({ from: date, to: date })
+      .then((next) => {
+        if (cancelled) return;
+        setSnapshot((prev) => ({
+          from: prev.from < next.from ? prev.from : next.from,
+          to: prev.to > next.to ? prev.to : next.to,
+          blockedDates: [
+            ...new Set([...prev.blockedDates, ...next.blockedDates]),
+          ].sort(),
+          busy: [...prev.busy, ...next.busy],
+        }));
+      })
+      .finally(() => {
+        if (!cancelled) setExtending(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [date, step, snapshot]);
 
   function handleAddToCart() {
     if (!selectedSlot) return;
@@ -108,6 +162,24 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
       router.refresh();
     });
   }
+
+  const loadingSlots = extending && !snapshotCoversDate(snapshot, date);
+
+  const extendCoverage = useCallback((from: string, to: string) => {
+    setExtending(true);
+    getBookingAvailabilitySnapshot({ from, to })
+      .then((next) => {
+        setSnapshot((prev) => ({
+          from: prev.from < next.from ? prev.from : next.from,
+          to: prev.to > next.to ? prev.to : next.to,
+          blockedDates: [
+            ...new Set([...prev.blockedDates, ...next.blockedDates]),
+          ].sort(),
+          busy: [...prev.busy, ...next.busy],
+        }));
+      })
+      .finally(() => setExtending(false));
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-[344px]">
@@ -186,6 +258,10 @@ export function BookingForm({ types }: { types: ConsultationTypeDTO[] }) {
               value={date}
               minDate={todayStr()}
               onChange={setDate}
+              blockedDates={blockedSet}
+              coverageFrom={snapshot.from}
+              coverageTo={snapshot.to}
+              onNeedRange={extendCoverage}
             />
 
             <div className="mt-5 flex flex-col gap-2">

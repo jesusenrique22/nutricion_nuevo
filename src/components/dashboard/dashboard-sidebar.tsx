@@ -95,16 +95,21 @@ export function DashboardSidebar({
   links,
   footer,
   cartCount = 0,
+  initialUnreadNotifications,
 }: {
   isAdmin: boolean;
   links: NavLink[];
   footer: ReactNode;
   cartCount?: number;
+  /** Contador SSR — evita GET /api/dashboard/badges al montar. */
+  initialUnreadNotifications?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const reducedMotion = useReducedMotion();
-  const { unreadNotifications } = useDashboardBadges();
+  const { unreadNotifications } = useDashboardBadges(
+    initialUnreadNotifications,
+  );
 
   useEffect(() => {
     try {

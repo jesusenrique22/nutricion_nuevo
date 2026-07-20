@@ -14,17 +14,27 @@ function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-const FLYER_PNG_TO_JPG: Record<string, string> = {
+const BRAND_PNG_TO_JPG: Record<string, string> = {
   "/brand/flyers/jump.png": "/brand/flyers/jump.jpg",
   "/brand/flyers/medical.png": "/brand/flyers/medical.jpg",
-  // training.jpg era un capture de diapositiva; usamos el PNG oficial
+  "/brand/flyers/training.png": "/brand/flyers/training.jpg",
+  "/brand/lifestyle/community.png": "/brand/lifestyle/community.jpg",
+  "/brand/lifestyle/running.png": "/brand/lifestyle/running.jpg",
+  "/brand/lifestyle/yoga-sky.png": "/brand/lifestyle/yoga-sky.jpg",
+  "/brand/lifestyle/nutrition-bowl.png": "/brand/lifestyle/nutrition-bowl.jpg",
+  "/brand/lifestyle/stretch.png": "/brand/lifestyle/stretch.jpg",
+  "/brand/plans/nutrition.png": "/brand/plans/nutrition.jpg",
+  "/brand/plans/training.png": "/brand/plans/training.jpg",
+  "/brand/plans/anthropometry.png": "/brand/plans/anthropometry.jpg",
+  "/brand/services/nutrition-detail.png": "/brand/services/nutrition-detail.jpg",
+  "/brand/services/training-detail.png": "/brand/services/training-detail.jpg",
+  "/brand/services/anthropometry-detail.png":
+    "/brand/services/anthropometry-detail.jpg",
 };
 
-function optimizeHeroFlyerSrc(src: string): string {
-  if (src === "/brand/flyers/training.jpg") {
-    return "/brand/flyers/training.png";
-  }
-  return FLYER_PNG_TO_JPG[src] ?? src;
+/** Prefiere JPG livianos (~100 KB) sobre PNG de 2–3 MB. */
+function optimizeBrandSrc(src: string): string {
+  return BRAND_PNG_TO_JPG[src] ?? src;
 }
 
 function parseHeroSlides(value: unknown): HeroSlide[] | null {
@@ -42,7 +52,7 @@ function parseHeroSlides(value: unknown): HeroSlide[] | null {
       continue;
     }
     slides.push({
-      src: optimizeHeroFlyerSrc(row.src),
+      src: optimizeBrandSrc(row.src),
       alt: row.alt,
       line1: row.line1,
       line2: row.line2,
@@ -58,7 +68,7 @@ function parseGallery(value: unknown): GalleryItem[] | null {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
     if (!isNonEmptyString(row.src) || !isNonEmptyString(row.alt)) continue;
-    items.push({ src: row.src, alt: row.alt });
+    items.push({ src: optimizeBrandSrc(row.src), alt: row.alt });
   }
   return items.length > 0 ? items : null;
 }
@@ -72,7 +82,7 @@ function parseImageMap(
   const result: Partial<LandingImagesData["plans"]> = {};
   for (const key of keys) {
     if (!isNonEmptyString(row[key])) return null;
-    result[key] = row[key];
+    result[key] = optimizeBrandSrc(row[key]);
   }
   return result as LandingImagesData["plans"];
 }
@@ -103,13 +113,13 @@ export function mergeLandingImages(
     plans: plans ?? DEFAULT_LANDING_IMAGES.plans,
     services: services ?? DEFAULT_LANDING_IMAGES.services,
     philosophyImage: isNonEmptyString(stored.philosophyImage)
-      ? stored.philosophyImage
+      ? optimizeBrandSrc(stored.philosophyImage)
       : DEFAULT_LANDING_IMAGES.philosophyImage,
     brandSectionImage: isNonEmptyString(stored.brandSectionImage)
-      ? stored.brandSectionImage
+      ? optimizeBrandSrc(stored.brandSectionImage)
       : DEFAULT_LANDING_IMAGES.brandSectionImage,
     ctaBackground: isNonEmptyString(stored.ctaBackground)
-      ? stored.ctaBackground
+      ? optimizeBrandSrc(stored.ctaBackground)
       : DEFAULT_LANDING_IMAGES.ctaBackground,
   };
 }

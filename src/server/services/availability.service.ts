@@ -1,32 +1,15 @@
 import { ConsultationType } from "@prisma/client";
+import {
+  computeSlotsForDay,
+  type ComputedSlot,
+} from "@/lib/booking-slots";
 import { weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
 } from "@/server/db/prisma";
 
-// Horario general de la clínica (para consultas no matutinas)
-const CLINIC_OPEN = "08:00";
-const CLINIC_CLOSE = "18:00";
-
-function toMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-
-/** Construye un Date combinando una fecha (YYYY-MM-DD) y minutos del día. */
-function dateAtMinutes(dateStr: string, minutes: number): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
-  date.setMinutes(minutes);
-  return date;
-}
-
-export interface Slot {
-  start: string; // ISO
-  end: string; // ISO
-  label: string; // "09:00"
-}
+export type Slot = ComputedSlot;
 
 /**
  * Genera los slots disponibles para un tipo de consulta en una fecha dada,
@@ -53,18 +36,18 @@ export async function getAvailableSlots(
     if (recurring) return [];
   }
 
-  const windowStart = consultationType.morningOnly
-    ? toMinutes(consultationType.morningStart ?? "08:00")
-    : toMinutes(CLINIC_OPEN);
-  const windowEnd = consultationType.morningOnly
-    ? toMinutes(consultationType.morningEnd ?? "12:00")
-    : toMinutes(CLINIC_CLOSE);
+  const dayStart = new Date(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(5, 7)) - 1,
+    Number(dateStr.slice(8, 10)),
+    0,
+    0,
+    0,
+    0,
+  );
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const duration = consultationType.durationMinutes;
-
-  // Citas activas del día (cualquier tipo) para validar cruce global
-  const dayStart = dateAtMinutes(dateStr, 0);
-  const dayEnd = dateAtMinutes(dateStr, 24 * 60);
   const taken = await prisma.appointment.findMany({
     where: {
       status: { in: ["PENDING", "CONFIRMED"] },
@@ -82,33 +65,18 @@ export async function getAvailableSlots(
     select: { startTime: true, endTime: true },
   });
 
-  const now = new Date();
-  const slots: Slot[] = [];
-
-  for (let t = windowStart; t + duration <= windowEnd; t += duration) {
-    const start = dateAtMinutes(dateStr, t);
-    const end = dateAtMinutes(dateStr, t + duration);
-
-    if (start < now) continue; // no agendar en el pasado
-
-    const overlaps = taken.some(
-      (a) => a.startTime < end && a.endTime > start,
-    );
-    if (overlaps) continue;
-
-    const blocked = blocks.some(
-      (b) => b.startTime < end && b.endTime > start,
-    );
-    if (blocked) continue;
-
-    const hh = String(Math.floor(t / 60)).padStart(2, "0");
-    const mm = String(t % 60).padStart(2, "0");
-    slots.push({
-      start: start.toISOString(),
-      end: end.toISOString(),
-      label: `${hh}:${mm}`,
-    });
-  }
-
-  return slots;
+  return computeSlotsForDay({
+    dateStr,
+    type: consultationType,
+    busy: [
+      ...taken.map((a) => ({
+        start: a.startTime.toISOString(),
+        end: a.endTime.toISOString(),
+      })),
+      ...blocks.map((b) => ({
+        start: b.startTime.toISOString(),
+        end: b.endTime.toISOString(),
+      })),
+    ],
+  });
 }

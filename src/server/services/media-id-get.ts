@@ -13,9 +13,9 @@ import {
   replaceMongoFileInPlace,
 } from "@/server/services/mongo-gridfs";
 
-/** Caché corta para que un reemplazo de foto se note al instante. */
+/** Caché de media pública: visitas siguientes casi instantáneas; al reemplazar foto, max-age corto + SWR. */
 const PUBLIC_MEDIA_CACHE =
-  "public, max-age=60, must-revalidate, stale-while-revalidate=300";
+  "public, max-age=300, stale-while-revalidate=86400";
 
 function jpegFileName(original?: string | null): string {
   const stem = (original ?? "imagen").replace(/\.[^.]+$/, "") || "imagen";
@@ -176,6 +176,34 @@ export async function handleMediaGet(
         "Esta imagen está en formato HEIC y no se pudo convertir. Volvé a subirla como JPG desde Personalizar.",
         { status: 415 },
       );
+    }
+  }
+
+  // Auto-aligerar fotos públicas pesadas (hero/CMS) y persistir para la próxima visita.
+  if (isPublic && body.length > 400_000 && folderFromMeta) {
+    try {
+      const { optimizeImageBufferForFolder } = await import(
+        "@/server/services/image-optimize"
+      );
+      const optimized = await optimizeImageBufferForFolder(
+        body,
+        folderFromMeta,
+        mimeType,
+      );
+      if (optimized && optimized.buffer.length < body.length * 0.9) {
+        const ownerId =
+          typeof metadata?.ownerId === "string" ? metadata.ownerId : null;
+        await replaceMongoFileInPlace(id, optimized.buffer, {
+          fileName: jpegFileName(loaded.meta.filename),
+          mimeType: optimized.mimeType,
+          folder: folderFromMeta,
+          ownerId,
+        });
+        body = optimized.buffer;
+        mimeType = optimized.mimeType;
+      }
+    } catch (err) {
+      console.warn("[media] No se pudo optimizar imagen pública:", err);
     }
   }
 

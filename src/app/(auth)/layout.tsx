@@ -1,4 +1,5 @@
 import { AuthBrandProvider } from "@/components/auth/auth-brand-context";
+import { preloadCriticalImages } from "@/lib/preload-critical-images";
 import { getAuthBranding } from "@/server/queries/auth-branding.queries";
 
 export default async function AuthLayout({
@@ -7,6 +8,7 @@ export default async function AuthLayout({
   children: React.ReactNode;
 }) {
   const branding = await getAuthBranding();
+  preloadCriticalImages([branding.photoUrl]);
 
   return (
     <AuthBrandProvider

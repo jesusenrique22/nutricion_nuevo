@@ -1,5 +1,6 @@
 import {
   AUTHENTICATED_MEDIA_FOLDERS,
+  PUBLIC_MEDIA_FOLDER_LIST,
   isPublicMediaFolder,
   isPublicUploadsFolder,
 } from "@/lib/media-access-policy";
@@ -31,7 +32,7 @@ async function isPublicCmsMediaUrl(url: string): Promise<boolean> {
     where: {
       url: normalized,
       folder: {
-        in: ["site", "cv", "brand", "auth", "products", "packages"],
+        in: [...PUBLIC_MEDIA_FOLDER_LIST],
       },
     },
     select: { id: true },

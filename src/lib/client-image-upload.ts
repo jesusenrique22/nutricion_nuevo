@@ -1,7 +1,9 @@
 "use client";
 
 const VERCEL_SAFE_IMAGE_BYTES = 3.5 * 1024 * 1024;
-const MAX_IMAGE_DIMENSION = 2560;
+/** Marketing / hero: lado máximo más chico → baja mucho más rápido. */
+const MAX_IMAGE_DIMENSION = 1920;
+const TARGET_PUBLIC_BYTES = 450 * 1024;
 
 function outputName(name: string): string {
   const stem = name.replace(/\.[^.]+$/, "") || "imagen";
@@ -109,17 +111,29 @@ export async function prepareImageForUpload(file: File): Promise<File> {
   try {
     const needsResize =
       Math.max(source.width, source.height) > MAX_IMAGE_DIMENSION;
-    if (!needsForcedJpeg && !needsResize && file.size <= VERCEL_SAFE_IMAGE_BYTES) {
+    const alreadyLight =
+      !needsForcedJpeg &&
+      !needsResize &&
+      file.size <= TARGET_PUBLIC_BYTES &&
+      (file.type === "image/jpeg" || file.type === "image/webp");
+
+    if (alreadyLight) {
       return file;
     }
 
     let maxDimension = MAX_IMAGE_DIMENSION;
-    let quality = 0.86;
+    let quality = 0.8;
     let blob = await canvasToJpeg(source, maxDimension, quality);
 
-    while (blob.size > VERCEL_SAFE_IMAGE_BYTES && maxDimension > 960) {
+    while (blob.size > TARGET_PUBLIC_BYTES && maxDimension > 960) {
+      maxDimension = Math.round(maxDimension * 0.82);
+      quality = Math.max(0.62, quality - 0.06);
+      blob = await canvasToJpeg(source, maxDimension, quality);
+    }
+
+    while (blob.size > VERCEL_SAFE_IMAGE_BYTES && maxDimension > 720) {
       maxDimension = Math.round(maxDimension * 0.8);
-      quality = Math.max(0.62, quality - 0.08);
+      quality = Math.max(0.55, quality - 0.08);
       blob = await canvasToJpeg(source, maxDimension, quality);
     }
 
