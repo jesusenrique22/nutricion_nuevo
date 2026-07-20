@@ -9,6 +9,7 @@ import { NavMenuEditor } from "@/components/cms/nav-menu-editor";
 import { ProductsEditor } from "@/components/cms/products-editor";
 import { NutricionistaCvEditor } from "@/components/cms/nutricionista-cv-editor";
 import { AuthBrandingEditor } from "@/components/cms/auth-branding-editor";
+import { ContactameEditor } from "@/components/cms/contactame-editor";
 import { SiteContentEditor } from "@/components/cms/site-content-editor";
 import { PageSectionPreview } from "@/components/cms/page-section-preview";
 import type {
@@ -31,6 +32,8 @@ import type { PaymentCheckoutPolicy } from "@/types/payment-checkout-policy";
 import { PAYMENT_CHAT_POLICY_SLUG } from "@/types/payment-chat-policy";
 import { AUTH_BRANDING_SLUG } from "@/types/auth-branding";
 import type { AuthBrandingData } from "@/types/auth-branding";
+import { CONTACTAME_SLUG } from "@/types/contactame";
+import type { ContactameData } from "@/types/contactame";
 
 const tabs = [
   {
@@ -62,6 +65,12 @@ const tabs = [
     label: "Métodos de pago",
     description: "Contacto y métodos del carrito",
     affects: "Carrito del paciente",
+  },
+  {
+    id: "contactame",
+    label: "Contáctame",
+    description: "Botones y URLs del pie del sitio",
+    affects: "Footer · #contacto",
   },
   {
     id: "recursos",
@@ -125,6 +134,7 @@ export function PersonalizarTabs({
   paymentCheckoutPolicy,
   packageTypes,
   authBranding,
+  contactame,
 }: {
   siteBlocks: SiteContentDTO[];
   resourceCount: number;
@@ -136,6 +146,7 @@ export function PersonalizarTabs({
   paymentCheckoutPolicy: PaymentCheckoutPolicy;
   packageTypes: ConsultationAdminDTO[];
   authBranding: AuthBrandingData;
+  contactame: ContactameData;
 }) {
   const [tab, setTab] = useState<TabId>("imagenes");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("edit");
@@ -168,7 +179,8 @@ export function PersonalizarTabs({
       b.slug !== PAYMENT_CHAT_POLICY_SLUG &&
       b.slug !== PAYMENT_CHECKOUT_POLICY_SLUG &&
       b.slug !== CURRENCY_POLICY_SLUG &&
-      b.slug !== AUTH_BRANDING_SLUG,
+      b.slug !== AUTH_BRANDING_SLUG &&
+      b.slug !== CONTACTAME_SLUG,
   );
 
   const activeTab = tabs.find((t) => t.id === tab)!;
@@ -273,6 +285,8 @@ export function PersonalizarTabs({
           onLiveChange={(data) => setLivePaymentPolicy(data)}
         />
       )}
+
+      {tab === "contactame" && <ContactameEditor initial={contactame} />}
 
       {tab === "recursos" && (
         <div className="rounded-2xl border border-foreground/10 bg-white p-6">

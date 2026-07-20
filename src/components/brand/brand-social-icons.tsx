@@ -2,16 +2,12 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  SOCIAL_ICON_ORDER,
-  SOCIAL_LINKS,
-  type SocialIconId,
-} from "@/lib/brand-links";
+import type { ContactameLink, ContactameLinkKind } from "@/types/contactame";
 
-function SocialIcon({ id }: { id: SocialIconId }) {
+function SocialIcon({ kind }: { kind: ContactameLinkKind }) {
   const common = "h-5 w-5 fill-current";
 
-  switch (id) {
+  switch (kind) {
     case "tiktok":
       return (
         <svg viewBox="0 0 24 24" className={common} aria-hidden>
@@ -42,37 +38,71 @@ function SocialIcon({ id }: { id: SocialIconId }) {
           <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.93-.39-4.21-1.13l-.3-.17-3.12.82.83-3.04-.2-.32a8.166 8.166 0 0 1-1.26-4.38c.01-4.54 3.7-8.23 8.25-8.23M8.53 7.33c-.16 0-.43.06-.66.31-.22.25-.87.86-.87 2.07 0 1.22.89 2.39 1 2.56.14.17 1.78 2.86 4.39 3.9.62.27 1.11.43 1.49.55.62.2 1.19.17 1.64.1.5-.07 1.53-.63 1.74-1.24.22-.6.22-1.12.15-1.24-.06-.11-.22-.18-.47-.32-.25-.14-1.49-.74-1.72-.82-.23-.08-.4-.12-.57.12-.17.24-.66.82-.81.99-.15.17-.3.19-.55.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.48-1.39-1.73-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.17-.24.25-.39.08-.15.04-.29-.02-.41-.06-.11-.57-1.38-.78-1.89-.2-.5-.41-.43-.57-.44-.15-.01-.32-.01-.49-.01z" />
         </svg>
       );
+    case "email":
+      return (
+        <svg viewBox="0 0 24 24" className={common} aria-hidden>
+          <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z" />
+        </svg>
+      );
+    case "phone":
+      return (
+        <svg viewBox="0 0 24 24" className={common} aria-hidden>
+          <path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.4 21 3 13.6 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.02l-2.2 2.19z" />
+        </svg>
+      );
+    case "location":
+      return (
+        <svg viewBox="0 0 24 24" className={common} aria-hidden>
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 24 24" className={common} aria-hidden>
+          <path d="M3.9 12a5 5 0 0 1 5-5h4v2h-4a3 3 0 0 0 0 6h4v2h-4a5 5 0 0 1-5-5zm7-1h6v2h-6v-2zm4.1-4h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4V7z" />
+        </svg>
+      );
   }
 }
 
-export function BrandSocialIcons({ className = "" }: { className?: string }) {
-  const hrefById = Object.fromEntries(
-    SOCIAL_LINKS.map((l) => [l.id, l.href]),
-  ) as Record<SocialIconId, string>;
+/**
+ * Iconos del footer: misma lista que los botones Contáctame.
+ * Si un botón se quita o se oculta, su icono desaparece.
+ */
+export function BrandSocialIcons({
+  className = "",
+  links,
+}: {
+  className?: string;
+  /** Enlaces ya filtrados (enabled + con URL). Si no hay, no se muestra nada. */
+  links?: ContactameLink[];
+}) {
+  const icons = links ?? [];
+  if (icons.length === 0) return null;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, duration: 0.45 }}
-      className={`flex items-center justify-center gap-5 text-ink ${className}`}
+      className={`flex flex-wrap items-center justify-center gap-5 text-ink ${className}`}
     >
-      {SOCIAL_ICON_ORDER.map((id, i) => (
+      {icons.map((link, i) => (
         <motion.div
-          key={id}
+          key={link.id}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.25 + i * 0.05, type: "spring", stiffness: 500 }}
           whileHover={{ scale: 1.12, y: -2 }}
         >
           <Link
-            href={hrefById[id]}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={link.href}
+            target={link.external ? "_blank" : undefined}
+            rel={link.external ? "noopener noreferrer" : undefined}
             className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-black/5"
-            aria-label={id}
+            aria-label={link.label}
           >
-            <SocialIcon id={id} />
+            <SocialIcon kind={link.kind} />
           </Link>
         </motion.div>
       ))}

@@ -15,6 +15,7 @@ import {
 } from "@/server/queries/landing.queries";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 import { getAuthBranding } from "@/server/queries/auth-branding.queries";
+import { getContactame } from "@/server/queries/contactame.queries";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function PersonalizarPage() {
     paymentCheckoutPolicy,
     packageTypes,
     authBranding,
+    contactame,
   ] = await Promise.all([
     getSiteContents(),
     getAllResourcesAdmin(),
@@ -41,6 +43,7 @@ export default async function PersonalizarPage() {
     getPaymentCheckoutPolicyAdmin(),
     getConsultationTypesAdmin(),
     getAuthBranding(),
+    getContactame(),
   ]);
 
   return (
@@ -60,6 +63,7 @@ export default async function PersonalizarPage() {
           paymentCheckoutPolicy={paymentCheckoutPolicy}
           packageTypes={packageTypes}
           authBranding={authBranding}
+          contactame={contactame}
         />
       </ContentLobbyShell>
     </DashboardPage>

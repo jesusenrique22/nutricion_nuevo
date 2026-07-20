@@ -3,8 +3,21 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand/logo";
 import { BrandSocialIcons } from "@/components/brand/brand-social-icons";
 import { BRAND_PROFILE } from "@/lib/brand-assets";
+import { SOCIAL_LINKS, type SocialIconId } from "@/lib/brand-links";
 import { shouldUnoptimizeImage } from "@/lib/media-url";
+import type { ContactameLink } from "@/types/contactame";
 import type { NutricionistaCvData } from "@/types/nutricionista-cv";
+
+const CV_SOCIAL_LINKS: ContactameLink[] = SOCIAL_LINKS.filter((l) =>
+  ["tiktok", "instagram", "linkedin", "youtube", "whatsapp"].includes(l.id),
+).map((l) => ({
+  id: l.id,
+  label: l.label,
+  href: l.href,
+  enabled: true,
+  kind: l.id as SocialIconId,
+  external: true,
+}));
 
 function CvSectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -125,7 +138,10 @@ export function NutricionistaCvDocument({ cv }: { cv: NutricionistaCvData }) {
                 <div className="mt-8">
                   <CvSectionTitle>Sígueme</CvSectionTitle>
                   <div className="mt-4 scale-90 origin-left">
-                    <BrandSocialIcons className="justify-start gap-3 text-primary" />
+                    <BrandSocialIcons
+                      className="justify-start gap-3 text-primary"
+                      links={CV_SOCIAL_LINKS}
+                    />
                   </div>
                 </div>
 

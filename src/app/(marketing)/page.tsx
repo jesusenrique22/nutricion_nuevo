@@ -11,18 +11,21 @@ import {
   getLandingBlocks,
   getLandingImages,
 } from "@/server/queries/landing.queries";
+import { getContactame } from "@/server/queries/contactame.queries";
 import { getPublishedReviews } from "@/server/queries/reviews.queries";
 import type { LandingBlockPlacement } from "@/types/landing-blocks";
 
 export const revalidate = 60;
 
 export default async function LandingPage() {
-  const [images, consultations, blocksData, reviews] = await Promise.all([
-    getLandingImages(),
-    getConsultationTypes(),
-    getLandingBlocks(),
-    getPublishedReviews(),
-  ]);
+  const [images, consultations, blocksData, reviews, contactame] =
+    await Promise.all([
+      getLandingImages(),
+      getConsultationTypes(),
+      getLandingBlocks(),
+      getPublishedReviews(),
+      getContactame(),
+    ]);
 
   const enabledBlocks = blocksData.blocks.filter((block) => block.enabled);
   const blocksAt = (placement: LandingBlockPlacement) =>
@@ -54,7 +57,7 @@ export default async function LandingPage() {
 
       <LandingBlocksRegion blocks={blocksAt("before_footer")} />
 
-      <BrandSocialFooter />
+      <BrandSocialFooter contactame={contactame} />
     </LandingLobbyShell>
   );
 }

@@ -9,7 +9,20 @@ import {
   BRAND_TAGLINE,
   SOCIAL_LINKS,
   type BrandLinkItem,
+  type SocialIconId,
 } from "@/lib/brand-links";
+import type { ContactameLink } from "@/types/contactame";
+
+const DEFAULT_SOCIAL_ICON_LINKS: ContactameLink[] = SOCIAL_LINKS.filter((l) =>
+  ["tiktok", "instagram", "linkedin", "youtube", "whatsapp"].includes(l.id),
+).map((l) => ({
+  id: l.id,
+  label: l.label,
+  href: l.href,
+  enabled: true,
+  kind: l.id as SocialIconId,
+  external: true,
+}));
 
 export function BrandLinkHub({
   links = SOCIAL_LINKS,
@@ -53,7 +66,9 @@ export function BrandLinkHub({
         {greeting ?? BRAND_TAGLINE}
       </motion.p>
 
-      {showSocialIcons && <BrandSocialIcons className="mt-6" />}
+      {showSocialIcons && (
+        <BrandSocialIcons className="mt-6" links={DEFAULT_SOCIAL_ICON_LINKS} />
+      )}
 
       {links.length > 0 && (
         <>

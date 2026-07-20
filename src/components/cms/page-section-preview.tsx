@@ -805,6 +805,7 @@ type PreviewTab =
   | "login"
   | "conocerme"
   | "pagos"
+  | "contactame"
   | "recursos";
 type ImageSection =
   | "hero"
@@ -844,6 +845,7 @@ export function PageSectionPreview({
     login: "anttova.com/login",
     conocerme: "anttova.com/nutricionista",
     pagos: "carrito del paciente",
+    contactame: "anttova.com · footer",
     recursos: "anttova.com/resources",
   };
 
@@ -885,6 +887,18 @@ export function PageSectionPreview({
         return <ProfilePreview data={nutricionista} />;
       case "pagos":
         return <CheckoutPreview policy={paymentPolicy} />;
+      case "contactame":
+        return (
+          <div className="rounded-xl border border-foreground/10 bg-white p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+              Contáctame · pie del sitio
+            </p>
+            <p className="mt-2 text-xs text-foreground/60">
+              Los botones activos (redes, email, ubicación, etc.) se muestran en
+              el footer público. Guardá para verlos en vivo en la landing.
+            </p>
+          </div>
+        );
       case "recursos":
         return (
           <div className="rounded-xl border border-foreground/10 bg-white p-4 text-center">
