@@ -9,8 +9,9 @@ import {
   type ReactNode,
 } from "react";
 
+/** En móvil: tarjeta casi a ancho completo y centrada al hacer snap. */
 const CARD_SIZES =
-  "w-[calc((100%-1.5rem)/1.15)] shrink-0 snap-center sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]";
+  "w-[min(100%,20.5rem)] shrink-0 snap-center sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]";
 
 function ChevronIcon({ direction }: { direction: "left" | "right" }) {
   return (
@@ -57,6 +58,13 @@ export function PackageCarousel({
     const el = trackRef.current;
     if (!el) return;
     updateButtons();
+    // Centrar la primera tarjeta en móvil
+    const card = el.querySelector<HTMLElement>("[data-carousel-card]");
+    if (card && window.matchMedia("(max-width: 639px)").matches) {
+      const left = card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2;
+      el.scrollLeft = Math.max(0, left);
+    }
+    updateButtons();
     el.addEventListener("scroll", updateButtons, { passive: true });
     window.addEventListener("resize", updateButtons);
     return () => {
@@ -77,7 +85,7 @@ export function PackageCarousel({
   const items = Children.toArray(children);
 
   return (
-    <div className="relative mt-10 sm:mt-12">
+    <div className="relative mt-10 w-full min-w-0 sm:mt-12">
       <button
         type="button"
         onClick={() => scroll(-1)}
@@ -102,7 +110,7 @@ export function PackageCarousel({
         ref={trackRef}
         role="region"
         aria-label={ariaLabel}
-        className="flex gap-6 overflow-x-auto scroll-smooth px-1 pb-2 snap-x snap-mandatory [scrollbar-width:none] sm:px-14 [&::-webkit-scrollbar]:hidden"
+        className="flex gap-4 overflow-x-auto scroll-smooth pb-2 snap-x snap-mandatory [scrollbar-width:none] sm:gap-6 sm:px-14 [&::-webkit-scrollbar]:hidden max-sm:justify-start max-sm:px-[max(1rem,calc((100%-min(100%,20.5rem))/2))]"
       >
         {items.map((child, i) => (
           <div key={i} data-carousel-card className={CARD_SIZES}>

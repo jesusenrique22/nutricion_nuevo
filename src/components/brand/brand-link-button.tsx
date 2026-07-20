@@ -33,7 +33,7 @@ export function BrandLinkButton({
     ? "rounded-2xl px-2 py-2.5 sm:rounded-[28px] sm:px-4 sm:py-3.5"
     : "rounded-[28px] px-6 py-4";
   const labelClass = compact
-    ? "text-xs font-semibold tracking-wide sm:text-sm"
+    ? "max-w-full truncate text-[11px] font-semibold tracking-wide sm:text-sm"
     : "text-base font-semibold tracking-wide";
   const className = `group flex ${widthClass} flex-col items-center justify-center ${sizeClass} text-center transition disabled:pointer-events-none disabled:opacity-50 ${
     selected

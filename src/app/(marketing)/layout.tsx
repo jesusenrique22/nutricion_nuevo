@@ -13,7 +13,7 @@ export default async function MarketingLayout({
     <MarketingShell>
       <MarketingHeader items={navMenu.items} />
       <main className="flex-1">{children}</main>
-      <footer className="relative z-10 border-t border-white/10 bg-primary px-6 py-8 text-primary-foreground">
+      <footer className="relative z-10 w-full border-t border-white/10 bg-primary px-4 py-8 text-primary-foreground sm:px-6">
         <p className="mx-auto max-w-6xl text-center text-sm font-medium text-primary-foreground/90">
           © {new Date().getFullYear()} Anttova · Buenos Aires
         </p>

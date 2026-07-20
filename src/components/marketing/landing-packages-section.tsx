@@ -68,7 +68,7 @@ function ConsultationPackageCard({
         </div>
         <Link
           href="/register"
-          className={`mt-6 rounded-full px-5 py-2.5 text-center font-semibold transition active:scale-95 ${
+          className={`mt-6 w-full rounded-full px-5 py-2.5 text-center text-sm font-semibold transition active:scale-95 sm:text-base ${
             highlight
               ? "bg-primary text-primary-foreground hover:scale-105"
               : "bg-primary-foreground text-primary hover:scale-105"
@@ -94,8 +94,8 @@ export function LandingPackagesSection({
       className="lobby-panel relative scroll-mt-20 bg-primary text-primary-foreground"
     >
       <DarkSectionSparks />
-      <div className="relative flex min-h-[100svh] flex-col justify-center px-6 py-16 sm:py-20">
-        <div className="mx-auto w-full max-w-6xl">
+      <div className="relative flex min-h-[100svh] flex-col justify-center px-4 py-16 sm:px-6 sm:py-20">
+        <div className="mx-auto w-full min-w-0 max-w-6xl">
           <Reveal direction="fade">
             <p className="text-center text-xs font-semibold uppercase tracking-[0.28em] text-accent-soft">
               Servicios
@@ -103,7 +103,7 @@ export function LandingPackagesSection({
             <h2 className="mt-2 text-center text-2xl font-bold sm:text-3xl">
               Paquetes disponibles
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-sm text-primary-foreground/75 sm:text-base">
+            <p className="mx-auto mt-4 max-w-2xl text-balance text-center text-sm text-primary-foreground/75 sm:text-base">
               Elige el servicio que necesitas y agenda tu cita en línea.
             </p>
           </Reveal>
