@@ -1,5 +1,6 @@
 import { unstable_cache, revalidateTag } from "next/cache";
 import { PUBLIC_MEDIA_FOLDERS } from "@/lib/media-access-policy";
+import { AUTH_BRANDING_SLUG } from "@/types/auth-branding";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 import { PRODUCTS_SLUG } from "@/types/products";
@@ -9,6 +10,7 @@ const PUBLIC_CMS_CONTENT_SLUGS = [
   LANDING_IMAGES_SLUG,
   NUTRICIONISTA_PAGE_SLUG,
   PRODUCTS_SLUG,
+  AUTH_BRANDING_SLUG,
 ] as const;
 
 function addPublicMediaUrl(out: Set<string>, normalized: string): void {
@@ -16,7 +18,7 @@ function addPublicMediaUrl(out: Set<string>, normalized: string): void {
 
   // HTML cacheado puede seguir pidiendo /api/media/{id} tras migrar a /uploads/.
   const migrated = normalized.match(
-    /^\/uploads\/(site|brand|cv|products|packages)\/([a-f0-9]{24})\.[^/]+$/i,
+    /^\/uploads\/(site|brand|auth|cv|products|packages)\/([a-f0-9]{24})\.[^/]+$/i,
   );
   if (migrated) {
     out.add(`/api/media/${migrated[2]}`);
@@ -85,7 +87,7 @@ async function loadPublicSiteMediaUrls(): Promise<string[]> {
 
 export const getPublicSiteMediaUrls = unstable_cache(
   loadPublicSiteMediaUrls,
-  ["public-site-media-urls", "v5"],
+  ["public-site-media-urls", "v6"],
   { revalidate: 300, tags: ["public-site-media"] },
 );
 

@@ -3,6 +3,7 @@ export const PUBLIC_MEDIA_FOLDERS = new Set([
   "site",
   "cv",
   "brand",
+  "auth", // foto del login / registro (página pública)
   "products",
   "packages", // fotos de paquetes del lobby (Público)
 ]);
@@ -21,7 +22,9 @@ export function isPublicUploadsFolder(folder: string | null): boolean {
   return (
     folder === "site" ||
     folder === "brand" ||
+    folder === "auth" ||
     folder === "packages" ||
-    folder === "products"
+    folder === "products" ||
+    folder === "cv"
   );
 }

@@ -5,6 +5,7 @@ import {
 } from "@/lib/media-access-policy";
 import { isUploadsPath, parseMediaIdFromUrl } from "@/lib/stored-file";
 import { getMongoFileMeta } from "@/server/services/mongo-gridfs";
+import { AUTH_BRANDING_SLUG } from "@/types/auth-branding";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 import { PRODUCTS_SLUG } from "@/types/products";
@@ -29,7 +30,9 @@ async function isPublicCmsMediaUrl(url: string): Promise<boolean> {
   const asset = await prisma.mediaAsset.findFirst({
     where: {
       url: normalized,
-      folder: { in: ["site", "cv", "brand", "products", "packages"] },
+      folder: {
+        in: ["site", "cv", "brand", "auth", "products", "packages"],
+      },
     },
     select: { id: true },
   });
@@ -44,7 +47,14 @@ async function isPublicCmsMediaUrl(url: string): Promise<boolean> {
 
   const rows = await prisma.siteContent.findMany({
     where: {
-      slug: { in: [LANDING_IMAGES_SLUG, NUTRICIONISTA_PAGE_SLUG, PRODUCTS_SLUG] },
+      slug: {
+        in: [
+          LANDING_IMAGES_SLUG,
+          NUTRICIONISTA_PAGE_SLUG,
+          PRODUCTS_SLUG,
+          AUTH_BRANDING_SLUG,
+        ],
+      },
     },
     select: { data: true },
   });

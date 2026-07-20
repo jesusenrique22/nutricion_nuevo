@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { isPublicMediaFolder } from "@/lib/media-access-policy";
 import { revalidatePublicSiteMediaCache } from "@/lib/public-site-media";
@@ -64,6 +65,10 @@ export async function POST(req: NextRequest) {
 
     if (isPublicMediaFolder(safeFolder)) {
       revalidatePublicSiteMediaCache();
+      revalidatePath("/");
+      revalidatePath("/login");
+      revalidatePath("/register");
+      revalidatePath("/dashboard/admin/personalizar");
     }
 
     return NextResponse.json({

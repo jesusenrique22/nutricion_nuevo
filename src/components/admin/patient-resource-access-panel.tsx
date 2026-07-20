@@ -12,7 +12,7 @@ import {
 import { approveResourcePayment } from "@/server/actions/payment-admin.actions";
 
 const statusLabels: Record<string, string> = {
-  PENDING: "Pendiente",
+  PENDING: "Procesando",
   GRANTED: "Activo",
   REFUNDED: "Revocado",
 };

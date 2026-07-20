@@ -12,6 +12,10 @@ import {
 import { uploadFile, uploadHint } from "@/lib/client-upload";
 import type { UploadKind } from "@/lib/upload-policy";
 import type { ProgressStatusPhase } from "@/components/ui/progress-status-modal";
+import {
+  ImageCropDialog,
+  type ImageCropShape,
+} from "@/components/media/image-crop-dialog";
 
 export type MediaUploadMode = "replace" | "append";
 
@@ -69,6 +73,7 @@ export function MediaUploadProvider({
   multiple = false,
   mode = "replace",
   useProgressModal = false,
+  cropShape = null,
   children,
 }: {
   kind: "image" | "pdf";
@@ -82,6 +87,8 @@ export function MediaUploadProvider({
   multiple?: boolean;
   mode?: MediaUploadMode;
   useProgressModal?: boolean;
+  /** Si se define, muestra el ajuste tipo WhatsApp antes de subir. */
+  cropShape?: ImageCropShape | null;
   children: ReactNode;
 }) {
   const labelId = useId();
@@ -95,6 +102,7 @@ export function MediaUploadProvider({
   const [phase, setPhase] = useState<ProgressStatusPhase>("working");
   const [modalTitle, setModalTitle] = useState("");
   const [modalDescription, setModalDescription] = useState("");
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   const listValues = values ?? (value ? [value] : []);
   const hint = hintProp ?? uploadHint(kind);
@@ -113,7 +121,10 @@ export function MediaUploadProvider({
 
   const uploadFiles = useCallback(
     async (files: FileList | File[] | null) => {
-      if (!files || (Array.isArray(files) ? files.length === 0 : files.length === 0)) {
+      if (
+        !files ||
+        (Array.isArray(files) ? files.length === 0 : files.length === 0)
+      ) {
         return;
       }
       const list = Array.from(files);
@@ -197,6 +208,20 @@ export function MediaUploadProvider({
     ],
   );
 
+  const handlePickedFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files?.length) return;
+      const first = files[0]!;
+      if (kind === "image" && cropShape && !multiple) {
+        setCropFile(first);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+      void uploadFiles(files);
+    },
+    [cropShape, kind, multiple, uploadFiles],
+  );
+
   const registerFileInput = useCallback((node: HTMLInputElement | null) => {
     fileRef.current = node;
   }, []);
@@ -239,7 +264,18 @@ export function MediaUploadProvider({
         className="hidden"
         disabled={busy}
         onChange={(e) => {
-          void uploadFiles(e.target.files);
+          handlePickedFiles(e.target.files);
+        }}
+      />
+      <ImageCropDialog
+        open={Boolean(cropFile)}
+        file={cropFile}
+        shape={cropShape ?? "circle"}
+        title={cropShape === "rect" ? "Ajustar imagen" : "Ajustar foto"}
+        onCancel={() => setCropFile(null)}
+        onConfirm={(cropped) => {
+          setCropFile(null);
+          void uploadFiles([cropped]);
         }}
       />
     </MediaUploadContext.Provider>

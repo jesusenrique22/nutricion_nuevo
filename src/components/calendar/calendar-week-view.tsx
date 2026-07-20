@@ -11,7 +11,7 @@ import {
 import { statusLabel, statusUi } from "@/components/calendar/calendar-status";
 
 const STATUS_WEEK: Record<string, string> = {
-  PENDING: "Pend.",
+  PENDING: "Por conf.",
   CONFIRMED: "Conf.",
   COMPLETED: "Ok",
   CANCELLED: "Canc.",

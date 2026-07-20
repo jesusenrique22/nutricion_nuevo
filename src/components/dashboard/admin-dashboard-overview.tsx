@@ -74,12 +74,7 @@ export function AdminDashboardOverviewPanel({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          label="Pacientes activos"
-          value={stats.activePatients}
-          href="/dashboard/admin/patients"
-        />
+      <div className="grid grid-cols-2 gap-3">
         <StatTile
           label="Citas esta semana"
           value={stats.weekAppointments}
@@ -89,11 +84,6 @@ export function AdminDashboardOverviewPanel({
           label="Pedidos por confirmar"
           value={stats.pendingPurchases}
           href="/dashboard/admin/payments"
-        />
-        <StatTile
-          label="Recursos publicados"
-          value={stats.publishedResources}
-          href="/dashboard/admin/resources"
         />
       </div>
 

@@ -6,19 +6,23 @@ function localDateKey(date: Date): string {
   });
 }
 
-/** Solo citas de hoy en adelante (zona GOOGLE_CALENDAR_TIMEZONE). */
+/**
+ * Solo citas cuyo día local (GOOGLE_CALENDAR_TIMEZONE) es hoy o futuro.
+ * Las citas de días anteriores no se crean ni se actualizan en Google.
+ */
 export function isAppointmentEligibleForGoogleSync(startTime: Date): boolean {
   return localDateKey(startTime) >= localDateKey(new Date());
 }
 
-/** Inicio del día local para filtros en BD (aprox. medianoche en la zona configurada). */
-export function getCalendarSyncFromDate(): Date {
+/** Medianoche local de “hoy” en la zona del calendario (para filtros Prisma). */
+export function getCalendarSyncFromDate(now = new Date()): Date {
   const { timeZone } = getGoogleCalendarConfig();
-  const todayYmd = localDateKey(new Date());
-  let low = Date.now() - 48 * 3600_000;
-  let high = Date.now() + 24 * 3600_000;
+  const todayYmd = localDateKey(now);
+  // Buscar el instante UTC más temprano cuyo día local es todayYmd.
+  let low = now.getTime() - 36 * 3600_000;
+  let high = now.getTime() + 36 * 3600_000;
 
-  while (high - low > 60_000) {
+  while (high - low > 30_000) {
     const mid = Math.floor((low + high) / 2);
     const midYmd = new Date(mid).toLocaleDateString("en-CA", { timeZone });
     if (midYmd < todayYmd) low = mid;

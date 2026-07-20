@@ -45,7 +45,13 @@ export async function setDefaultCalendarAdminAction(): Promise<
 }
 
 export async function syncExistingAppointmentsAction(): Promise<
-  | { ok: true; synced: number; failed: number; alreadySynced: number }
+  | {
+      ok: true;
+      synced: number;
+      failed: number;
+      alreadySynced: number;
+      skippedPast: number;
+    }
   | { ok: false; message: string }
 > {
   const session = await auth();
@@ -63,10 +69,9 @@ export async function syncExistingAppointmentsAction(): Promise<
     };
   }
 
-  const { synced, failed, alreadySynced } = await syncExistingAppointments(
-    session.user.id,
-  );
+  const { synced, failed, alreadySynced, skippedPast } =
+    await syncExistingAppointments(session.user.id);
 
   revalidatePath("/dashboard/admin/calendar");
-  return { ok: true, synced, failed, alreadySynced };
+  return { ok: true, synced, failed, alreadySynced, skippedPast };
 }

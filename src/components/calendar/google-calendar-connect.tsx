@@ -15,7 +15,7 @@ type ConnectionInfo = {
 
 const statusMessages: Record<string, string> = {
   connected:
-    "Google Calendar conectado. Las citas nuevas se sincronizan solas; usá «Sincronizar citas existentes» si faltan en Google.",
+    "Google Calendar conectado. Solo se sincronizan citas desde hoy en adelante; las nuevas se agregan solas al crearlas.",
   denied:
     "Google bloqueó la autorización. Agregá tu correo (david.30249427@uru.edu) en Test users del OAuth consent screen y el scope calendar.events.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
@@ -64,7 +64,7 @@ function GoogleCalendarConnectInner({
           if (result.ok && result.synced > 0) {
             setMessageTone("success");
             setMessage(
-              `Google Calendar conectado. Sincronizadas ${result.synced} cita(s) existentes.`,
+              `Google Calendar conectado. Sincronizadas ${result.synced} cita(s) desde hoy en adelante.`,
             );
             router.refresh();
           }
@@ -157,7 +157,7 @@ function GoogleCalendarConnectInner({
                       if (result.synced > 0) {
                         setMessageTone("success");
                         setMessage(
-                          `Sincronizadas ${result.synced} cita(s) con Google Calendar.`,
+                          `Sincronizadas ${result.synced} cita(s) desde hoy en adelante. Las nuevas se agregan solas.`,
                         );
                       } else if (result.failed > 0) {
                         setMessageTone("error");
@@ -167,12 +167,14 @@ function GoogleCalendarConnectInner({
                       } else if (result.alreadySynced > 0) {
                         setMessageTone("success");
                         setMessage(
-                          `Todo al día: ${result.alreadySynced} cita(s) futura(s) ya están en Google Calendar. Las nuevas se sincronizan solas al crearlas.`,
+                          `Todo al día: ${result.alreadySynced} cita(s) desde hoy ya están en Google. Las nuevas se sincronizan solas. Las anteriores no se envían.`,
                         );
                       } else {
                         setMessageTone("info");
                         setMessage(
-                          "No hay citas programadas (desde hoy en adelante) para sincronizar.",
+                          result.skippedPast > 0
+                            ? `No hay citas desde hoy para sincronizar (${result.skippedPast} anteriores se omitieron a propósito).`
+                            : "No hay citas programadas desde hoy en adelante para sincronizar.",
                         );
                       }
                       router.refresh();
@@ -184,7 +186,7 @@ function GoogleCalendarConnectInner({
                 }}
                 className="rounded-full border border-foreground/15 px-4 py-2 text-xs font-semibold disabled:opacity-50"
               >
-                Sincronizar citas existentes
+                Sincronizar desde hoy
               </button>
               <button
                 type="button"

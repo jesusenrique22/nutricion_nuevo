@@ -162,16 +162,29 @@ export async function syncAppointmentToGoogleCalendar(
   }
 }
 
-/** Sincroniza citas existentes que aún no tienen evento en Google Calendar. */
+/** Sincroniza citas desde hoy en adelante que aún no tienen evento en Google. */
 export async function syncUnsyncedAppointmentsForAdmin(
   adminUserId: string,
-): Promise<{ synced: number; failed: number; alreadySynced: number }> {
+): Promise<{
+  synced: number;
+  failed: number;
+  alreadySynced: number;
+  skippedPast: number;
+}> {
   const hasConnection = await adminHasGoogleConnection(adminUserId);
   if (!hasConnection) {
-    return { synced: 0, failed: 0, alreadySynced: 0 };
+    return { synced: 0, failed: 0, alreadySynced: 0, skippedPast: 0 };
   }
 
   const since = getCalendarSyncFromDate();
+
+  const skippedPast = await prisma.appointment.count({
+    where: {
+      status: { not: "CANCELLED" },
+      googleEventId: null,
+      startTime: { lt: since },
+    },
+  });
 
   const alreadySynced = await prisma.appointment.count({
     where: {
@@ -195,6 +208,7 @@ export async function syncUnsyncedAppointmentsForAdmin(
   let failed = 0;
 
   for (const appt of appointments) {
+    // Doble filtro por día local (por si el clock/TZ del filtro Prisma difiere).
     if (!isAppointmentEligibleForGoogleSync(appt.startTime)) {
       continue;
     }
@@ -204,7 +218,7 @@ export async function syncUnsyncedAppointmentsForAdmin(
     else failed++;
   }
 
-  return { synced, failed, alreadySynced };
+  return { synced, failed, alreadySynced, skippedPast };
 }
 
 /** Elimina el evento de Google al cancelar. */

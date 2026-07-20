@@ -87,11 +87,112 @@ export async function deleteFromMongo(fileId: string): Promise<boolean> {
   return true;
 }
 
+/** Reemplaza el binario en GridFS manteniendo el mismo id (URLs CMS intactas). */
+export async function replaceMongoFileInPlace(
+  fileId: string,
+  buffer: Buffer,
+  options: {
+    fileName: string;
+    mimeType: string;
+    folder: string;
+    ownerId?: string | null;
+    extraMeta?: Record<string, unknown>;
+  },
+): Promise<boolean> {
+  if (!ObjectId.isValid(fileId)) return false;
+  const db = await tryGetMongoDb();
+  if (!db) return false;
+  const bucket = new GridFSBucket(db, { bucketName: BUCKET });
+  const oid = new ObjectId(fileId);
+
+  try {
+    await bucket.delete(oid);
+  } catch {
+    // puede no existir
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const stream = bucket.openUploadStreamWithId(oid, options.fileName, {
+      metadata: {
+        mimeType: options.mimeType,
+        folder: options.folder,
+        ownerId: options.ownerId ?? null,
+        ...options.extraMeta,
+      },
+    });
+    stream.on("error", reject);
+    stream.on("finish", () => resolve());
+    stream.end(buffer);
+  });
+
+  return true;
+}
+
+export async function readGridFsBuffer(fileId: string): Promise<{
+  buffer: Buffer;
+  meta: Awaited<ReturnType<typeof getMongoFileMeta>>;
+} | null> {
+  const opened = await openGridFsDownloadStream(fileId);
+  if (!opened) return null;
+  const chunks: Buffer[] = [];
+  for await (const chunk of opened.stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return { buffer: Buffer.concat(chunks), meta: opened.meta };
+}
+
 export function gridFileMimeType(
   metadata: Record<string, unknown> | undefined,
+  fileName?: string | null,
 ): string {
   const mime = metadata?.mimeType;
-  return typeof mime === "string" ? mime : "application/octet-stream";
+  if (typeof mime === "string" && mime.trim()) {
+    const normalized = mime.trim().toLowerCase();
+    // HEIC no se pinta en Chrome/Firefox; si el archivo ya es web-safe
+    // pero quedó mal etiquetado, inferimos por extensión abajo.
+    if (
+      normalized !== "application/octet-stream" &&
+      normalized !== "image/heic" &&
+      normalized !== "image/heif"
+    ) {
+      return mime.trim();
+    }
+  }
+
+  const name =
+    (typeof fileName === "string" && fileName) ||
+    (typeof metadata?.originalName === "string" && metadata.originalName) ||
+    (typeof metadata?.fileName === "string" && metadata.fileName) ||
+    "";
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const byExt: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    pdf: "application/pdf",
+    mp4: "video/mp4",
+    webm: "video/webm",
+  };
+  if (byExt[ext]) return byExt[ext];
+
+  // Assets de carpetas públicas de imagen: asumir JPEG si no hay pista.
+  const folder = typeof metadata?.folder === "string" ? metadata.folder : "";
+  if (
+    folder === "site" ||
+    folder === "brand" ||
+    folder === "auth" ||
+    folder === "cv" ||
+    folder === "products" ||
+    folder === "packages"
+  ) {
+    return "image/jpeg";
+  }
+
+  return typeof mime === "string" && mime.trim()
+    ? mime.trim()
+    : "application/octet-stream";
 }
 
 export function mongoStreamToWebResponse(

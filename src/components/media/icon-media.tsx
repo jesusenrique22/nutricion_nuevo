@@ -26,6 +26,7 @@ function Root({
   onUploaded,
   hint,
   useProgressModal = true,
+  cropShape = "circle",
   children,
 }: {
   value: string;
@@ -34,6 +35,7 @@ function Root({
   onUploaded?: (url: string) => void | Promise<void>;
   hint?: string;
   useProgressModal?: boolean;
+  cropShape?: "circle" | "rect" | null;
   children: ReactNode;
 }) {
   return (
@@ -45,6 +47,7 @@ function Root({
       onUploaded={onUploaded}
       hint={hint}
       useProgressModal={useProgressModal}
+      cropShape={cropShape}
     >
       <div className={mediaFieldShellClass}>{children}</div>
     </MediaUploadProvider>

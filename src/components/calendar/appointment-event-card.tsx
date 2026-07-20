@@ -66,7 +66,9 @@ export function AppointmentEventCard({
           {!compact && (
             <p className="mt-2 text-xs text-foreground/45">
               {modalityLabels[appointment.modality] ?? appointment.modality}
-              {appointment.paymentStatus === "PENDING" && " · Pago pendiente"}
+              {appointment.paymentStatus === "PENDING" && " · Procesando"}
+              {appointment.paymentStatus === "PAID" && " · Pagado"}
+              {appointment.paymentStatus === "PARTIAL" && " · Adelanto pagado"}
               {appointment.status === "CANCELLED" &&
                 appointment.cancelledBy &&
                 ` · ${cancelledByLabels[appointment.cancelledBy] ?? appointment.cancelledBy}`}

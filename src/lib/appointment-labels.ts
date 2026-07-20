@@ -1,5 +1,5 @@
 export const appointmentStatusLabels: Record<string, string> = {
-  PENDING: "Pendiente",
+  PENDING: "Por confirmar",
   CONFIRMED: "Confirmada",
   COMPLETED: "Completada",
   CANCELLED: "Cancelada",
@@ -7,7 +7,7 @@ export const appointmentStatusLabels: Record<string, string> = {
 };
 
 export const paymentStatusLabels: Record<string, string> = {
-  PENDING: "Pago pendiente",
+  PENDING: "Procesando",
   PARTIAL: "Adelanto pagado",
   PAID: "Pagado",
   REFUNDED: "Reembolsado",
@@ -15,7 +15,7 @@ export const paymentStatusLabels: Record<string, string> = {
 };
 
 export const paymentPhaseLabels: Record<string, string> = {
-  PENDING: "Pendiente",
+  PENDING: "Procesando",
   PAID: "Pagado",
   REFUNDED: "Reembolsado",
 };

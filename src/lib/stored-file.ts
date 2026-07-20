@@ -76,12 +76,13 @@ export async function guessContentKindFromStoredUrl(
   const meta = await getMongoFileMeta(mediaId);
   if (!meta) return "unknown";
 
-  const mime = gridFileMimeType(
+  const mimeType = gridFileMimeType(
     meta.metadata as Record<string, unknown> | undefined,
+    meta.filename,
   );
-  if (mime === "application/pdf") return "pdf";
-  if (mime.startsWith("image/")) return "image";
-  if (mime.startsWith("video/")) return "video";
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
   return "unknown";
 }
 
