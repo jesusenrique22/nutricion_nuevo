@@ -183,9 +183,7 @@ export function BrandAmbientBackground() {
       data-ambient="water-stars-v4"
     >
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_#faf6f8_0%,_#f2f0ed_55%,_#efe8ea_100%)]" />
-      {!reduced && (
-        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-      )}
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );
 }

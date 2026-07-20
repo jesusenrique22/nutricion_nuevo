@@ -22,10 +22,7 @@ export const revalidate = 60;
 /** Hero solo: no espera reviews/paquetes → HTML + imagen LCP más temprano. */
 async function LandingHero() {
   const images = await getLandingImages();
-  preloadCriticalImages([
-    images.heroSlides[0]?.src,
-    images.heroSlides[1]?.src,
-  ]);
+  preloadCriticalImages([images.heroSlides[0]?.src]);
   return <FlyerHero slides={images.heroSlides} />;
 }
 
@@ -48,12 +45,6 @@ async function LandingRest() {
       getPublishedReviews(),
       getContactame(),
     ]);
-
-  preloadCriticalImages([
-    images.services.nutrition,
-    images.services.training,
-    images.services.anthropometry,
-  ]);
 
   const enabledBlocks = blocksData.blocks.filter((block) => block.enabled);
   const blocksAt = (placement: LandingBlockPlacement) =>

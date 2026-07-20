@@ -147,8 +147,6 @@ export function DarkSectionSparks({
     };
   }, [reduced, count]);
 
-  if (reduced) return null;
-
   return (
     <canvas
       ref={canvasRef}

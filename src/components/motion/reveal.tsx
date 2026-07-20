@@ -17,6 +17,10 @@ const ease = [0.22, 1, 0.36, 1] as const;
 /** Repite la animación cada vez que el bloque entra al viewport (subir o bajar). */
 const viewportRepeat = { once: false as const, amount: 0.15 };
 
+/**
+ * Siempre el mismo árbol DOM (motion.div) en server y client.
+ * No ramificar con useReducedMotion en el render: causa React #418.
+ */
 export function Reveal({
   children,
   delay = 0,
@@ -31,17 +35,15 @@ export function Reveal({
   const reduced = useReducedMotion();
   const { x, y } = offset[direction];
 
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
-
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, x, y }}
+      initial={reduced ? false : { opacity: 0, x, y }}
       whileInView={{ opacity: 1, x: 0, y: 0 }}
       viewport={viewportRepeat}
-      transition={{ duration: 0.65, delay, ease }}
+      transition={
+        reduced ? { duration: 0 } : { duration: 0.65, delay, ease }
+      }
     >
       {children}
     </motion.div>
@@ -59,17 +61,15 @@ export function RevealScale({
 }) {
   const reduced = useReducedMotion();
 
-  if (reduced) {
-    return <div className={className}>{children}</div>;
-  }
-
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, scale: 0.94 }}
+      initial={reduced ? false : { opacity: 0, scale: 0.94 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={viewportRepeat}
-      transition={{ duration: 0.6, delay, ease }}
+      transition={
+        reduced ? { duration: 0 } : { duration: 0.6, delay, ease }
+      }
     >
       {children}
     </motion.div>
@@ -93,6 +93,16 @@ const staggerItem: Variants = {
   },
 };
 
+const staggerContainerReduced: Variants = {
+  hidden: { opacity: 1 },
+  show: { opacity: 1 },
+};
+
+const staggerItemReduced: Variants = {
+  hidden: { opacity: 1, y: 0 },
+  show: { opacity: 1, y: 0 },
+};
+
 /** Contenedor que revela hijos con stagger al entrar en viewport (lobby). */
 export function StaggerReveal({
   children,
@@ -107,20 +117,12 @@ export function StaggerReveal({
 }) {
   const reduced = useReducedMotion();
 
-  if (reduced) {
-    return (
-      <div className={className} role={role} aria-label={ariaLabel}>
-        {children}
-      </div>
-    );
-  }
-
   return (
     <motion.div
       className={className}
       role={role}
       aria-label={ariaLabel}
-      variants={staggerContainer}
+      variants={reduced ? staggerContainerReduced : staggerContainer}
       initial="hidden"
       whileInView="show"
       viewport={viewportRepeat}
@@ -137,8 +139,13 @@ export function StaggerRevealItem({
   children: React.ReactNode;
   className?: string;
 }) {
+  const reduced = useReducedMotion();
+
   return (
-    <motion.div className={className} variants={staggerItem}>
+    <motion.div
+      className={className}
+      variants={reduced ? staggerItemReduced : staggerItem}
+    >
       {children}
     </motion.div>
   );

@@ -38,6 +38,7 @@ export function CurrencySelector({
         }
         className={`${darkSelect} ${block ? "w-full" : ""}`}
         aria-label="Elegir moneda"
+        suppressHydrationWarning
       >
         {(Object.keys(CURRENCY_LABELS) as SupportedCurrency[]).map((code) => (
           <option key={code} value={code}>
