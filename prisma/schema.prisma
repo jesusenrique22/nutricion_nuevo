@@ -264,11 +264,16 @@ model BlockedDay {
 /**
  * Bloqueo recurrente por día de la semana (0=domingo … 6=sábado, como Date.getDay()).
  * Ej.: weekday=6 → todos los sábados sin atención.
+ * Si startTime/endTime están definidos (HH:mm), solo esa franja; si son null, día completo.
  */
 model RecurringBlockedWeekday {
   id        String   @id @default(cuid())
   weekday   Int      @unique // 0–6
   reason    String?
+  /** HH:mm — inicio de franja bloqueada; null = día completo. */
+  startTime String?
+  /** HH:mm — fin de franja bloqueada; null = día completo. */
+  endTime   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -46,10 +46,11 @@ function fmtBlock(iso: string) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Argentina/Buenos_Aires",
   });
 }
 
-type BlockMode = "dates" | "weekdays";
+type BlockMode = "dates" | "weekdays" | "hours";
 
 export function ScheduleBlocksPanel({
   blockedDays: initialBlockedDays,
@@ -65,7 +66,6 @@ export function ScheduleBlocksPanel({
   const [recurringWeekdays, setRecurringWeekdays] = useState(initialRecurring);
   const [blocks, setBlocks] = useState(initialBlocks);
   const [expanded, setExpanded] = useState(false);
-  const [showPartial, setShowPartial] = useState(false);
   const [mode, setMode] = useState<BlockMode>("dates");
 
   const [fromDate, setFromDate] = useState(todayStr());
@@ -73,10 +73,13 @@ export function ScheduleBlocksPanel({
   const [dayReason, setDayReason] = useState("");
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [weekdayReason, setWeekdayReason] = useState("");
+  const [weekdayScope, setWeekdayScope] = useState<"full" | "partial">("full");
+  const [weekdayStart, setWeekdayStart] = useState("08:00");
+  const [weekdayEnd, setWeekdayEnd] = useState("13:00");
 
   const [date, setDate] = useState(todayStr());
   const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("13:00");
   const [reason, setReason] = useState("");
 
   const [message, setMessage] = useState<string | null>(null);
@@ -136,6 +139,9 @@ export function ScheduleBlocksPanel({
       const res = await createRecurringBlockedWeekdays({
         weekdays: selectedWeekdays,
         reason: weekdayReason.trim() || undefined,
+        ...(weekdayScope === "partial"
+          ? { startTime: weekdayStart, endTime: weekdayEnd }
+          : {}),
       });
       if (!res.ok) {
         setMessage(res.message);
@@ -144,9 +150,13 @@ export function ScheduleBlocksPanel({
       setSelectedWeekdays([]);
       setWeekdayReason("");
       setMessage(
-        res.count && res.count > 1
-          ? `${res.count} días de la semana bloqueados de forma fija.`
-          : "Día de la semana bloqueado de forma fija.",
+        weekdayScope === "partial"
+          ? res.count && res.count > 1
+            ? `${res.count} días: franja ${weekdayStart}–${weekdayEnd} bloqueada.`
+            : `Franja ${weekdayStart}–${weekdayEnd} bloqueada de forma fija.`
+          : res.count && res.count > 1
+            ? `${res.count} días de la semana bloqueados de forma fija.`
+            : "Día de la semana bloqueado de forma fija.",
       );
       router.refresh();
     });
@@ -211,6 +221,21 @@ export function ScheduleBlocksPanel({
     });
   }
 
+  const modeBtn = (id: BlockMode, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setMode(id)}
+      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+        mode === id
+          ? "bg-primary text-primary-foreground"
+          : "border border-foreground/15 bg-white hover:bg-muted/40"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="mt-4 rounded-2xl border border-foreground/10 bg-surface">
       <button
@@ -219,10 +244,10 @@ export function ScheduleBlocksPanel({
         className="flex w-full items-center justify-between px-4 py-3 text-left sm:px-5"
       >
         <div>
-          <p className="text-sm font-bold">Días sin atención</p>
+          <p className="text-sm font-bold">Días y horarios sin atención</p>
           <p className="text-xs text-foreground/50">
-            Bloqueá fechas puntuales o todos los días de una semana (ej. todos
-            los sábados)
+            Fechas puntuales, días fijos de la semana (completos o por franja) u
+            horas sueltas
           </p>
         </div>
         <span className="text-sm text-foreground/40">{expanded ? "▲" : "▼"}</span>
@@ -231,31 +256,12 @@ export function ScheduleBlocksPanel({
       {expanded && (
         <div className="border-t border-foreground/8 px-4 py-4 sm:px-5">
           <div className="mb-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setMode("dates")}
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                mode === "dates"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-foreground/15 bg-white hover:bg-muted/40"
-              }`}
-            >
-              Fechas puntuales
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("weekdays")}
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                mode === "weekdays"
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-foreground/15 bg-white hover:bg-muted/40"
-              }`}
-            >
-              Todos los…
-            </button>
+            {modeBtn("dates", "Fechas puntuales")}
+            {modeBtn("weekdays", "Todos los…")}
+            {modeBtn("hours", "Solo horas")}
           </div>
 
-          {mode === "dates" ? (
+          {mode === "dates" && (
             <form onSubmit={handleBlockDays} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
@@ -311,12 +317,39 @@ export function ScheduleBlocksPanel({
                 {isPending ? "Guardando…" : "Bloquear días"}
               </button>
             </form>
-          ) : (
+          )}
+
+          {mode === "weekdays" && (
             <form onSubmit={handleBlockWeekdays} className="space-y-3">
               <p className="text-sm text-foreground/60">
-                Se bloquean <strong>todos</strong> esos días de la semana, de
-                forma permanente, hasta que los habilites.
+                Se aplica a <strong>todos</strong> esos días de la semana hasta
+                que los habilites. Podés cerrar el día entero o solo una franja
+                (ej. jueves mañana cerrado, tarde libre).
               </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWeekdayScope("full")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    weekdayScope === "full"
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-foreground/15 bg-white"
+                  }`}
+                >
+                  Día completo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWeekdayScope("partial")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    weekdayScope === "partial"
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-foreground/15 bg-white"
+                  }`}
+                >
+                  Solo franja horaria
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {WEEKDAY_OPTIONS.map((day) => {
                   const active = selectedWeekdays.includes(day.value);
@@ -343,6 +376,37 @@ export function ScheduleBlocksPanel({
                   );
                 })}
               </div>
+              {weekdayScope === "partial" && (
+                <div className="grid max-w-md gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-semibold text-foreground/60">
+                      Desde
+                    </label>
+                    <input
+                      type="time"
+                      value={weekdayStart}
+                      onChange={(e) => setWeekdayStart(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-foreground/60">
+                      Hasta
+                    </label>
+                    <input
+                      type="time"
+                      value={weekdayEnd}
+                      onChange={(e) => setWeekdayEnd(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                      required
+                    />
+                  </div>
+                  <p className="sm:col-span-2 text-[11px] text-foreground/45">
+                    Ejemplo: 08:00–13:00 deja libres las citas de la tarde.
+                  </p>
+                </div>
+              )}
               <div className="max-w-sm">
                 <label className="text-xs font-semibold text-foreground/60">
                   Motivo (opcional)
@@ -351,7 +415,7 @@ export function ScheduleBlocksPanel({
                   type="text"
                   value={weekdayReason}
                   onChange={(e) => setWeekdayReason(e.target.value)}
-                  placeholder="Ej. No atiendo sábados"
+                  placeholder="Ej. Mañana sin atención"
                   maxLength={200}
                   className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
                 />
@@ -362,6 +426,74 @@ export function ScheduleBlocksPanel({
                 className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
                 {isPending ? "Guardando…" : "Bloquear días elegidos"}
+              </button>
+            </form>
+          )}
+
+          {mode === "hours" && (
+            <form onSubmit={handleCreatePartial} className="space-y-3">
+              <p className="text-sm text-foreground/60">
+                Bloqueá solo algunas horas de una fecha concreta (reunión,
+                turno médico, etc.). El resto del día sigue disponible.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    min={todayStr()}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Desde
+                  </label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Hasta
+                  </label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/60">
+                    Motivo (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Ej. Reunión"
+                    maxLength={200}
+                    className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {isPending ? "Guardando…" : "Bloquear horario"}
               </button>
             </form>
           )}
@@ -381,6 +513,15 @@ export function ScheduleBlocksPanel({
                       <span className="font-semibold">
                         Todos los {weekdayLabel(r.weekday).toLowerCase()}
                       </span>
+                      {r.startTime && r.endTime ? (
+                        <span className="ml-2 text-foreground/60">
+                          · {r.startTime}–{r.endTime}
+                        </span>
+                      ) : (
+                        <span className="ml-2 text-foreground/45">
+                          · día completo
+                        </span>
+                      )}
                       {r.reason && (
                         <span className="ml-2 text-foreground/50">
                           · {r.reason}
@@ -436,121 +577,53 @@ export function ScheduleBlocksPanel({
             </div>
           )}
 
-          {blockedDays.length === 0 && recurringWeekdays.length === 0 && (
-            <p className="mt-4 text-sm text-foreground/50">
-              No hay días bloqueados.
-            </p>
+          {blocks.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-foreground/55">
+                Horarios parciales
+              </h3>
+              <ul className="mt-2 space-y-2">
+                {blocks.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <span className="font-semibold">
+                        {fmtBlock(b.start)} –{" "}
+                        {new Date(b.end).toLocaleTimeString("es", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "America/Argentina/Buenos_Aires",
+                        })}
+                      </span>
+                      {b.reason && (
+                        <span className="ml-2 text-foreground/50">
+                          · {b.reason}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDeleteBlock(b.id)}
+                      className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      Eliminar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
-          <div className="mt-6 border-t border-foreground/8 pt-4">
-            <button
-              type="button"
-              onClick={() => setShowPartial((v) => !v)}
-              className="text-sm font-semibold text-foreground/70 hover:text-primary"
-            >
-              {showPartial
-                ? "▲ Ocultar bloqueo por horario"
-                : "▼ Bloqueo parcial (solo algunas horas)"}
-            </button>
-
-            {showPartial && (
-              <form onSubmit={handleCreatePartial} className="mt-3 space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <label className="text-xs font-semibold text-foreground/60">
-                      Fecha
-                    </label>
-                    <input
-                      type="date"
-                      value={date}
-                      min={todayStr()}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-foreground/60">
-                      Desde
-                    </label>
-                    <input
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-foreground/60">
-                      Hasta
-                    </label>
-                    <input
-                      type="time"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-foreground/60">
-                      Motivo (opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Ej. Reunión"
-                      maxLength={200}
-                      className="mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="rounded-full border border-foreground/20 px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50"
-                >
-                  {isPending ? "Guardando…" : "Bloquear horario"}
-                </button>
-
-                {blocks.length > 0 && (
-                  <ul className="space-y-2">
-                    {blocks.map((b) => (
-                      <li
-                        key={b.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <span className="font-semibold">
-                            {fmtBlock(b.start)} –{" "}
-                            {new Date(b.end).toLocaleTimeString("es", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          {b.reason && (
-                            <span className="ml-2 text-foreground/50">
-                              · {b.reason}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleDeleteBlock(b.id)}
-                          className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                        >
-                          Eliminar
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </form>
+          {blockedDays.length === 0 &&
+            recurringWeekdays.length === 0 &&
+            blocks.length === 0 && (
+              <p className="mt-4 text-sm text-foreground/50">
+                No hay bloqueos de agenda.
+              </p>
             )}
-          </div>
 
           {message && (
             <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-sm">{message}</p>

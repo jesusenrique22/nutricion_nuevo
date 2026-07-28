@@ -3,9 +3,11 @@
 import { cache } from "react";
 import { auth } from "@/lib/auth";
 import type { BookingAvailabilitySnapshot } from "@/lib/booking-slots";
+import { clinicDateAtMinutes, clinicDateTimeToUtc, dateKeyInClinicTz } from "@/lib/clinic-timezone";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 import { dateRangeKeys, weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
+  isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
 } from "@/server/db/prisma";
@@ -114,13 +116,31 @@ export async function getUnavailableBookingDates(params: {
 
   if (isPrismaRecurringBlockedWeekdayReady()) {
     try {
+      const partial = isPrismaRecurringBlockedWeekdayPartialReady();
       const recurring = await prisma.recurringBlockedWeekday.findMany({
-        select: { weekday: true },
+        select: partial
+          ? { weekday: true, startTime: true, endTime: true }
+          : { weekday: true },
       });
-      const weekdays = new Set(recurring.map((r) => r.weekday));
-      if (weekdays.size > 0) {
+      // Solo días completos van al calendario como “no disponibles”.
+      // Las franjas parciales se inyectan como busy en el snapshot.
+      const fullDayWeekdays = new Set(
+        recurring
+          .filter((r) => {
+            if (!partial) return true;
+            const start =
+              "startTime" in r
+                ? (r.startTime as string | null)?.trim()
+                : null;
+            const end =
+              "endTime" in r ? (r.endTime as string | null)?.trim() : null;
+            return !start || !end;
+          })
+          .map((r) => r.weekday),
+      );
+      if (fullDayWeekdays.size > 0) {
         for (const key of keys) {
-          if (weekdays.has(weekdayFromDateKey(key))) blocked.add(key);
+          if (fullDayWeekdays.has(weekdayFromDateKey(key))) blocked.add(key);
         }
       }
     } catch {
@@ -129,6 +149,46 @@ export async function getUnavailableBookingDates(params: {
   }
 
   return [...blocked].sort();
+}
+
+/** Intervalos busy sintéticos por bloqueos recurrentes de franja (no día completo). */
+async function getRecurringPartialBusyIntervals(
+  from: string,
+  to: string,
+): Promise<{ start: string; end: string }[]> {
+  if (!isPrismaRecurringBlockedWeekdayReady()) return [];
+  if (!isPrismaRecurringBlockedWeekdayPartialReady()) return [];
+
+  try {
+    const recurring = await prisma.recurringBlockedWeekday.findMany({
+      select: { weekday: true, startTime: true, endTime: true },
+    });
+    const partials = recurring.filter((r) => {
+      const start = r.startTime?.trim();
+      const end = r.endTime?.trim();
+      return Boolean(start && end);
+    });
+    if (partials.length === 0) return [];
+
+    const byWeekday = new Map(
+      partials.map((r) => [
+        r.weekday,
+        { start: r.startTime!.trim(), end: r.endTime!.trim() },
+      ]),
+    );
+    const out: { start: string; end: string }[] = [];
+    for (const key of dateRangeKeys(from, to)) {
+      const window = byWeekday.get(weekdayFromDateKey(key));
+      if (!window) continue;
+      out.push({
+        start: clinicDateTimeToUtc(key, window.start).toISOString(),
+        end: clinicDateTimeToUtc(key, window.end).toISOString(),
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 function addDaysKey(dateStr: string, days: number): string {
@@ -142,11 +202,7 @@ function addDaysKey(dateStr: string, days: number): string {
 }
 
 function todayKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateKeyInClinicTz(new Date());
 }
 
 /**
@@ -164,43 +220,29 @@ export async function getBookingAvailabilitySnapshot(params?: {
     return { from, to, blockedDates: [], busy: [] };
   }
 
-  const rangeStart = new Date(
-    Number(from.slice(0, 4)),
-    Number(from.slice(5, 7)) - 1,
-    Number(from.slice(8, 10)),
-    0,
-    0,
-    0,
-    0,
-  );
-  const rangeEnd = new Date(
-    Number(to.slice(0, 4)),
-    Number(to.slice(5, 7)) - 1,
-    Number(to.slice(8, 10)) + 1,
-    0,
-    0,
-    0,
-    0,
-  );
+  const rangeStart = clinicDateAtMinutes(from, 0);
+  const rangeEnd = clinicDateAtMinutes(to, 24 * 60);
 
-  const [blockedDates, appointments, blocks] = await Promise.all([
-    getUnavailableBookingDates({ from, to }),
-    prisma.appointment.findMany({
-      where: {
-        status: { in: ["PENDING", "CONFIRMED"] },
-        startTime: { lt: rangeEnd },
-        endTime: { gt: rangeStart },
-      },
-      select: { startTime: true, endTime: true },
-    }),
-    prisma.scheduleBlock.findMany({
-      where: {
-        startTime: { lt: rangeEnd },
-        endTime: { gt: rangeStart },
-      },
-      select: { startTime: true, endTime: true },
-    }),
-  ]);
+  const [blockedDates, appointments, blocks, recurringPartial] =
+    await Promise.all([
+      getUnavailableBookingDates({ from, to }),
+      prisma.appointment.findMany({
+        where: {
+          status: { in: ["PENDING", "CONFIRMED"] },
+          startTime: { lt: rangeEnd },
+          endTime: { gt: rangeStart },
+        },
+        select: { startTime: true, endTime: true },
+      }),
+      prisma.scheduleBlock.findMany({
+        where: {
+          startTime: { lt: rangeEnd },
+          endTime: { gt: rangeStart },
+        },
+        select: { startTime: true, endTime: true },
+      }),
+      getRecurringPartialBusyIntervals(from, to),
+    ]);
 
   return {
     from,
@@ -215,6 +257,7 @@ export async function getBookingAvailabilitySnapshot(params?: {
         start: b.startTime.toISOString(),
         end: b.endTime.toISOString(),
       })),
+      ...recurringPartial,
     ],
   };
 }

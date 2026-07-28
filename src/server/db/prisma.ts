@@ -61,6 +61,17 @@ export function isPrismaRecurringBlockedWeekdayReady(): boolean {
   return prismaHasDelegate("recurringBlockedWeekday");
 }
 
+/** Franja horaria opcional en bloqueos recurrentes (startTime/endTime). */
+export function isPrismaRecurringBlockedWeekdayPartialReady(): boolean {
+  if (!isPrismaRecurringBlockedWeekdayReady()) return false;
+  const recurring = (
+    Prisma as {
+      RecurringBlockedWeekdayScalarFieldEnum?: Record<string, string>;
+    }
+  ).RecurringBlockedWeekdayScalarFieldEnum;
+  return Boolean(recurring && "startTime" in recurring && "endTime" in recurring);
+}
+
 /** Campos recientes del schema; si faltan, el bundle de Turbopack sigue con client viejo. */
 function clientHasExpectedSchema(): boolean {
   const purchase = Prisma.ResourcePurchaseScalarFieldEnum;

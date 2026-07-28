@@ -1,10 +1,13 @@
 import { ConsultationType } from "@prisma/client";
 import {
   computeSlotsForDay,
+  type BusyInterval,
   type ComputedSlot,
 } from "@/lib/booking-slots";
+import { clinicDateAtMinutes, clinicDateTimeToUtc } from "@/lib/clinic-timezone";
 import { weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
+  isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
 } from "@/server/db/prisma";
@@ -27,26 +30,40 @@ export async function getAvailableSlots(
   });
   if (blockedDay) return [];
 
+  const recurringBusy: BusyInterval[] = [];
+
   if (isPrismaRecurringBlockedWeekdayReady()) {
     const weekday = weekdayFromDateKey(dateStr);
+    const partial = isPrismaRecurringBlockedWeekdayPartialReady();
     const recurring = await prisma.recurringBlockedWeekday.findUnique({
       where: { weekday },
-      select: { id: true },
+      select: partial
+        ? { id: true, startTime: true, endTime: true }
+        : { id: true },
     });
-    if (recurring) return [];
+    if (recurring) {
+      const windowStart =
+        partial && "startTime" in recurring
+          ? (recurring.startTime as string | null)?.trim() || null
+          : null;
+      const windowEnd =
+        partial && "endTime" in recurring
+          ? (recurring.endTime as string | null)?.trim() || null
+          : null;
+
+      if (!windowStart || !windowEnd) {
+        return [];
+      }
+
+      recurringBusy.push({
+        start: clinicDateTimeToUtc(dateStr, windowStart).toISOString(),
+        end: clinicDateTimeToUtc(dateStr, windowEnd).toISOString(),
+      });
+    }
   }
 
-  const dayStart = new Date(
-    Number(dateStr.slice(0, 4)),
-    Number(dateStr.slice(5, 7)) - 1,
-    Number(dateStr.slice(8, 10)),
-    0,
-    0,
-    0,
-    0,
-  );
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const dayStart = clinicDateAtMinutes(dateStr, 0);
+  const dayEnd = clinicDateAtMinutes(dateStr, 24 * 60);
 
   const taken = await prisma.appointment.findMany({
     where: {
@@ -77,6 +94,7 @@ export async function getAvailableSlots(
         start: b.startTime.toISOString(),
         end: b.endTime.toISOString(),
       })),
+      ...recurringBusy,
     ],
   });
 }

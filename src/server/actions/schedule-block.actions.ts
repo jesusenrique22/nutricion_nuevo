@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { clinicDateTimeToUtc, dateKeyInClinicTz } from "@/lib/clinic-timezone";
 import { formatActionError } from "@/lib/db-errors";
-import { dateRangeKeys, todayDateKey } from "@/lib/scheduling-dates";
+import { dateRangeKeys } from "@/lib/scheduling-dates";
 import {
   createBlockedDaysSchema,
   createRecurringBlockedWeekdaysSchema,
@@ -13,6 +14,7 @@ import {
   deleteScheduleBlockSchema,
 } from "@/lib/validators/appointment-status";
 import {
+  isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
 } from "@/server/db/prisma";
@@ -34,17 +36,15 @@ export interface RecurringBlockedWeekdayDTO {
   id: string;
   weekday: number;
   reason: string | null;
+  /** HH:mm — null = día completo. */
+  startTime: string | null;
+  /** HH:mm — null = día completo. */
+  endTime: string | null;
 }
 
 export type BlockActionResult =
   | { ok: true; count?: number }
   | { ok: false; message: string };
-
-function dateAtTime(dateStr: string, hhmm: string): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const [hh, mm] = hhmm.split(":").map(Number);
-  return new Date(y, m - 1, d, hh, mm, 0, 0);
-}
 
 export async function getScheduleBlocks(): Promise<ScheduleBlockDTO[]> {
   const session = await auth();
@@ -69,7 +69,7 @@ export async function getBlockedDays(): Promise<BlockedDayDTO[]> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
 
-  const today = todayDateKey();
+  const today = dateKeyInClinicTz(new Date());
   const days = await prisma.blockedDay.findMany({
     where: { date: { gte: today } },
     orderBy: { date: "asc" },
@@ -95,6 +95,7 @@ export async function getRecurringBlockedWeekdays(): Promise<
     return [];
   }
 
+  const partial = isPrismaRecurringBlockedWeekdayPartialReady();
   const rows = await prisma.recurringBlockedWeekday.findMany({
     orderBy: { weekday: "asc" },
   });
@@ -107,6 +108,12 @@ export async function getRecurringBlockedWeekdays(): Promise<
       id: r.id,
       weekday: r.weekday,
       reason: r.reason,
+      startTime: partial
+        ? ((r as { startTime?: string | null }).startTime ?? null)
+        : null,
+      endTime: partial
+        ? ((r as { endTime?: string | null }).endTime ?? null)
+        : null,
     }));
 }
 
@@ -131,7 +138,7 @@ export async function createBlockedDays(
       };
     }
 
-    const today = todayDateKey();
+    const today = dateKeyInClinicTz(new Date());
     const futureKeys = keys.filter((k) => k >= today);
     if (futureKeys.length === 0) {
       return { ok: false, message: "No podés bloquear días en el pasado." };
@@ -186,13 +193,34 @@ export async function createRecurringBlockedWeekdays(
 
     const unique = [...new Set(parsed.data.weekdays)];
     const reason = parsed.data.reason?.trim() || null;
+    const startTime = parsed.data.startTime?.trim() || null;
+    const endTime = parsed.data.endTime?.trim() || null;
+    const partialReady = isPrismaRecurringBlockedWeekdayPartialReady();
+
+    if ((startTime || endTime) && !partialReady) {
+      return {
+        ok: false,
+        message:
+          "Para bloquear solo una franja horaria, regenerá Prisma: pnpm db:generate && pnpm run dev:clean",
+      };
+    }
 
     await prisma.$transaction(
       unique.map((weekday) =>
         prisma.recurringBlockedWeekday.upsert({
           where: { weekday },
-          create: { weekday, reason },
-          update: reason ? { reason } : {},
+          create: partialReady
+            ? { weekday, reason, startTime, endTime }
+            : { weekday, reason },
+          update: partialReady
+            ? {
+                ...(reason ? { reason } : {}),
+                startTime,
+                endTime,
+              }
+            : reason
+              ? { reason }
+              : {},
         }),
       ),
     );
@@ -285,8 +313,14 @@ export async function createScheduleBlock(
     const parsed = createScheduleBlockSchema.safeParse(formData);
     if (!parsed.success) return { ok: false, message: "Datos inválidos." };
 
-    const startTime = dateAtTime(parsed.data.dateStr, parsed.data.startTime);
-    const endTime = dateAtTime(parsed.data.dateStr, parsed.data.endTime);
+    const startTime = clinicDateTimeToUtc(
+      parsed.data.dateStr,
+      parsed.data.startTime,
+    );
+    const endTime = clinicDateTimeToUtc(
+      parsed.data.dateStr,
+      parsed.data.endTime,
+    );
 
     if (endTime <= startTime) {
       return { ok: false, message: "La hora de fin debe ser posterior al inicio." };

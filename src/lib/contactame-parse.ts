@@ -5,6 +5,7 @@ import {
   type ContactameLink,
   type ContactameLinkKind,
 } from "@/types/contactame";
+import { normalizeContactHref } from "@/lib/contact-href";
 
 const KINDS = new Set<ContactameLinkKind>([
   "tiktok",
@@ -26,14 +27,14 @@ function parseLink(raw: unknown, index: number): ContactameLink | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
   const label = str(row.label);
-  const href = str(row.href);
-  if (!label || !href) return null;
+  const hrefRaw = str(row.href);
+  if (!label || !hrefRaw) return null;
   const kindRaw = str(row.kind, "custom") as ContactameLinkKind;
   const kind = KINDS.has(kindRaw) ? kindRaw : "custom";
   return {
     id: str(row.id) || `link-${index}`,
     label,
-    href,
+    href: normalizeContactHref(kind, hrefRaw),
     enabled: row.enabled !== false,
     kind,
     external: row.external !== false && kind !== "email" && kind !== "phone",
@@ -68,7 +69,7 @@ export function contactameToRecord(
     links: data.links.map((l) => ({
       id: l.id,
       label: l.label,
-      href: l.href,
+      href: normalizeContactHref(l.kind, l.href),
       enabled: l.enabled,
       kind: l.kind,
       external: l.external,
@@ -77,7 +78,12 @@ export function contactameToRecord(
 }
 
 export function visibleContactameLinks(data: ContactameData): ContactameLink[] {
-  return data.links.filter((l) => l.enabled && l.href.trim());
+  return data.links
+    .filter((l) => l.enabled && l.href.trim())
+    .map((l) => ({
+      ...l,
+      href: normalizeContactHref(l.kind, l.href),
+    }));
 }
 
 export { CONTACTAME_SLUG };

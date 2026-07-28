@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import type { ContactameLink, ContactameLinkKind } from "@/types/contactame";
 
@@ -95,15 +94,19 @@ export function BrandSocialIcons({
           transition={{ delay: 0.25 + i * 0.05, type: "spring", stiffness: 500 }}
           whileHover={{ scale: 1.12, y: -2 }}
         >
-          <Link
+          <a
             href={link.href}
-            target={link.external ? "_blank" : undefined}
-            rel={link.external ? "noopener noreferrer" : undefined}
+            target={link.external || /^https?:/i.test(link.href) ? "_blank" : undefined}
+            rel={
+              link.external || /^https?:/i.test(link.href)
+                ? "noopener noreferrer"
+                : undefined
+            }
             className="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-black/5"
             aria-label={link.label}
           >
             <SocialIcon kind={link.kind} />
-          </Link>
+          </a>
         </motion.div>
       ))}
     </motion.div>

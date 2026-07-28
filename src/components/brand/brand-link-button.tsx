@@ -3,6 +3,10 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 
+function isAbsoluteHref(href: string): boolean {
+  return /^(https?:|mailto:|tel:)/i.test(href.trim());
+}
+
 export function BrandLinkButton({
   href,
   label,
@@ -78,16 +82,30 @@ export function BrandLinkButton({
     );
   }
 
+  const resolvedHref = (href ?? "#").trim() || "#";
+  // Redes / mailto / tel: <a> nativo (next/link no es ideal para externos).
+  const useNativeAnchor = external || isAbsoluteHref(resolvedHref);
+
   return (
     <motion.div {...motionProps} className={wide ? "w-full" : "w-full max-w-[344px]"}>
-      <Link
-        href={href ?? "#"}
-        target={external ? "_blank" : undefined}
-        rel={external ? "noopener noreferrer" : undefined}
-        className={className}
-      >
-        {inner}
-      </Link>
+      {useNativeAnchor ? (
+        <a
+          href={resolvedHref}
+          target={external || resolvedHref.startsWith("http") ? "_blank" : undefined}
+          rel={
+            external || resolvedHref.startsWith("http")
+              ? "noopener noreferrer"
+              : undefined
+          }
+          className={className}
+        >
+          {inner}
+        </a>
+      ) : (
+        <Link href={resolvedHref} className={className}>
+          {inner}
+        </Link>
+      )}
     </motion.div>
   );
 }

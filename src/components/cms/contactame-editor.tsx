@@ -3,6 +3,10 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { contactameToRecord } from "@/lib/contactame-parse";
+import {
+  isIncompleteContactHref,
+  normalizeContactHref,
+} from "@/lib/contact-href";
 import { updateSiteContent } from "@/server/actions/cms.actions";
 import {
   CONTACTAME_SLUG,
@@ -76,18 +80,6 @@ const KIND_OPTIONS: {
   },
 ];
 
-function presetFor(kind: ContactameLinkKind): ContactameLink {
-  const opt = KIND_OPTIONS.find((o) => o.value === kind) ?? KIND_OPTIONS.at(-1)!;
-  return {
-    id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    label: opt.label,
-    href: opt.defaultHref,
-    enabled: true,
-    kind,
-    external: kind !== "email" && kind !== "phone",
-  };
-}
-
 export function ContactameEditor({
   initial,
   onLiveChange,
@@ -143,7 +135,25 @@ export function ContactameEditor({
   }
 
   function addLink(link: ContactameLink) {
-    update({ ...data, links: [...data.links, link] });
+    const normalizedLabel = link.label.trim().toLowerCase();
+    if (
+      data.links.some((l) => l.label.trim().toLowerCase() === normalizedLabel)
+    ) {
+      setMessage(
+        `Ya existe un botón llamado «${link.label.trim()}». Cambiá el texto o editá el existente.`,
+      );
+      return;
+    }
+    const href = normalizeContactHref(link.kind, link.href);
+    if (isIncompleteContactHref(link.kind, href)) {
+      setMessage(
+        link.kind === "instagram"
+          ? "Completá el usuario de Instagram (ej. @anttova_fitness)."
+          : "Completá la URL / enlace del botón antes de crearlo.",
+      );
+      return;
+    }
+    update({ ...data, links: [...data.links, { ...link, href }] });
     setHighlightId(link.id);
     setMessage(null);
   }
@@ -178,6 +188,25 @@ export function ContactameEditor({
 
   function save() {
     setMessage(null);
+    const labels = data.links.map((l) => l.label.trim().toLowerCase());
+    const dup = labels.find((l, i) => l && labels.indexOf(l) !== i);
+    if (dup) {
+      setMessage(
+        "Hay botones con el mismo nombre. Cada uno debe tener un texto distinto.",
+      );
+      return;
+    }
+    for (const link of data.links) {
+      const href = normalizeContactHref(link.kind, link.href);
+      if (link.enabled && isIncompleteContactHref(link.kind, href)) {
+        setMessage(
+          link.kind === "instagram"
+            ? `El botón «${link.label}» no tiene usuario de Instagram válido.`
+            : `El botón «${link.label}» tiene un enlace incompleto.`,
+        );
+        return;
+      }
+    }
     startTransition(async () => {
       const res = await updateSiteContent({
         slug: CONTACTAME_SLUG,
@@ -237,17 +266,21 @@ export function ContactameEditor({
             <button
               key={o.value}
               type="button"
-              onClick={() => {
-                onPickKind(o.value);
-                // Un toque = crear al instante con plantilla
-                addLink(presetFor(o.value));
-              }}
-              className="rounded-full border border-foreground/15 bg-muted/40 px-3 py-1.5 text-xs font-semibold hover:border-primary hover:bg-primary/5 hover:text-primary"
+              onClick={() => onPickKind(o.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                draftKind === o.value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-foreground/15 bg-muted/40 hover:border-primary hover:bg-primary/5 hover:text-primary"
+              }`}
             >
-              + {o.label}
+              {o.label}
             </button>
           ))}
         </div>
+        <p className="text-[11px] text-foreground/45">
+          Elegí un tipo, completá el usuario/URL (ej. @anttova_fitness) y tocá
+          Crear. No dejes solo https://instagram.com/ sin usuario.
+        </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm">
@@ -296,8 +329,8 @@ export function ContactameEditor({
       <div ref={listRef} className="space-y-3">
         {data.links.length === 0 ? (
           <p className="rounded-xl border border-dashed border-foreground/15 bg-white/60 px-4 py-6 text-center text-sm text-foreground/50">
-            Todavía no hay botones. Usá <strong>+ Instagram</strong>,{" "}
-            <strong>+ Ubicación</strong> o el formulario de arriba.
+            Todavía no hay botones. Elegí un tipo arriba, completá el enlace y
+            tocá <strong>Crear botón</strong>.
           </p>
         ) : (
           data.links.map((link, index) => (

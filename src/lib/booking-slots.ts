@@ -1,3 +1,5 @@
+import { clinicDateAtMinutes } from "@/lib/clinic-timezone";
+
 /** Horario general de la clínica (consultas no matutinas). */
 export const CLINIC_OPEN = "08:00";
 export const CLINIC_CLOSE = "18:00";
@@ -31,12 +33,9 @@ export function toMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-/** Date local combinando YYYY-MM-DD y minutos del día. */
+/** Instant UTC para YYYY-MM-DD + minutos del día en zona de la clínica. */
 export function dateAtMinutes(dateStr: string, minutes: number): Date {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
-  date.setMinutes(minutes);
-  return date;
+  return clinicDateAtMinutes(dateStr, minutes);
 }
 
 export function windowForType(type: SlotComputeType): {

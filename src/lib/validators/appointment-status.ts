@@ -44,12 +44,42 @@ export const deleteBlockedDaySchema = z.object({
   id: z.string().min(1),
 });
 
-export const createRecurringBlockedWeekdaysSchema = z.object({
-  weekdays: z
-    .array(z.number().int().min(0).max(6))
-    .min(1, "Elegí al menos un día"),
-  reason: z.string().max(200).optional(),
-});
+const hhmm = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, "Hora inválida")
+  .optional();
+
+export const createRecurringBlockedWeekdaysSchema = z
+  .object({
+    weekdays: z
+      .array(z.number().int().min(0).max(6))
+      .min(1, "Elegí al menos un día"),
+    reason: z.string().max(200).optional(),
+    /** HH:mm — con endTime = franja; sin ambos = día completo. */
+    startTime: hhmm,
+    endTime: hhmm,
+  })
+  .superRefine((data, ctx) => {
+    const hasStart = Boolean(data.startTime);
+    const hasEnd = Boolean(data.endTime);
+    if (hasStart !== hasEnd) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Indicá hora de inicio y de fin, o dejá ambas vacías (día completo).",
+      });
+      return;
+    }
+    if (hasStart && hasEnd) {
+      const [sh, sm] = data.startTime!.split(":").map(Number);
+      const [eh, em] = data.endTime!.split(":").map(Number);
+      if (eh * 60 + em <= sh * 60 + sm) {
+        ctx.addIssue({
+          code: "custom",
+          message: "La hora de fin debe ser posterior al inicio.",
+        });
+      }
+    }
+  });
 
 export const deleteRecurringBlockedWeekdaySchema = z.object({
   id: z.string().min(1),

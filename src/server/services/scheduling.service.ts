@@ -4,9 +4,19 @@ import {
   ConsultationModality,
   type PrismaClient,
 } from "@prisma/client";
-import { prisma, isPrismaRecurringBlockedWeekdayReady } from "@/server/db/prisma";
-import { toDateKey, weekdayFromDateKey } from "@/lib/scheduling-dates";
+import {
+  clinicDateTimeToUtc,
+  dateKeyInClinicTz,
+  minutesInClinicTz,
+  toMinutesHhmm,
+} from "@/lib/clinic-timezone";
+import { weekdayFromDateKey } from "@/lib/scheduling-dates";
 import { TimeSlotTakenError } from "@/lib/scheduling-errors";
+import {
+  isPrismaRecurringBlockedWeekdayPartialReady,
+  isPrismaRecurringBlockedWeekdayReady,
+  prisma,
+} from "@/server/db/prisma";
 
 export type SchedulingError =
   | "MODALITY_NOT_ALLOWED"
@@ -20,11 +30,6 @@ export type ValidationResult =
   | { ok: false; error: SchedulingError; message: string };
 
 type DbLike = PrismaClient | Prisma.TransactionClient;
-
-function toMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
 
 function overlapWhere(params: {
   startTime: Date;
@@ -121,14 +126,15 @@ function validateBusinessRules(params: {
   if (consultationType.morningOnly) {
     const start = consultationType.morningStart ?? "08:00";
     const end = consultationType.morningEnd ?? "12:00";
-    const startMin = startTime.getHours() * 60 + startTime.getMinutes();
-    const endMin = endTime.getHours() * 60 + endTime.getMinutes();
+    // Crítico: hora de Buenos Aires, no getHours() del server (UTC en Vercel).
+    const startMin = minutesInClinicTz(startTime);
+    const endMin = minutesInClinicTz(endTime);
 
-    if (startMin < toMinutes(start) || endMin > toMinutes(end)) {
+    if (startMin < toMinutesHhmm(start) || endMin > toMinutesHhmm(end)) {
       return {
         ok: false,
         error: "OUTSIDE_MORNING_WINDOW",
-        message: `${consultationType.name} solo se agenda entre ${start} y ${end}.`,
+        message: `${consultationType.name} solo se agenda entre ${start} y ${end} (hora Argentina).`,
       };
     }
   }
@@ -152,8 +158,10 @@ export async function validateAppointmentSlot(params: {
   const rules = validateBusinessRules({ consultationType, startTime, modality });
   if (!rules.ok) return rules;
 
+  const dateKey = dateKeyInClinicTz(startTime);
+
   const blockedDay = await prisma.blockedDay.findUnique({
-    where: { date: toDateKey(startTime) },
+    where: { date: dateKey },
     select: { id: true },
   });
   if (blockedDay) {
@@ -165,17 +173,41 @@ export async function validateAppointmentSlot(params: {
   }
 
   if (isPrismaRecurringBlockedWeekdayReady()) {
-    const weekday = weekdayFromDateKey(toDateKey(startTime));
+    const weekday = weekdayFromDateKey(dateKey);
+    const select = isPrismaRecurringBlockedWeekdayPartialReady()
+      ? ({ id: true, startTime: true, endTime: true } as const)
+      : ({ id: true } as const);
     const recurring = await prisma.recurringBlockedWeekday.findUnique({
       where: { weekday },
-      select: { id: true },
+      select,
     });
     if (recurring) {
-      return {
-        ok: false,
-        error: "BLOCKED_TIME",
-        message: "Ese día de la semana no hay atención.",
-      };
+      const windowStart =
+        "startTime" in recurring
+          ? (recurring.startTime as string | null)?.trim() || null
+          : null;
+      const windowEnd =
+        "endTime" in recurring
+          ? (recurring.endTime as string | null)?.trim() || null
+          : null;
+
+      if (!windowStart || !windowEnd) {
+        return {
+          ok: false,
+          error: "BLOCKED_TIME",
+          message: "Ese día de la semana no hay atención.",
+        };
+      }
+
+      const blockStart = clinicDateTimeToUtc(dateKey, windowStart);
+      const blockEnd = clinicDateTimeToUtc(dateKey, windowEnd);
+      if (startTime < blockEnd && rules.endTime > blockStart) {
+        return {
+          ok: false,
+          error: "BLOCKED_TIME",
+          message: `Ese día no hay atención entre ${windowStart} y ${windowEnd}.`,
+        };
+      }
     }
   }
 
