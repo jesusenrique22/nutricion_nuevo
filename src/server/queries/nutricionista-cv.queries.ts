@@ -6,7 +6,12 @@ import type { NutricionistaPageData } from "@/types/nutricionista-cv";
 import { NUTRICIONISTA_PAGE_SLUG } from "@/types/nutricionista-cv";
 
 export const getNutricionistaPage = cache(async (): Promise<NutricionistaPageData> => {
-  const row = await getSiteContentBySlug(NUTRICIONISTA_PAGE_SLUG);
-  if (!row?.data) return DEFAULT_NUTRICIONISTA_PAGE;
-  return parseNutricionistaPage(row.data);
+  try {
+    const row = await getSiteContentBySlug(NUTRICIONISTA_PAGE_SLUG);
+    if (!row?.data) return DEFAULT_NUTRICIONISTA_PAGE;
+    return parseNutricionistaPage(row.data);
+  } catch (error) {
+    console.error("[cms] getNutricionistaPage falló; usando defaults", error);
+    return DEFAULT_NUTRICIONISTA_PAGE;
+  }
 });

@@ -7,17 +7,37 @@ import { LandingCtaSection } from "@/components/marketing/landing-cta-section";
 import { LandingLobbyShell } from "@/components/marketing/landing-lobby-shell";
 import { LandingPackagesSection } from "@/components/marketing/landing-packages-section";
 import { ReviewsShowcase } from "@/components/marketing/reviews-showcase";
+import { DEFAULT_LANDING_BLOCKS } from "@/lib/landing-blocks-defaults";
+import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { preloadCriticalImages } from "@/lib/preload-critical-images";
-import { getConsultationTypes } from "@/server/actions/booking.queries";
+import {
+  getConsultationTypes,
+  type ConsultationTypeDTO,
+} from "@/server/actions/booking.queries";
 import {
   getLandingBlocks,
   getLandingImages,
 } from "@/server/queries/landing.queries";
 import { getContactame } from "@/server/queries/contactame.queries";
 import { getPublishedReviews } from "@/server/queries/reviews.queries";
-import type { LandingBlockPlacement } from "@/types/landing-blocks";
+import {
+  DEFAULT_CONTACTAME,
+  type ContactameData,
+} from "@/types/contactame";
+import type {
+  LandingBlockPlacement,
+  LandingBlocksData,
+} from "@/types/landing-blocks";
+import type { LandingImagesData } from "@/types/landing-images";
+import type { PublicReview } from "@/types/review";
 
 export const revalidate = 60;
+
+function settledOr<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  if (result.status === "fulfilled") return result.value;
+  console.error("[landing] fetch falló; usando fallback", result.reason);
+  return fallback;
+}
 
 /** Hero solo: no espera reviews/paquetes → HTML + imagen LCP más temprano. */
 async function LandingHero() {
@@ -37,14 +57,28 @@ function HeroFallback() {
 }
 
 async function LandingRest() {
-  const [images, consultations, blocksData, reviews, contactame] =
-    await Promise.all([
-      getLandingImages(),
-      getConsultationTypes(),
-      getLandingBlocks(),
-      getPublishedReviews(),
-      getContactame(),
-    ]);
+  const results = await Promise.allSettled([
+    getLandingImages(),
+    getConsultationTypes(),
+    getLandingBlocks(),
+    getPublishedReviews(),
+    getContactame(),
+  ]);
+
+  const images = settledOr<LandingImagesData>(
+    results[0],
+    DEFAULT_LANDING_IMAGES,
+  );
+  const consultations = settledOr<ConsultationTypeDTO[]>(results[1], []);
+  const blocksData = settledOr<LandingBlocksData>(
+    results[2],
+    DEFAULT_LANDING_BLOCKS,
+  );
+  const reviews = settledOr<PublicReview[]>(results[3], []);
+  const contactame = settledOr<ContactameData>(
+    results[4],
+    DEFAULT_CONTACTAME,
+  );
 
   const enabledBlocks = blocksData.blocks.filter((block) => block.enabled);
   const blocksAt = (placement: LandingBlockPlacement) =>

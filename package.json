@@ -13,6 +13,7 @@
     "check:edge": "node scripts/check-edge-boundaries.mjs",
     "check:sql": "node scripts/check-sql-safety.mjs",
     "check:smoke": "node scripts/smoke-production.mjs",
+    "check:requests": "node scripts/check-request-resilience.mjs",
     "check:deploy": "node scripts/check-deploy.mjs",
     "check:env": "CHECK_PRODUCTION_ENV=1 tsx scripts/check-production-env.ts",
     "start": "next start",

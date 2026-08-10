@@ -229,6 +229,217 @@ html {
   }
 }
 
+/* Splash de marca (lobby) */
+html.anttova-splash-lock,
+html.anttova-splash-lock body {
+  overflow: hidden;
+}
+
+.anttova-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #2a0812 0%, #741e31 48%, #5a1728 100%);
+  color: #fff;
+  overflow: hidden;
+  animation: anttova-splash-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anttova-splash--exit {
+  animation: anttova-splash-out 0.78s cubic-bezier(0.65, 0, 0.35, 1) both;
+  pointer-events: none;
+}
+
+.anttova-splash__glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.anttova-splash__glow--a {
+  width: min(55vw, 28rem);
+  height: min(55vw, 28rem);
+  left: -8%;
+  top: 12%;
+  background: rgb(242 181 204 / 0.28);
+  animation: anttova-splash-float 4.5s ease-in-out infinite;
+}
+
+.anttova-splash__glow--b {
+  width: min(45vw, 22rem);
+  height: min(45vw, 22rem);
+  right: -6%;
+  bottom: 8%;
+  background: rgb(232 180 200 / 0.22);
+  animation: anttova-splash-float 5.2s ease-in-out infinite reverse;
+}
+
+.anttova-splash__sparks {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 72%, rgb(255 255 255 / 0.55) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 72% 28%, rgb(255 255 255 / 0.4) 0 1px, transparent 2px),
+    radial-gradient(circle at 42% 18%, rgb(242 181 204 / 0.7) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 86% 64%, rgb(255 255 255 / 0.35) 0 1px, transparent 2px),
+    radial-gradient(circle at 30% 40%, rgb(255 255 255 / 0.3) 0 1px, transparent 2px);
+  opacity: 0.85;
+  animation: anttova-splash-twinkle 2.8s ease-in-out infinite;
+}
+
+.anttova-splash__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.anttova-splash__eyebrow {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgb(242 181 204 / 0.9);
+  animation: anttova-splash-fade-up 0.7s 0.05s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anttova-splash__logo {
+  margin-top: 1.75rem;
+  opacity: 0.95;
+  animation: anttova-splash-fade-up 0.75s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anttova-splash__logo-img {
+  height: auto;
+  width: clamp(7.5rem, 22vw, 10rem);
+}
+
+.anttova-splash__word {
+  margin: 1.35rem 0 0;
+  display: flex;
+  gap: 0.02em;
+  font-size: clamp(2.75rem, 11vw, 5.5rem);
+  font-weight: 200;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  text-transform: lowercase;
+}
+
+.anttova-splash__letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.55em);
+  animation: anttova-splash-letter 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.anttova-splash__tag {
+  margin: 1.1rem 0 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.72);
+  animation: anttova-splash-fade-up 0.7s 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.anttova-splash__bar {
+  margin-top: 2.25rem;
+  width: min(12rem, 48vw);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.anttova-splash__bar-fill {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f2b5cc, #fff, #f2b5cc);
+  animation: anttova-splash-bar 1.35s ease-in-out infinite;
+}
+
+@keyframes anttova-splash-in {
+  from {
+    opacity: 0.92;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes anttova-splash-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.03);
+    clip-path: inset(0 0 100% 0);
+  }
+}
+
+@keyframes anttova-splash-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anttova-splash-letter {
+  from {
+    opacity: 0;
+    transform: translateY(0.55em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes anttova-splash-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes anttova-splash-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(12px, -18px, 0);
+  }
+}
+
+@keyframes anttova-splash-twinkle {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anttova-page-enter {
     animation: none !important;
@@ -238,6 +449,27 @@ html {
   .anttova-curtain-active .anttova-curtain-panel--a,
   .anttova-curtain-active .anttova-curtain-panel--b {
     animation: none !important;
+  }
+
+  .anttova-splash,
+  .anttova-splash--exit,
+  .anttova-splash__eyebrow,
+  .anttova-splash__logo,
+  .anttova-splash__letter,
+  .anttova-splash__tag,
+  .anttova-splash__bar-fill,
+  .anttova-splash__glow,
+  .anttova-splash__sparks {
+    animation: none !important;
+  }
+
+  .anttova-splash__letter {
+    opacity: 1;
+    transform: none;
+  }
+
+  .anttova-splash--exit {
+    opacity: 0;
   }
 }
 

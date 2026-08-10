@@ -246,22 +246,31 @@ export interface SiteContentDTO {
   data: Record<string, unknown>;
 }
 
-export const getSiteContents = cache(async (): Promise<SiteContentDTO[]> => {
-  const rows = await prisma.siteContent.findMany({ orderBy: { slug: "asc" } });
-
-  if (rows.length === 0) {
-    return Object.entries(SITE_CONTENT_DEFAULTS).map(([slug, v]) => ({
-      slug,
-      title: v.title,
-      data: v.data,
-    }));
-  }
-
-  return rows.map((r) => ({
-    slug: r.slug,
-    title: r.title,
-    data: r.data as Record<string, unknown>,
+function siteContentDefaultsList(): SiteContentDTO[] {
+  return Object.entries(SITE_CONTENT_DEFAULTS).map(([slug, v]) => ({
+    slug,
+    title: v.title,
+    data: v.data,
   }));
+}
+
+export const getSiteContents = cache(async (): Promise<SiteContentDTO[]> => {
+  try {
+    const rows = await prisma.siteContent.findMany({ orderBy: { slug: "asc" } });
+
+    if (rows.length === 0) {
+      return siteContentDefaultsList();
+    }
+
+    return rows.map((r) => ({
+      slug: r.slug,
+      title: r.title,
+      data: r.data as Record<string, unknown>,
+    }));
+  } catch (error) {
+    console.error("[cms] getSiteContents falló; usando defaults", error);
+    return siteContentDefaultsList();
+  }
 });
 
 /** Una sola consulta por request: reutiliza getSiteContents en memoria. */

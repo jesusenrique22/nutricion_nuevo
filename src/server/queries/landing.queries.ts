@@ -1,9 +1,11 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import { DEFAULT_LANDING_BLOCKS } from "@/lib/landing-blocks-defaults";
+import { DEFAULT_LANDING_IMAGES } from "@/lib/landing-images-defaults";
 import { mergeLandingImages } from "@/lib/landing-images-parse";
 import { mergeLandingBlocks } from "@/lib/landing-blocks-parse";
-import { mergeNavMenu } from "@/lib/nav-menu-parse";
-import { mergeProducts } from "@/lib/products-parse";
+import { DEFAULT_NAV_MENU, mergeNavMenu } from "@/lib/nav-menu-parse";
+import { DEFAULT_PRODUCTS, mergeProducts } from "@/lib/products-parse";
 import { prisma } from "@/server/db/prisma";
 import type { LandingImagesData } from "@/types/landing-images";
 import { LANDING_IMAGES_SLUG } from "@/types/landing-images";
@@ -14,6 +16,10 @@ import { NAV_MENU_SLUG } from "@/types/nav-menu";
 import type { ProductsData } from "@/types/products";
 import { PRODUCTS_SLUG } from "@/types/products";
 import type { Prisma } from "@prisma/client";
+
+function logCmsFallback(label: string, error: unknown) {
+  console.error(`[cms] ${label} falló; usando defaults`, error);
+}
 
 /** Tags de caché para invalidar al guardar contenido CMS. */
 export const CMS_CACHE_TAG = "cms-site-content";
@@ -79,9 +85,41 @@ const fetchProducts = unstable_cache(
   { revalidate: 300, tags: [CMS_CACHE_TAG, "products"] },
 );
 
-// ── Wrappers con deduplicación por request (React cache) ─────────────────────
+// ── Wrappers fail-safe + deduplicación por request (React cache) ─────────────
+// Si Neon/Prisma falla, devolvemos defaults para que marketing no se caiga.
 
-export const getLandingImages = cache(fetchLandingImages);
-export const getLandingBlocks = cache(fetchLandingBlocks);
-export const getNavMenu = cache(fetchNavMenu);
-export const getProducts = cache(fetchProducts);
+export const getLandingImages = cache(async (): Promise<LandingImagesData> => {
+  try {
+    return await fetchLandingImages();
+  } catch (error) {
+    logCmsFallback("getLandingImages", error);
+    return DEFAULT_LANDING_IMAGES;
+  }
+});
+
+export const getLandingBlocks = cache(async (): Promise<LandingBlocksData> => {
+  try {
+    return await fetchLandingBlocks();
+  } catch (error) {
+    logCmsFallback("getLandingBlocks", error);
+    return DEFAULT_LANDING_BLOCKS;
+  }
+});
+
+export const getNavMenu = cache(async (): Promise<NavMenuData> => {
+  try {
+    return await fetchNavMenu();
+  } catch (error) {
+    logCmsFallback("getNavMenu", error);
+    return DEFAULT_NAV_MENU;
+  }
+});
+
+export const getProducts = cache(async (): Promise<ProductsData> => {
+  try {
+    return await fetchProducts();
+  } catch (error) {
+    logCmsFallback("getProducts", error);
+    return DEFAULT_PRODUCTS;
+  }
+});
