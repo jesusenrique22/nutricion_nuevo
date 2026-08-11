@@ -1,75 +1,117 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
-const SESSION_KEY = "anttova-splash-seen";
-const MIN_MS = 1500;
+/** Persistente: solo la 1ª visita (mientras el navegador conserve datos del sitio). */
+export const SPLASH_STORAGE_KEY = "anttova-splash-seen";
+
+const MIN_MS = 1400;
 const MAX_MS = 4200;
 const EXIT_MS = 780;
 
 type Phase = "show" | "exit" | "done";
 
+function hasSeenSplash(): boolean {
+  try {
+    return localStorage.getItem(SPLASH_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSplashSeen(): void {
+  try {
+    localStorage.setItem(SPLASH_STORAGE_KEY, "1");
+  } catch {
+    /* private mode */
+  }
+}
+
+function setSplashAttr(value: "boot" | "skip" | "show" | null): void {
+  const root = document.documentElement;
+  if (value) root.setAttribute("data-anttova-splash", value);
+  else root.removeAttribute("data-anttova-splash");
+}
+
+function setSplashLock(on: boolean): void {
+  const root = document.documentElement;
+  if (on) root.setAttribute("data-anttova-splash-lock", "");
+  else root.removeAttribute("data-anttova-splash-lock");
+}
+
+function clearBootOverlay(): void {
+  const root = document.documentElement;
+  if (root.getAttribute("data-anttova-splash") === "boot") {
+    root.removeAttribute("data-anttova-splash");
+  }
+  setSplashLock(false);
+}
+
 /**
- * Splash de marca al abrir el lobby: cubre la carga de imágenes/hero
- * y se retira con una salida suave. Una vez por pestaña (sessionStorage).
+ * Splash solo en la primera carga del lobby.
+ * Si ya se vio o las imágenes están en caché → no vuelve a aparecer.
  */
 export function BrandSplashLoader() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  // Mismo valor en SSR y 1er paint → sin mismatch de hidratación
-  const [phase, setPhase] = useState<Phase>(isHome ? "show" : "done");
+  // SSR: nunca montar splash (evita flash en recargas siguientes)
+  const [phase, setPhase] = useState<Phase>("done");
+  const runId = useRef(0);
 
   useLayoutEffect(() => {
     if (!isHome) {
       setPhase("done");
+      clearBootOverlay();
+      setSplashAttr("skip");
       return;
     }
-    try {
-      if (sessionStorage.getItem(SESSION_KEY)) {
-        setPhase("done");
-      } else {
-        setPhase("show");
-      }
-    } catch {
-      setPhase("show");
+
+    if (hasSeenSplash()) {
+      setPhase("done");
+      setSplashAttr("skip");
+      setSplashLock(false);
+      return;
     }
+
+    runId.current += 1;
+    setPhase("show");
+    setSplashAttr("show");
+    setSplashLock(true);
   }, [isHome]);
 
   useEffect(() => {
     if (!isHome) return;
+    if (hasSeenSplash()) return;
 
-    try {
-      if (sessionStorage.getItem(SESSION_KEY)) return;
-    } catch {
-      /* ignore */
-    }
-
+    const myRun = runId.current;
     const start = Date.now();
     let finished = false;
     let exitTimer = 0;
     let maxTimer = 0;
     let minWaitTimer = 0;
     let pollTimer = 0;
+    let imagesWereCached = false;
 
-    const markSeen = () => {
-      try {
-        sessionStorage.setItem(SESSION_KEY, "1");
-      } catch {
-        /* ignore */
-      }
-    };
+    const stillActive = () => myRun === runId.current;
 
     const beginExit = () => {
-      if (finished) return;
+      if (finished || !stillActive()) return;
       finished = true;
+
       const elapsed = Date.now() - start;
-      const wait = Math.max(0, MIN_MS - elapsed);
+      const wait = imagesWereCached ? 0 : Math.max(0, MIN_MS - elapsed);
+
       minWaitTimer = window.setTimeout(() => {
+        if (!stillActive()) return;
+        markSplashSeen();
+        setSplashAttr("skip");
         setPhase("exit");
-        markSeen();
-        exitTimer = window.setTimeout(() => setPhase("done"), EXIT_MS);
+        clearBootOverlay();
+        exitTimer = window.setTimeout(() => {
+          if (stillActive()) setPhase("done");
+        }, EXIT_MS);
       }, wait);
     };
 
@@ -89,6 +131,16 @@ export function BrandSplashLoader() {
             ),
           );
           if (nodes.length === 0) return false;
+
+          const allCached = nodes.every(
+            (img) => img.complete && img.naturalWidth > 0,
+          );
+          if (allCached) {
+            imagesWereCached = true;
+            finish();
+            return true;
+          }
+
           Promise.all(
             nodes.map(
               (img) =>
@@ -109,7 +161,7 @@ export function BrandSplashLoader() {
         if (!tryCollect()) {
           pollTimer = window.setTimeout(() => {
             if (!tryCollect()) finish();
-          }, 500);
+          }, 450);
         }
       });
 
@@ -124,7 +176,6 @@ export function BrandSplashLoader() {
     }
 
     maxTimer = window.setTimeout(beginExit, MAX_MS);
-    document.documentElement.classList.add("anttova-splash-lock");
 
     return () => {
       finished = true;
@@ -133,17 +184,9 @@ export function BrandSplashLoader() {
       window.clearTimeout(maxTimer);
       window.clearTimeout(pollTimer);
       window.removeEventListener("load", onWindowReady);
-      document.documentElement.classList.remove("anttova-splash-lock");
+      setSplashLock(false);
     };
   }, [isHome]);
-
-  useEffect(() => {
-    if (phase === "show") {
-      document.documentElement.classList.add("anttova-splash-lock");
-    } else {
-      document.documentElement.classList.remove("anttova-splash-lock");
-    }
-  }, [phase]);
 
   if (phase === "done" || !isHome) return null;
 

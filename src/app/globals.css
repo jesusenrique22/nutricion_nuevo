@@ -229,10 +229,24 @@ html {
   }
 }
 
-/* Splash de marca (lobby) */
-html.anttova-splash-lock,
-html.anttova-splash-lock body {
+/* Splash de marca (lobby) — solo 1ª carga (data-* para no tocar className de <html>) */
+html[data-anttova-splash-lock],
+html[data-anttova-splash-lock] body {
   overflow: hidden;
+}
+
+/* Cobertura inmediata antes de hidratar (solo 1ª visita) */
+html[data-anttova-splash="boot"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: linear-gradient(145deg, #2a0812 0%, #741e31 48%, #5a1728 100%);
+  pointer-events: none;
+}
+
+html[data-anttova-splash="skip"] .anttova-splash {
+  display: none !important;
 }
 
 .anttova-splash {
