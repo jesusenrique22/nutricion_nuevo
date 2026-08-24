@@ -3,19 +3,17 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
+import {
+  BookingTimezoneSelector,
+  SlotTimeLabel,
+} from "@/components/booking/booking-timezone-ui";
+import { useBookingTimezone } from "@/contexts/booking-timezone-context";
+import { clinicTodayDateKey } from "@/lib/clinic-timezone";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import { getSlotsForDay } from "@/server/actions/booking.queries";
 import { createAppointmentForPatient } from "@/server/actions/appointment.actions";
 import type { Slot } from "@/server/services/availability.service";
 import { LoadingInline } from "@/components/ui/loading-indicator";
-
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function AdminBookAppointmentForm({
   patientId,
@@ -25,10 +23,12 @@ export function AdminBookAppointmentForm({
   consultationTypes: ConsultationTypeDTO[];
 }) {
   const router = useRouter();
+  const clinicToday = clinicTodayDateKey();
+  const { showsClinicReference, clinicTimezoneName } = useBookingTimezone();
   const [open, setOpen] = useState(false);
   const [typeId, setTypeId] = useState(consultationTypes[0]?.id ?? "");
   const [modality, setModality] = useState<"ONLINE" | "PRESENCIAL">("PRESENCIAL");
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(clinicToday);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -151,19 +151,31 @@ export function AdminBookAppointmentForm({
             </div>
           )}
 
+          <BookingTimezoneSelector compact />
+
           <div>
             <label className="text-xs font-semibold text-foreground/60">
               Fecha
             </label>
+            {showsClinicReference && (
+              <p className="mt-0.5 text-[11px] text-foreground/50">
+                Calendario de la clínica ({clinicTimezoneName}).
+              </p>
+            )}
             <BookingDateCalendar
               value={date}
-              minDate={todayStr()}
+              minDate={clinicToday}
               onChange={setDate}
             />
           </div>
 
           <div>
             <p className="text-xs font-semibold text-foreground/60">Horario</p>
+            {showsClinicReference && (
+              <p className="mt-0.5 text-[11px] text-foreground/50">
+                Hora grande = tu zona · debajo = Argentina
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
               {loadingSlots && <LoadingInline label="Buscando horarios…" />}
               {!loadingSlots && slots.length === 0 && (
@@ -183,7 +195,7 @@ export function AdminBookAppointmentForm({
                         : "bg-muted hover:bg-accent-soft"
                     }`}
                   >
-                    {s.label}
+                    <SlotTimeLabel iso={s.start} />
                   </button>
                 ))}
             </div>

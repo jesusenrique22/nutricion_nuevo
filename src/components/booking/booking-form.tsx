@@ -4,8 +4,13 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation";
 import { BrandLinkButton } from "@/components/brand/brand-link-button";
 import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
+import {
+  BookingTimezoneSelector,
+  SlotTimeLabel,
+} from "@/components/booking/booking-timezone-ui";
 import { RecaptchaNotice } from "@/components/security/recaptcha-notice";
 import { useCurrency } from "@/contexts/currency-context";
+import { useBookingTimezone } from "@/contexts/booking-timezone-context";
 import { FlowStep, FlowStepDots } from "@/components/motion/flow-step";
 import { useRecaptcha } from "@/hooks/use-recaptcha";
 import {
@@ -17,14 +22,7 @@ import {
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import { getBookingAvailabilitySnapshot } from "@/server/actions/booking.queries";
 import { addAppointmentToCart } from "@/server/actions/cart.actions";
-
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+import { clinicTodayDateKey } from "@/lib/clinic-timezone";
 
 type Step = "service" | "details" | "confirm";
 
@@ -37,6 +35,8 @@ export function BookingForm({
 }) {
   const router = useRouter();
   const { formatPrice } = useCurrency();
+  const { showsClinicReference, clinicTimezoneName } = useBookingTimezone();
+  const clinicToday = clinicTodayDateKey();
   const [snapshot, setSnapshot] = useState(availability);
   const [step, setStep] = useState<Step>("service");
   const [direction, setDirection] = useState<1 | -1>(1);
@@ -44,7 +44,7 @@ export function BookingForm({
   const [modality, setModality] = useState<"ONLINE" | "PRESENCIAL">(
     "PRESENCIAL",
   );
-  const [date, setDate] = useState(todayStr());
+  const [date, setDate] = useState(clinicToday);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [extending, setExtending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -220,9 +220,13 @@ export function BookingForm({
             {selectedType.morningOnly && (
               <p className="mt-3 rounded-2xl bg-accent/15 px-3 py-2 text-xs text-foreground/70">
                 Solo presencial · horario matutino ({selectedType.morningStart}–
-                {selectedType.morningEnd})
+                {selectedType.morningEnd} hora {clinicTimezoneName})
               </p>
             )}
+
+            <div className="mt-4">
+              <BookingTimezoneSelector compact />
+            </div>
 
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {selectedType.allowsPresencial && (
@@ -254,9 +258,14 @@ export function BookingForm({
             </div>
 
             <label className="mt-5 block text-sm font-semibold">Fecha</label>
+            {showsClinicReference && (
+              <p className="mt-1 text-[11px] text-foreground/50">
+                El calendario usa la fecha de la clínica ({clinicTimezoneName}).
+              </p>
+            )}
             <BookingDateCalendar
               value={date}
-              minDate={todayStr()}
+              minDate={clinicToday}
               onChange={setDate}
               blockedDates={blockedSet}
               coverageFrom={snapshot.from}
@@ -290,6 +299,12 @@ export function BookingForm({
               {formatPrice(selectedType.price, "ARS")}
             </p>
 
+            {showsClinicReference && (
+              <p className="mt-2 text-center text-[11px] text-foreground/50">
+                Hora grande = tu zona · debajo = hora Argentina de la clínica
+              </p>
+            )}
+
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {loadingSlots && (
                 <span className="text-sm text-foreground/50">Cargando…</span>
@@ -311,7 +326,7 @@ export function BookingForm({
                         : "bg-muted hover:bg-accent/20"
                     }`}
                   >
-                    {s.label}
+                    <SlotTimeLabel iso={s.start} />
                   </button>
                 ))}
             </div>

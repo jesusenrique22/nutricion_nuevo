@@ -30,6 +30,7 @@ export function FlyerHero({ slides }: { slides?: HeroSlide[] }) {
             alt={first.alt}
             className="absolute inset-0 h-full w-full object-cover object-center"
             fetchPriority="high"
+            loading="eager"
             decoding="async"
           />
         ) : (

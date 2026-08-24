@@ -2,17 +2,15 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { BookingDateCalendar } from "@/components/booking/booking-date-calendar";
+import {
+  BookingTimezoneSelector,
+  SlotTimeLabel,
+} from "@/components/booking/booking-timezone-ui";
+import { useBookingTimezone } from "@/contexts/booking-timezone-context";
+import { clinicTodayDateKey } from "@/lib/clinic-timezone";
 import { getRescheduleSlots } from "@/server/actions/booking.queries";
 import { rescheduleAppointment } from "@/server/actions/appointment-status.actions";
 import type { Slot } from "@/server/services/availability.service";
-
-function todayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function RescheduleAppointmentForm({
   appointmentId,
@@ -23,7 +21,9 @@ export function RescheduleAppointmentForm({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [date, setDate] = useState(todayStr());
+  const clinicToday = clinicTodayDateKey();
+  const { showsClinicReference, clinicTimezoneName } = useBookingTimezone();
+  const [date, setDate] = useState(clinicToday);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -56,15 +56,27 @@ export function RescheduleAppointmentForm({
 
   return (
     <div className="space-y-4">
+      <BookingTimezoneSelector compact />
+
       <label className="block text-sm font-semibold">Nueva fecha</label>
+      {showsClinicReference && (
+        <p className="text-[11px] text-foreground/50">
+          Calendario de la clínica ({clinicTimezoneName}).
+        </p>
+      )}
       <BookingDateCalendar
         value={date}
-        minDate={todayStr()}
+        minDate={clinicToday}
         onChange={setDate}
       />
 
       <div>
         <p className="text-sm font-semibold">Horario disponible</p>
+        {showsClinicReference && (
+          <p className="mt-0.5 text-[11px] text-foreground/50">
+            Hora grande = tu zona · debajo = Argentina
+          </p>
+        )}
         <div className="mt-2 flex flex-wrap gap-2">
           {loadingSlots && (
             <span className="text-sm text-foreground/50">Cargando…</span>
@@ -86,7 +98,7 @@ export function RescheduleAppointmentForm({
                     : "bg-muted hover:bg-accent-soft"
                 }`}
               >
-                {s.label}
+                <SlotTimeLabel iso={s.start} />
               </button>
             ))}
         </div>

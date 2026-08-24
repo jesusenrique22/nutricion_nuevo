@@ -42,7 +42,7 @@ function settledOr<T>(result: PromiseSettledResult<T>, fallback: T): T {
 /** Hero solo: no espera reviews/paquetes → HTML + imagen LCP más temprano. */
 async function LandingHero() {
   const images = await getLandingImages();
-  preloadCriticalImages([images.heroSlides[0]?.src]);
+  preloadCriticalImages(images.heroSlides.map((s) => s.src));
   return <FlyerHero slides={images.heroSlides} />;
 }
 

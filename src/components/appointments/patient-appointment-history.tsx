@@ -1,6 +1,9 @@
 "use client";
 
 import { DisplayPrice } from "@/components/currency/display-price";
+import { useBookingTimezone } from "@/contexts/booking-timezone-context";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
+import { formatDateTimeInZone } from "@/lib/timezone/display";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 import { CancelAppointmentButton } from "@/components/booking/cancel-appointment-button";
 import { RescheduleAppointmentButton } from "@/components/booking/reschedule-appointment-button";
@@ -28,14 +31,22 @@ const paymentStyles: Record<string, string> = {
   FAILED: "bg-red-50 text-red-600",
 };
 
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString("es", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function AppointmentWhen({ iso }: { iso: string }) {
+  const { formatAppointmentDateTime, showsClinicReference } =
+    useBookingTimezone();
+  const primary = formatAppointmentDateTime(iso);
+  if (!showsClinicReference) {
+    return <>{primary}</>;
+  }
+  const clinic = formatDateTimeInZone(iso, CLINIC_TIMEZONE);
+  return (
+    <span className="inline-flex flex-col">
+      <span>{primary}</span>
+      <span className="text-[11px] font-normal text-foreground/50">
+        {clinic} (Argentina)
+      </span>
+    </span>
+  );
 }
 
 function canModify(status: string, start: string) {
@@ -83,7 +94,8 @@ export function PatientAppointmentHistory({
                 <div>
                   <div className="font-semibold">{a.title}</div>
                   <div className="mt-1 text-sm text-foreground/50">
-                    {fmt(a.start)} · {modalityLabels[a.modality] ?? a.modality}
+                    <AppointmentWhen iso={a.start} /> ·{" "}
+                    {modalityLabels[a.modality] ?? a.modality}
                     {a.flow === "INTAKE" ? " · 1ª cita" : " · Seguimiento"}
                     {a.price ? (
                       <>

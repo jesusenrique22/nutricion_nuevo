@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
@@ -49,13 +49,91 @@ function clearBootOverlay(): void {
   setSplashLock(false);
 }
 
+function preloadUrls(urls: string[]): Promise<void> {
+  const unique = [...new Set(urls.map((u) => u.trim()).filter(Boolean))];
+  if (unique.length === 0) return Promise.resolve();
+
+  return Promise.all(
+    unique.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const img = new window.Image();
+          const done = () => resolve();
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", done, { once: true });
+          img.src = src;
+        }),
+    ),
+  ).then(() => undefined);
+}
+
+function waitForDomImages(selectors: string): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    const tryCollect = () => {
+      const nodes = Array.from(
+        document.querySelectorAll<HTMLImageElement>(selectors),
+      );
+      if (nodes.length === 0) return false;
+
+      const allCached = nodes.every(
+        (img) => img.complete && img.naturalWidth > 0,
+      );
+      if (allCached) {
+        finish();
+        return true;
+      }
+
+      Promise.all(
+        nodes.map(
+          (img) =>
+            new Promise<void>((r) => {
+              if (img.complete && img.naturalWidth > 0) {
+                r();
+                return;
+              }
+              const done = () => r();
+              img.addEventListener("load", done, { once: true });
+              img.addEventListener("error", done, { once: true });
+            }),
+        ),
+      ).then(finish);
+      return true;
+    };
+
+    if (!tryCollect()) {
+      window.setTimeout(() => {
+        if (!tryCollect()) finish();
+      }, 450);
+    }
+  });
+}
+
 /**
  * Splash solo en la primera carga del lobby.
- * Si ya se vio o las imágenes están en caché → no vuelve a aparecer.
+ * Precarga imágenes críticas del lobby mientras muestra la marca Anttova.
  */
-export function BrandSplashLoader() {
+export function BrandSplashLoader({
+  criticalImageUrls = [],
+}: {
+  criticalImageUrls?: string[];
+}) {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  // React 19: no pasar arrays en deps (cambia el tamaño del array). Clave estable.
+  const criticalUrlsKey = useMemo(
+    () => criticalImageUrls.join("\0"),
+    [criticalImageUrls],
+  );
+  const criticalUrlsRef = useRef(criticalImageUrls);
+  criticalUrlsRef.current = criticalImageUrls;
+
   // SSR: nunca montar splash (evita flash en recargas siguientes)
   const [phase, setPhase] = useState<Phase>("done");
   const runId = useRef(0);
@@ -91,7 +169,6 @@ export function BrandSplashLoader() {
     let exitTimer = 0;
     let maxTimer = 0;
     let minWaitTimer = 0;
-    let pollTimer = 0;
     let imagesWereCached = false;
 
     const stillActive = () => myRun === runId.current;
@@ -115,58 +192,27 @@ export function BrandSplashLoader() {
       }, wait);
     };
 
-    const waitForHeroImages = (): Promise<void> =>
-      new Promise((resolve) => {
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          resolve();
-        };
+    const urls = criticalUrlsRef.current;
 
-        const tryCollect = () => {
-          const nodes = Array.from(
-            document.querySelectorAll<HTMLImageElement>(
-              '#inicio img, img[fetchpriority="high"]',
-            ),
-          );
-          if (nodes.length === 0) return false;
-
-          const allCached = nodes.every(
-            (img) => img.complete && img.naturalWidth > 0,
-          );
-          if (allCached) {
-            imagesWereCached = true;
-            finish();
-            return true;
-          }
-
-          Promise.all(
-            nodes.map(
-              (img) =>
-                new Promise<void>((r) => {
-                  if (img.complete && img.naturalWidth > 0) {
-                    r();
-                    return;
-                  }
-                  const done = () => r();
-                  img.addEventListener("load", done, { once: true });
-                  img.addEventListener("error", done, { once: true });
-                }),
-            ),
-          ).then(finish);
-          return true;
-        };
-
-        if (!tryCollect()) {
-          pollTimer = window.setTimeout(() => {
-            if (!tryCollect()) finish();
-          }, 450);
-        }
+    const waitForLobbyImages = (): Promise<{ cached: boolean }> =>
+      Promise.all([
+        preloadUrls(urls),
+        waitForDomImages('#inicio img, img[fetchpriority="high"]'),
+      ]).then(() => {
+        const heroInDom = document.querySelector<HTMLImageElement>("#inicio img");
+        const cached = Boolean(
+          heroInDom?.complete &&
+            heroInDom.naturalWidth > 0 &&
+            urls.length > 0,
+        );
+        return { cached };
       });
 
     const onWindowReady = () => {
-      void waitForHeroImages().then(beginExit);
+      void waitForLobbyImages().then(({ cached }) => {
+        imagesWereCached = cached;
+        beginExit();
+      });
     };
 
     if (document.readyState === "complete") {
@@ -182,11 +228,10 @@ export function BrandSplashLoader() {
       window.clearTimeout(minWaitTimer);
       window.clearTimeout(exitTimer);
       window.clearTimeout(maxTimer);
-      window.clearTimeout(pollTimer);
       window.removeEventListener("load", onWindowReady);
       setSplashLock(false);
     };
-  }, [isHome]);
+  }, [isHome, criticalUrlsKey]);
 
   if (phase === "done" || !isHome) return null;
 

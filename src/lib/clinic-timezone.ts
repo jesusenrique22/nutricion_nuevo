@@ -55,3 +55,8 @@ export function toMinutesHhmm(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
+
+/** Hoy YYYY-MM-DD según calendario de la clínica. */
+export function clinicTodayDateKey(): string {
+  return dateKeyInClinicTz(new Date());
+}
