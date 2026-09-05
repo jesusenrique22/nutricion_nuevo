@@ -28,6 +28,7 @@ next-env.d.ts
 
 # env files (secrets — nunca subir)
 .env*
+*.env
 !.env.example
 .env.backup
 .env.*.backup
