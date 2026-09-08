@@ -90,7 +90,7 @@ function Hint({ children }: { children?: ReactNode }) {
 }
 
 function UrlField({
-  placeholder = "/uploads/cv/... o /api/media/...",
+  placeholder = "URL del archivo o subilo desde el botón",
 }: {
   placeholder?: string;
 }) {

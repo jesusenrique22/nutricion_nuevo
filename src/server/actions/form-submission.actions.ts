@@ -431,9 +431,10 @@ export async function submitDynamicConsultationForm(
         return { ok: false, message: "Tipo de formulario no soportado." };
     }
   } catch (err) {
+    console.error("[submitForm]", err);
     return {
       ok: false,
-      message: err instanceof Error ? err.message : "Error al guardar.",
+      message: "No se pudo guardar el formulario. Intentá de nuevo.",
     };
   }
 

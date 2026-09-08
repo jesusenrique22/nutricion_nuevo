@@ -179,7 +179,7 @@ export async function createRecurringBlockedWeekdays(
       return {
         ok: false,
         message:
-          "Prisma Client desactualizado. Reiniciá con: pnpm db:generate && pnpm run dev:clean",
+          "No se pudo completar la acción. Recargá la página e intentá de nuevo.",
       };
     }
 
@@ -201,7 +201,7 @@ export async function createRecurringBlockedWeekdays(
       return {
         ok: false,
         message:
-          "Para bloquear solo una franja horaria, regenerá Prisma: pnpm db:generate && pnpm run dev:clean",
+          "No se pudo bloquear esa franja horaria. Recargá la página e intentá de nuevo.",
       };
     }
 
@@ -276,7 +276,7 @@ export async function deleteRecurringBlockedWeekday(
       return {
         ok: false,
         message:
-          "Prisma Client desactualizado. Reiniciá con: pnpm db:generate && pnpm run dev:clean",
+          "No se pudo completar la acción. Recargá la página e intentá de nuevo.",
       };
     }
 

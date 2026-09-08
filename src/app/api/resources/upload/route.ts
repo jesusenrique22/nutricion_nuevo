@@ -78,8 +78,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[resources/upload]", err);
-    const message =
-      err instanceof Error ? err.message : "Error al subir el archivo.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "No pudimos subir el archivo. Intentá de nuevo." },
+      { status: 500 },
+    );
   }
 }

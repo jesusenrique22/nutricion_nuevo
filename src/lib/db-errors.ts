@@ -4,20 +4,17 @@ import {
   TIME_SLOT_TAKEN_MESSAGE,
 } from "@/lib/scheduling-errors";
 
+const GENERIC_DB =
+  "No pudimos completar la operación en este momento. Intentá de nuevo en unos minutos.";
+
 /** Mensaje amigable cuando Prisma no puede conectar a PostgreSQL. */
 export function getDbErrorMessage(error: unknown): string | null {
   if (error instanceof Prisma.PrismaClientInitializationError) {
-    return "No se pudo conectar a la base de datos. Revisá DATABASE_URL en .env (URL pooled de Neon con ?sslmode=require).";
+    return GENERIC_DB;
   }
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P1000") {
-      return "Credenciales de PostgreSQL inválidas. Actualizá DATABASE_URL en .env (Neon → Reset password si hace falta).";
-    }
-    if (error.code === "P1001") {
-      return "No se puede alcanzar Neon. Verificá que el proyecto esté activo en console.neon.tech y que DATABASE_URL sea la URL pooled (*.neon.tech).";
-    }
-    if (error.code === "P1003") {
-      return 'La base de datos "nutricion" no existe. Créala en pgAdmin y ejecuta: npm run db:migrate';
+    if (error.code === "P1000" || error.code === "P1001" || error.code === "P1003") {
+      return GENERIC_DB;
     }
     if (error.code === "P2002") {
       return "Ya existe un registro con esos datos.";
@@ -29,7 +26,7 @@ export function getDbErrorMessage(error: unknown): string | null {
       return "El registro ya no existe.";
     }
     if (error.code === "P2022") {
-      return "La base de datos en producción no está actualizada. Ejecutá las migraciones (pnpm run db:migrate en Neon o redeploy en Vercel con migrate deploy).";
+      return "El servicio no está disponible temporalmente. Intentá de nuevo más tarde.";
     }
   }
   if (error instanceof Prisma.PrismaClientValidationError) {
@@ -59,28 +56,29 @@ export function formatActionError(
     ) {
       return "No se puede eliminar porque hay registros vinculados.";
     }
-    if (msg.includes("Unknown argument") || msg.includes("Invalid `prisma.")) {
+    if (
+      msg.includes("Unknown argument") ||
+      msg.includes("Invalid `prisma.") ||
+      msg.includes("Prisma Client") ||
+      msg.includes("does not exist") ||
+      msg.includes("MONGODB") ||
+      msg.includes("MongoDB") ||
+      msg.includes("variable de entorno") ||
+      msg.includes("DATABASE_URL") ||
+      msg.includes(".env")
+    ) {
       return "Error interno. Recargá la página e intentá de nuevo.";
     }
-    if (
-      msg.includes("does not exist") &&
-      (msg.includes("column") || msg.includes("Column"))
-    ) {
-      return "Faltan migraciones en la base de datos. En Vercel, verificá que el build ejecute prisma migrate deploy; o corré pnpm exec prisma migrate deploy contra Neon.";
-    }
-    if (msg.includes("Prisma Client desactualizado")) {
-      return "El cliente Prisma no coincide con el schema. Redeploy en Vercel o ejecutá pnpm exec prisma generate.";
-    }
-    if (msg.length > 0 && msg.length <= 240) return msg;
   }
 
+  console.error("[action]", error);
   return fallback;
 }
 
 /** Ejecuta una operación Prisma y devuelve error amigable si falla la conexión. */
 export async function withDb<T>(
   fn: () => Promise<T>,
-  fallbackMessage = "Error de base de datos. Intenta de nuevo más tarde.",
+  fallbackMessage = "No pudimos completar la operación. Intentá de nuevo más tarde.",
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
   try {
     const data = await fn();
@@ -88,10 +86,7 @@ export async function withDb<T>(
   } catch (error) {
     const dbMessage = getDbErrorMessage(error);
     if (dbMessage) return { ok: false, message: dbMessage };
-    if (error instanceof Error && error.message.length <= 200) {
-      return { ok: false, message: error.message };
-    }
-    console.error(error);
+    console.error("[withDb]", error);
     return { ok: false, message: fallbackMessage };
   }
 }

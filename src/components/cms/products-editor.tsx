@@ -294,6 +294,10 @@ export function ProductsEditor({
   }
 
   function removeItem(id: string) {
+    const item = data.items.find((it) => it.id === id);
+    if (!confirm(`¿Eliminar el producto «${item?.name || "sin nombre"}»?`)) {
+      return;
+    }
     update({ ...data, items: data.items.filter((it) => it.id !== id) });
     if (activeId === id) setActiveId(null);
   }

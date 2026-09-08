@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ items });
   } catch (err) {
     console.error("[media/library]", err);
-    const message =
-      err instanceof Error ? err.message : "Error al cargar la biblioteca.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "No pudimos cargar la biblioteca. Intentá de nuevo." },
+      { status: 500 },
+    );
   }
 }

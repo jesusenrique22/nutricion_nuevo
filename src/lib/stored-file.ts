@@ -58,6 +58,42 @@ export function isUploadsPath(url: string): boolean {
   return normalizeStoredUrl(url).startsWith("/uploads/");
 }
 
+function isRemoteHttpsUrl(url: string): boolean {
+  return /^https:\/\//i.test(normalizeStoredUrl(url));
+}
+
+async function openRemoteHttpsUrl(
+  url: string,
+): Promise<StoredFileOpenResult | null> {
+  if (!isRemoteHttpsUrl(url)) return null;
+  try {
+    const res = await fetch(normalizeStoredUrl(url), {
+      cache: "no-store",
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const contentType = res.headers.get("content-type")?.split(";")[0]?.trim();
+    const fileName = (() => {
+      try {
+        return path.basename(new URL(url).pathname) || undefined;
+      } catch {
+        return undefined;
+      }
+    })();
+    return {
+      stream: Readable.from(buffer),
+      mimeType:
+        contentType && contentType !== "application/octet-stream"
+          ? contentType
+          : mimeFromPath(fileName ?? url),
+      fileName,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function mimeFromPath(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
@@ -159,6 +195,10 @@ export async function openStoredFileUrl(
 
   if (isUploadsPath(normalized)) {
     return openLocalUploadsPath(normalized);
+  }
+
+  if (isRemoteHttpsUrl(normalized)) {
+    return openRemoteHttpsUrl(normalized);
   }
 
   return null;

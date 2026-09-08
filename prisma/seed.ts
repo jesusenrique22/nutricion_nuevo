@@ -183,6 +183,9 @@ async function main() {
 
   console.log("Seed completado: consultas, admin, CMS, recurso demo.");
   console.log(`Admin -> ${adminEmail} / Admin123!`);
+  console.log(
+    "Para restaurar «Guía de porciones proteicas»: pnpm run db:restore-guia",
+  );
 }
 
 main()

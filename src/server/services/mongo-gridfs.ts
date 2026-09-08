@@ -19,7 +19,7 @@ export async function uploadToMongo(
 ): Promise<{ fileId: string; url: string }> {
   const db = await tryGetMongoDb();
   if (!db) {
-    throw new Error("MongoDB no disponible");
+    throw new Error("No pudimos guardar el archivo. Intentá de nuevo más tarde.");
   }
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
 

@@ -54,7 +54,7 @@ function LoginForm() {
       }
       if (code === "DATABASE_UNAVAILABLE" || res.error === "Configuration") {
         setError(
-          "No se pudo conectar con la base de datos (Neon). Revisá DATABASE_URL en Vercel o esperá a que termine el deploy.",
+          "El servicio no está disponible temporalmente. Intentá de nuevo en unos minutos.",
         );
         return;
       }
@@ -75,7 +75,7 @@ function LoginForm() {
       )}
       {registered && (
         <p className="mb-4 rounded-xl bg-primary/10 px-4 py-3 text-sm">
-          Cuenta creada. En desarrollo sin correo configurado ya podés ingresar.
+          Cuenta creada. Ya podés iniciar sesión.
         </p>
       )}
       {deactivated && (

@@ -19,10 +19,24 @@ type PdfDoc = {
 };
 
 async function loadPdfDocument(data: ArrayBuffer): Promise<PdfDoc> {
+  const bytes = new Uint8Array(data);
+  const header = String.fromCharCode(...bytes.slice(0, 5));
+  if (header !== "%PDF-") {
+    throw new Error(
+      "El documento no es un PDF válido. Pedile a Anttova que lo vuelva a subir desde Recursos.",
+    );
+  }
+
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf/pdf.worker.min.mjs";
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
-  return doc as unknown as PdfDoc;
+  try {
+    const doc = await pdfjs.getDocument({ data: bytes }).promise;
+    return doc as unknown as PdfDoc;
+  } catch {
+    throw new Error(
+      "No se pudo abrir el PDF. Puede estar dañado o incompleto; pedí que lo vuelvan a subir.",
+    );
+  }
 }
 
 function PdfPageCanvas({
@@ -117,10 +131,18 @@ export function ClientPdfDocumentViewer({
         const res = await fetch(pdfUrl, { credentials: "include" });
         if (!res.ok) {
           const detail = (await res.text().catch(() => "")).trim();
+          const safeDetail =
+            detail &&
+            detail.length < 200 &&
+            !detail.startsWith("<") &&
+            !detail.includes("/api/")
+              ? detail
+              : null;
           throw new Error(
             res.status === 403 || res.status === 401
               ? "No autorizado para ver este documento."
-              : detail || `No se pudo cargar el PDF (${res.status}).`,
+              : safeDetail ||
+                  "No se pudo cargar el documento. Intentá de nuevo más tarde.",
           );
         }
         const buffer = await res.arrayBuffer();

@@ -94,11 +94,11 @@ export async function storePublicFile(
     }
   } else if (hasMongoUri() && requiresPersistentStorage()) {
     throw new Error(
-      "MongoDB no está disponible. Revisá MONGODB_URI y Atlas.",
+      "No pudimos guardar el archivo. Intentá de nuevo en unos minutos.",
     );
   } else if (requiresPersistentStorage()) {
     throw new Error(
-      "MONGODB_URI no está configurado. Es necesario para subir archivos en producción.",
+      "No pudimos guardar el archivo. Intentá de nuevo más tarde.",
     );
   }
 

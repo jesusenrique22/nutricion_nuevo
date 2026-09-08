@@ -64,7 +64,7 @@ function getClientOptions() {
 function getMongoUri(): string {
   const uri = process.env.MONGODB_URI?.trim();
   if (!uri) {
-    throw new Error("Falta la variable de entorno MONGODB_URI");
+    throw new Error("No pudimos conectar con el almacenamiento de archivos.");
   }
   return normalizeMongoUri(uri);
 }

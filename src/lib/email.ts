@@ -25,7 +25,7 @@ let cachedTransporter: nodemailer.Transporter | null = null;
 let cachedConfigKey: string | null = null;
 
 function appBaseUrl() {
-  return process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  return process.env.NEXTAUTH_URL ?? "https://nutricion-phi.vercel.app";
 }
 
 export function absoluteUrl(path: string) {
@@ -107,7 +107,7 @@ async function sendViaSmtp(
     return {
       ok: false,
       message:
-        "No se pudo enviar el correo de verificación. Si estás en producción, configurá SMTP en el hosting (Vercel/Render).",
+        "No se pudo enviar el correo. Intentá de nuevo en unos minutos.",
     };
   }
 }
@@ -140,7 +140,7 @@ export async function verifySmtpConnection(): Promise<{
   if (!config) {
     return {
       ok: false,
-      message: "SMTP no configurado (falta SMTP_HOST en .env).",
+      message: "El envío de correo no está disponible en este momento.",
     };
   }
 
@@ -148,10 +148,13 @@ export async function verifySmtpConnection(): Promise<{
     await getTransporter(config).verify();
     return {
       ok: true,
-      message: `SMTP OK — ${config.host}:${config.port} (${config.from})`,
+      message: "El correo está configurado correctamente.",
     };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, message: `SMTP falló: ${msg}` };
+    console.error("[email/verify]", err);
+    return {
+      ok: false,
+      message: "No se pudo verificar el envío de correo. Intentá más tarde.",
+    };
   }
 }

@@ -95,36 +95,53 @@ export async function upsertResource(
   }
 }
 
-export async function deleteResource(id: string): Promise<ResourceActionResult> {
+export type DeleteResourceScope = "all" | "new_only";
+
+export async function deleteResource(
+  id: string,
+  scope: DeleteResourceScope = "all",
+): Promise<ResourceActionResult> {
   if (!(await requireAdmin())) {
     return { ok: false, message: "No autorizado." };
   }
 
   const resource = await prisma.resource.findUnique({
     where: { id },
-    select: {
-      id: true,
-      purchases: {
-        where: { status: "GRANTED" },
-        select: { id: true },
-        take: 1,
-      },
-    },
+    select: { id: true, title: true },
   });
   if (!resource) {
     return { ok: false, message: "Recurso no encontrado." };
   }
 
-  if (resource.purchases.length > 0) {
-    return {
-      ok: false,
-      message:
-        "No se puede eliminar: hay pacientes con acceso activo. Despublícalo para ocultarlo de la tienda.",
-    };
+  if (scope === "new_only") {
+    try {
+      await prisma.$transaction([
+        prisma.resource.update({
+          where: { id },
+          data: { isPublished: false },
+        }),
+        prisma.cartItem.deleteMany({ where: { resourceId: id } }),
+      ]);
+      revalidateResourcePaths();
+      return { ok: true };
+    } catch (err) {
+      console.error("[deleteResource:new_only]", err);
+      return {
+        ok: false,
+        message: formatActionError(
+          err,
+          "No se pudo ocultar el recurso para nuevos pacientes.",
+        ),
+      };
+    }
   }
 
   try {
     await prisma.$transaction([
+      prisma.resourcePurchase.updateMany({
+        where: { resourceId: id, status: "GRANTED" },
+        data: { status: "REFUNDED" },
+      }),
       prisma.cartItem.deleteMany({ where: { resourceId: id } }),
       prisma.resourcePurchase.deleteMany({ where: { resourceId: id } }),
       prisma.resource.delete({ where: { id } }),

@@ -17,14 +17,14 @@ const statusMessages: Record<string, string> = {
   connected:
     "Google Calendar conectado. Solo se sincronizan citas desde hoy en adelante; las nuevas se agregan solas al crearlas.",
   denied:
-    "Google bloqueó la autorización. Agregá tu correo (david.30249427@uru.edu) en Test users del OAuth consent screen y el scope calendar.events.",
+    "No se pudo autorizar Google Calendar. Revisá que tu cuenta tenga permiso e intentá de nuevo.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
   no_refresh:
-    "Google no devolvió token persistente. En Google Cloud → desconectá la app de tu cuenta y volvé a conectar con «Conectar mi Google Calendar».",
+    "No se pudo completar la conexión con Google. Desconectá la app desde tu cuenta de Google y volvé a conectar.",
   error:
-    "Error al conectar Google Calendar. Revisá el detalle abajo. Si ves redirect_uri_mismatch, agregá la URL de producción en Google Cloud.",
+    "No se pudo conectar Google Calendar. Intentá de nuevo en unos minutos.",
   missing_config:
-    "Faltan GOOGLE_CALENDAR_CLIENT_ID y GOOGLE_CALENDAR_CLIENT_SECRET en Vercel/Render.",
+    "La conexión con Google Calendar no está disponible en este momento.",
 };
 
 function GoogleCalendarConnectInner({
@@ -47,14 +47,11 @@ function GoogleCalendarConnectInner({
 
   useEffect(() => {
     const gcal = params.get("gcal");
-    const detail = params.get("gcal_detail");
     const shouldSync = params.get("sync") === "1";
 
     if (gcal && statusMessages[gcal]) {
       setMessageTone(gcal === "connected" ? "success" : gcal === "error" ? "error" : "info");
-      setMessage(
-        detail ? `${statusMessages[gcal]} (${detail})` : statusMessages[gcal],
-      );
+      setMessage(statusMessages[gcal]);
       router.replace("/dashboard/admin/calendar", { scroll: false });
 
       if (gcal === "connected" && shouldSync && !autoSyncDone) {

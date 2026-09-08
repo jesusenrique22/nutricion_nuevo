@@ -13,12 +13,7 @@ export async function GET() {
     });
   } catch (err) {
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : "No se pudo obtener la cotización.",
-      },
+      { error: "No se pudo obtener la cotización. Intentá de nuevo más tarde." },
       { status: 503 },
     );
   }

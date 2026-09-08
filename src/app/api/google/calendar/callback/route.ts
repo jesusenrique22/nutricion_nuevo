@@ -80,10 +80,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${calendarUrl}?gcal=connected&sync=1`);
   } catch (err) {
     console.error("[google-calendar/callback]", err);
-    const params = new URLSearchParams({ gcal: "error" });
-    const message =
-      err instanceof Error ? err.message : "Error desconocido al guardar la conexión.";
-    params.set("gcal_detail", message.slice(0, 240));
-    return NextResponse.redirect(`${calendarUrl}?${params.toString()}`);
+    return NextResponse.redirect(`${calendarUrl}?gcal=error`);
   }
 }

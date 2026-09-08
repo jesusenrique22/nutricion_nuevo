@@ -78,6 +78,7 @@ export function CartLineItem({
   }
 
   function handleRemove() {
+    if (!confirm(`¿Quitar «${item.title}» del carrito?`)) return;
     startTransition(async () => {
       await removeCartItem(item.id);
       refresh();

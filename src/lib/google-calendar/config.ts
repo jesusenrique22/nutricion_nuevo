@@ -16,7 +16,7 @@ export function getGoogleCalendarConfig() {
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET?.trim();
   const nextAuthBase = (
-    sanitizeEnvUrl(process.env.NEXTAUTH_URL) ?? "http://localhost:3000"
+    sanitizeEnvUrl(process.env.NEXTAUTH_URL) ?? "https://nutricion-phi.vercel.app"
   ).replace(/\/$/, "");
   const redirectUri =
     sanitizeEnvUrl(process.env.GOOGLE_CALENDAR_REDIRECT_URI) ??

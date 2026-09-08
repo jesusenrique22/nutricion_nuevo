@@ -19,7 +19,7 @@ if (!SOCKET_SECRET) {
 const httpServer = createServer(handleHttpRequest);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+    origin: process.env.NEXTAUTH_URL ?? "https://nutricion-phi.vercel.app",
     methods: ["GET", "POST"],
   },
 });

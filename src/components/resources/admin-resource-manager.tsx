@@ -8,8 +8,10 @@ import {
   deleteResource,
   toggleResourcePublished,
   upsertResource,
+  type DeleteResourceScope,
 } from "@/server/actions/resource.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
+import { DeleteResourceDialog } from "@/components/resources/delete-resource-dialog";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { uploadFile as uploadPublicFile } from "@/lib/client-upload";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -47,6 +49,7 @@ export function AdminResourceManager({
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ResourceDTO | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -142,6 +145,24 @@ export function AdminResourceManager({
     });
   }
 
+  function handleDeleteConfirm(scope: DeleteResourceScope) {
+    if (!deleteTarget) return;
+    startTransition(async () => {
+      const res = await deleteResource(deleteTarget.id, scope);
+      if (!res.ok) {
+        setMessage(res.message);
+        return;
+      }
+      setDeleteTarget(null);
+      setMessage(
+        scope === "new_only"
+          ? "Recurso oculto para nuevos pacientes."
+          : "Recurso eliminado para todos.",
+      );
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between gap-4">
@@ -157,6 +178,19 @@ export function AdminResourceManager({
           + Nuevo recurso
         </button>
       </div>
+
+      {message && (
+        <p
+          role="alert"
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            message === "Guardado." || message === "Portada actualizada en la tienda."
+              ? "border-foreground/10 bg-foreground/5 text-foreground/70"
+              : "border-red-200 bg-red-50 font-medium text-red-700"
+          }`}
+        >
+          {message}
+        </p>
+      )}
 
       {editing && (
         <form
@@ -327,7 +361,7 @@ export function AdminResourceManager({
                   setForm({ ...form, contentUrl: e.target.value })
                 }
                 className={inputClass}
-                placeholder="/api/media/… o URL del archivo"
+                placeholder="URL del archivo o subilo desde el botón"
               />
               <button
                 type="button"
@@ -401,13 +435,6 @@ export function AdminResourceManager({
               Cancelar
             </button>
           </div>
-          {message && (
-            <p
-              className={`text-sm ${message === "Guardado." ? "text-foreground/70" : "font-medium text-red-600"}`}
-            >
-              {message}
-            </p>
-          )}
         </form>
       )}
 
@@ -471,18 +498,10 @@ export function AdminResourceManager({
               <button
                 type="button"
                 disabled={isPending}
-                onClick={() =>
-                  startTransition(async () => {
-                    if (!confirm("¿Eliminar recurso?")) return;
-                    const res = await deleteResource(r.id);
-                    if (!res.ok) {
-                      setMessage(res.message);
-                      return;
-                    }
-                    setMessage(null);
-                    router.refresh();
-                  })
-                }
+                onClick={() => {
+                  setMessage(null);
+                  setDeleteTarget(r);
+                }}
                 className="text-sm font-semibold text-red-600"
               >
                 Eliminar
@@ -491,6 +510,16 @@ export function AdminResourceManager({
           </div>
         ))}
       </div>
+
+      <DeleteResourceDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget?.title ?? ""}
+        loading={isPending}
+        onOpenChange={(open) => {
+          if (!isPending && !open) setDeleteTarget(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

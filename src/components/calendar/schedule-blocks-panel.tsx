@@ -183,6 +183,7 @@ export function ScheduleBlocksPanel({
   }
 
   function handleDeleteDay(id: string) {
+    if (!confirm("¿Eliminar este día bloqueado?")) return;
     setMessage(null);
     startTransition(async () => {
       const res = await deleteBlockedDay({ id });
@@ -196,6 +197,7 @@ export function ScheduleBlocksPanel({
   }
 
   function handleDeleteRecurring(id: string) {
+    if (!confirm("¿Eliminar este bloqueo recurrente?")) return;
     setMessage(null);
     startTransition(async () => {
       const res = await deleteRecurringBlockedWeekday({ id });
@@ -209,6 +211,7 @@ export function ScheduleBlocksPanel({
   }
 
   function handleDeleteBlock(id: string) {
+    if (!confirm("¿Eliminar este bloqueo de horario?")) return;
     setMessage(null);
     startTransition(async () => {
       const res = await deleteScheduleBlock({ id });

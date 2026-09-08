@@ -117,10 +117,10 @@ export async function forceRefreshExchangeRate(): Promise<CurrencyActionResult> 
     revalidateCurrencyPaths();
     return { ok: true, snapshot };
   } catch (err) {
+    console.error("[forceRefreshExchangeRate]", err);
     return {
       ok: false,
-      message:
-        err instanceof Error ? err.message : "No se pudo actualizar la tasa.",
+      message: "No se pudo actualizar la tasa. Intentá de nuevo más tarde.",
     };
   }
 }

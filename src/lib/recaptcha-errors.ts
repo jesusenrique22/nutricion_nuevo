@@ -7,14 +7,24 @@ type SiteVerifyResponse = {
   "error-codes"?: string[];
 };
 
+const GENERIC_FAILURE =
+  "No pudimos verificar la solicitud. Recargá la página e intentá de nuevo.";
+
+const BROWSER_FAILURE =
+  "No pudimos completar la verificación de seguridad. Desactivá bloqueadores de anuncios, probá en otra red o navegador e intentá de nuevo.";
+
 export function recaptchaFailureMessage(
   data: SiteVerifyResponse,
-  hostname?: string,
+  _hostname?: string,
 ): string {
   const codes = data["error-codes"] ?? [];
 
+  if (process.env.NODE_ENV === "development") {
+    console.warn("[recaptcha] siteverify failed:", data);
+  }
+
   if (codes.includes("invalid-input-secret")) {
-    return "Clave secreta de reCAPTCHA incorrecta. Revisá RECAPTCHA_SECRET en .env.";
+    return GENERIC_FAILURE;
   }
 
   if (
@@ -22,16 +32,7 @@ export function recaptchaFailureMessage(
     codes.includes("invalid-domain") ||
     codes.includes("hostname-mismatch")
   ) {
-    if (codes.includes("browser-error")) {
-      return (
-        "reCAPTCHA no pudo completarse en el navegador (bloqueador de anuncios, " +
-        "red, o DevTools en modo iPhone). Desactivá bloqueadores en localhost, " +
-        "cerrá el emulador móvil de Chrome e intentá de nuevo. " +
-        "El 401 en /api2/pat es normal y se puede ignorar."
-      );
-    }
-    const host = data.hostname ?? hostname ?? "localhost";
-    return `reCAPTCHA no pudo validar «${host}». Agregá ese dominio en Google reCAPTCHA → Dominios e intentá de nuevo.`;
+    return BROWSER_FAILURE;
   }
 
   if (codes.includes("timeout-or-duplicate")) {
@@ -50,7 +51,7 @@ export function recaptchaFailureMessage(
     return "No pudimos confirmar la solicitud. Esperá un momento e intentá otra vez.";
   }
 
-  return "Verificación de seguridad fallida. Revisá que localhost esté en Dominios de Google reCAPTCHA.";
+  return GENERIC_FAILURE;
 }
 
 export type { SiteVerifyResponse };

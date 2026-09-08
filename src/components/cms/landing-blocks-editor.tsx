@@ -157,6 +157,14 @@ export function LandingBlocksEditor({
   }
 
   function removeBlock(id: string) {
+    const block = data.blocks.find((b) => b.id === id);
+    if (
+      !confirm(
+        `¿Eliminar la sección «${block?.title || "sin título"}» del inicio?`,
+      )
+    ) {
+      return;
+    }
     const next = { blocks: data.blocks.filter((b) => b.id !== id) };
     update(next);
     if (activeId === id) setActiveId(next.blocks[0]?.id ?? null);
@@ -427,11 +435,12 @@ function CarouselFields({
                 {block.items.length > 1 && (
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (!confirm(`¿Eliminar la foto ${i + 1}?`)) return;
                       onChange({
                         items: block.items.filter((_, idx) => idx !== i),
-                      })
-                    }
+                      });
+                    }}
                     className="text-xs font-semibold text-red-600 hover:underline"
                   >
                     Eliminar

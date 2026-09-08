@@ -1,7 +1,14 @@
 import { auth } from "@/lib/auth";
-import { openStoredFileUrl, storedFileToResponse } from "@/lib/stored-file";
+import {
+  openStoredFileUrl,
+  readStoredFileUrlToBuffer,
+} from "@/lib/stored-file";
 import { canAccessResourceContent } from "@/server/services/media-access.service";
 import { prisma } from "@/server/db/prisma";
+
+function isPdfBuffer(buffer: Buffer): boolean {
+  return buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+}
 
 export async function GET(
   _req: Request,
@@ -25,19 +32,46 @@ export async function GET(
       return new Response("Sin contenido", { status: 404 });
     }
 
-    const file = await openStoredFileUrl(resource.contentUrl);
-    if (!file) {
+    const buffer = await readStoredFileUrlToBuffer(resource.contentUrl);
+    if (!buffer || buffer.length === 0) {
       console.warn(
-        "[resources/content] archivo no encontrado",
+        "[resources/content] archivo no encontrado o vacío",
         resource.contentUrl,
       );
       return new Response(
-        "Archivo no encontrado. Si el PDF se subió antes del almacenamiento en la nube, volvé a subirlo desde Recursos.",
+        "Archivo no encontrado. Volvé a subir el PDF desde Admin → Recursos.",
         { status: 404 },
       );
     }
 
-    return storedFileToResponse(file, { inline: true });
+    const file = await openStoredFileUrl(resource.contentUrl);
+    const mimeType = file?.mimeType ?? "application/octet-stream";
+    const expectsPdf =
+      resource.type === "EBOOK" ||
+      resource.type === "PACKAGE" ||
+      mimeType === "application/pdf";
+
+    if (expectsPdf && !isPdfBuffer(buffer)) {
+      console.warn(
+        "[resources/content] contenido no es PDF válido",
+        resource.contentUrl,
+        mimeType,
+      );
+      return new Response(
+        "El archivo no es un PDF válido. Editá el recurso y volvé a subir el documento.",
+        { status: 422 },
+      );
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": expectsPdf ? "application/pdf" : mimeType,
+      "Content-Length": String(buffer.length),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": "inline",
+    };
+
+    return new Response(new Uint8Array(buffer), { headers });
   } catch (err) {
     console.error("[resources/content]", err);
     return new Response("Error al cargar contenido", { status: 500 });

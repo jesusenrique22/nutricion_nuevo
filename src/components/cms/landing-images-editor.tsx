@@ -163,7 +163,12 @@ export function LandingImagesEditor({
                   </div>
                   {data.heroSlides.length > 1 && (
                     <button type="button"
-                      onClick={(e) => { e.stopPropagation(); update({ ...data, heroSlides: data.heroSlides.filter((_, idx) => idx !== i) }); setActiveSlide(0); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!confirm(`¿Eliminar la diapositiva ${i + 1}?`)) return;
+                        update({ ...data, heroSlides: data.heroSlides.filter((_, idx) => idx !== i) });
+                        setActiveSlide(0);
+                      }}
                       className="shrink-0 text-xs font-semibold text-red-600 hover:underline">
                       Eliminar
                     </button>

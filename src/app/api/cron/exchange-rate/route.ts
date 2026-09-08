@@ -28,12 +28,9 @@ export async function GET(request: Request) {
       source: snapshot.source,
     });
   } catch (err) {
+    console.error("[cron/exchange-rate]", err);
     return NextResponse.json(
-      {
-        ok: false,
-        error:
-          err instanceof Error ? err.message : "No se pudo actualizar la tasa.",
-      },
+      { ok: false, error: "No se pudo actualizar la tasa." },
       { status: 503 },
     );
   }

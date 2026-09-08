@@ -20,8 +20,9 @@ export async function DELETE(_req: Request, context: RouteContext) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[media/library/delete]", err);
-    const message =
-      err instanceof Error ? err.message : "Error al eliminar la imagen.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "No pudimos eliminar la imagen. Intentá de nuevo." },
+      { status: 500 },
+    );
   }
 }

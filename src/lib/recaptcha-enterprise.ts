@@ -30,10 +30,14 @@ export async function verifyEnterpriseRecaptchaToken(
   const siteKey = getPublicRecaptchaSite();
 
   if (!projectId || !apiKey) {
+    if (process.env.NODE_ENV === "development") {
+      console.error(
+        "[recaptcha-enterprise] Faltan RECAPTCHA_PROJECT_ID o GOOGLE_CLOUD_API_KEY.",
+      );
+    }
     return {
       ok: false,
-      message:
-        "Faltan RECAPTCHA_PROJECT_ID y GOOGLE_CLOUD_API_KEY en .env para reCAPTCHA Enterprise.",
+      message: "No pudimos verificar la solicitud. Intentá de nuevo más tarde.",
     };
   }
 
@@ -61,7 +65,7 @@ export async function verifyEnterpriseRecaptchaToken(
       }
       return {
         ok: false,
-        message: "No pudimos verificar la solicitud con Google Cloud.",
+        message: "No pudimos verificar la solicitud. Intentá de nuevo más tarde.",
       };
     }
 
@@ -79,20 +83,22 @@ export async function verifyEnterpriseRecaptchaToken(
         return {
           ok: false,
           message:
-            "reCAPTCHA no pudo conectarse (bloqueador de anuncios, red o dominio). Desactivá bloqueadores en localhost, agregá 127.0.0.1 en Dominios e intentá de nuevo.",
+            "No pudimos completar la verificación de seguridad. Desactivá bloqueadores de anuncios, probá en otra red o navegador e intentá de nuevo.",
         };
       }
 
-      if (host) {
-        return {
-          ok: false,
-          message: `El dominio «${host}» no está autorizado. Agregalo en Google reCAPTCHA → Dominios (localhost y 127.0.0.1).`,
-        };
+      if (host && process.env.NODE_ENV === "development") {
+        console.warn(
+          "[recaptcha-enterprise] dominio no autorizado:",
+          host,
+          reason,
+        );
       }
 
       return {
         ok: false,
-        message: `Verificación de seguridad fallida (${reason}). Intentá de nuevo.`,
+        message:
+          "No pudimos verificar la solicitud. Recargá la página e intentá de nuevo.",
       };
     }
 

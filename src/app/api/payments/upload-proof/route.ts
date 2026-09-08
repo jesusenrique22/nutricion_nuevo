@@ -46,8 +46,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[payments/upload-proof]", err);
-    const message =
-      err instanceof Error ? err.message : "Error al subir la captura.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "No pudimos subir la captura. Intentá de nuevo." },
+      { status: 500 },
+    );
   }
 }

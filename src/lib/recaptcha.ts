@@ -99,9 +99,12 @@ export async function verifyRecaptchaToken(
     }
 
     if (!getRecaptchaSecret()) {
+      if (process.env.NODE_ENV === "development") {
+        console.error("[recaptcha] Falta RECAPTCHA_SECRET.");
+      }
       return {
         ok: false,
-        message: "Falta RECAPTCHA_SECRET en .env.",
+        message: "No pudimos verificar la solicitud. Intentá de nuevo más tarde.",
       };
     }
 

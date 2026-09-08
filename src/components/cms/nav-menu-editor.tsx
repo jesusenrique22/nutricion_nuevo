@@ -241,6 +241,10 @@ export function NavMenuEditor({
   }
 
   function removeItem(id: string) {
+    const item = data.items.find((it) => it.id === id);
+    if (!confirm(`¿Eliminar «${item?.label || "esta opción"}» del menú?`)) {
+      return;
+    }
     update({ items: data.items.filter((it) => it.id !== id) });
   }
 
