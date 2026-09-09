@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BrandLogo, BrandLogoLink } from "@/components/brand/logo";
 import { CurrencySelector } from "@/components/currency/currency-selector";
@@ -71,6 +72,10 @@ function navClass(active: boolean) {
 }
 
 export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
+  const { data: session } = useSession();
+  const authHref = session ? "/dashboard" : "/login";
+  const authLabel = session ? "Mi Panel" : "Iniciar sesión";
+
   const pathname = usePathname();
   const isHome = pathname === "/";
   const showCurrency = showsPublicCurrencySelector(pathname);
@@ -221,10 +226,10 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
           })}
           {showCurrency && <CurrencySelector className="ml-1" />}
           <Link
-            href="/login"
+            href={authHref}
             className="ml-2 inline-flex rounded-full bg-primary px-5 py-2 text-primary-foreground transition hover:bg-[#5a1728]"
           >
-            Iniciar sesión
+            {authLabel}
           </Link>
         </div>
 
@@ -234,6 +239,8 @@ export function MarketingHeader({ items }: { items?: NavMenuItem[] }) {
           pathname={pathname}
           showCurrency={showCurrency}
           onSectionNav={handleSectionNav}
+          authHref={authHref}
+          authLabel={authLabel}
         />
       </nav>
     </header>
@@ -246,12 +253,16 @@ function MobileNav({
   pathname,
   showCurrency,
   onSectionNav,
+  authHref,
+  authLabel,
 }: {
   items: ResolvedNavItem[];
   isHome: boolean;
   pathname: string;
   showCurrency: boolean;
   onSectionNav: (e: React.MouseEvent, id: LobbySectionId) => void;
+  authHref: string;
+  authLabel: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -370,11 +381,11 @@ function MobileNav({
                   </div>
                 )}
                 <Link
-                  href="/login"
+                  href={authHref}
                   onClick={close}
                   className="mt-2 block rounded-full bg-primary px-5 py-2.5 text-center text-primary-foreground"
                 >
-                  Iniciar sesión
+                  {authLabel}
                 </Link>
               </div>
             </motion.div>
