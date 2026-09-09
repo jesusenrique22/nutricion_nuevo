@@ -1,14 +1,14 @@
 import { headers } from "next/headers";
 import { limitByKey } from "@/lib/ratelimit";
-import {
-  RECAPTCHA_ACTION_BOOK,
-  verifyRecaptchaToken,
-} from "@/lib/recaptcha";
 
-/** Rate limit + reCAPTCHA antes de crear o agendar citas. */
+/**
+ * Rate limit antes de crear o agendar citas.
+ * reCAPTCHA fue removido: los usuarios ya están autenticados (requirePatient)
+ * y el rate limiting por IP + usuario es protección suficiente.
+ */
 export async function assertBookingRequestAllowed(
   userId: string,
-  recaptchaToken?: string | null,
+  _recaptchaToken?: string | null,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const hdrs = await headers();
   const ip =
@@ -25,12 +25,6 @@ export async function assertBookingRequestAllowed(
       message: "Demasiadas solicitudes. Intentá de nuevo en un minuto.",
     };
   }
-
-  const captcha = await verifyRecaptchaToken(
-    recaptchaToken,
-    RECAPTCHA_ACTION_BOOK,
-  );
-  if (!captcha.ok) return captcha;
 
   return { ok: true };
 }

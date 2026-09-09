@@ -19,10 +19,25 @@ export function recaptchaFailureMessage(
 ): string {
   const codes = data["error-codes"] ?? [];
 
-  console.error("[recaptcha] siteverify failed data:", JSON.stringify(data));
+  if (codes.includes("invalid-input-secret")) {
+    return GENERIC_FAILURE;
+  }
 
-  if (codes.length > 0) {
-    return `No pudimos verificar la solicitud [${codes.join(", ")}]. Recargá la página e intentá de nuevo.`;
+  if (
+    codes.includes("browser-error") ||
+    codes.includes("invalid-domain") ||
+    codes.includes("hostname-mismatch") ||
+    codes.includes("invalid-input-response")
+  ) {
+    return BROWSER_FAILURE;
+  }
+
+  if (codes.includes("timeout-or-duplicate")) {
+    return "La verificación expiró. Intentá agregar al carrito otra vez.";
+  }
+
+  if (codes.includes("missing-input-response")) {
+    return "No se recibió la verificación de seguridad. Recargá la página e intentá de nuevo.";
   }
 
   if (
@@ -30,7 +45,7 @@ export function recaptchaFailureMessage(
     data.success &&
     data.score < 0.5
   ) {
-    return `No pudimos confirmar la solicitud (score: ${data.score}). Esperá un momento e intentá otra vez.`;
+    return "No pudimos confirmar la solicitud. Esperá un momento e intentá otra vez.";
   }
 
   return GENERIC_FAILURE;

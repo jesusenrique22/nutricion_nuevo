@@ -12,7 +12,6 @@ import { RecaptchaNotice } from "@/components/security/recaptcha-notice";
 import { useCurrency } from "@/contexts/currency-context";
 import { useBookingTimezone } from "@/contexts/booking-timezone-context";
 import { FlowStep, FlowStepDots } from "@/components/motion/flow-step";
-import { useRecaptcha } from "@/hooks/use-recaptcha";
 import {
   computeSlotsForDay,
   snapshotCoversDate,
@@ -49,8 +48,6 @@ export function BookingForm({
   const [extending, setExtending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const { enabled: recaptchaEnabled, ready: recaptchaReady, loadFailed: recaptchaLoadFailed, getToken } =
-    useRecaptcha(undefined, step !== "service");
 
   const selectedType = types.find((t) => t.id === typeId);
   const stepIndex = step === "service" ? 0 : step === "details" ? 1 : 2;
@@ -125,34 +122,10 @@ export function BookingForm({
     if (!selectedSlot) return;
     setMessage(null);
     startTransition(async () => {
-      let recaptchaToken: string | undefined;
-
-      if (recaptchaEnabled) {
-        if (recaptchaLoadFailed) {
-          setMessage(
-            "No pudimos cargar la verificación de seguridad. Desactivá bloqueadores de anuncios o probá con otra red.",
-          );
-          return;
-        }
-        if (!recaptchaReady) {
-          setMessage("Cargando verificación de seguridad… Intentá en unos segundos.");
-          return;
-        }
-        const token = await getToken();
-        if (!token) {
-          setMessage(
-            "No pudimos verificar la solicitud. Recargá la página e intentá de nuevo.",
-          );
-          return;
-        }
-        recaptchaToken = token;
-      }
-
       const res = await addAppointmentToCart({
         consultationTypeId: typeId,
         startTime: selectedSlot,
         modality,
-        recaptchaToken,
       });
       if (!res.ok) {
         setMessage(res.message);
@@ -347,13 +320,7 @@ export function BookingForm({
               <p className="text-center text-xs text-foreground/50">
                 Podés sumar recursos y pagar todo junto desde el carrito.
               </p>
-              <RecaptchaNotice className="text-center" />
-              {recaptchaEnabled && (
-                <p className="text-center text-[10px] leading-snug text-foreground/45">
-                  La verificación es automática en segundo plano; no verás un
-                  checkbox.
-                </p>
-              )}
+
               <button
                 type="button"
                 onClick={() => go("details")}
