@@ -3,8 +3,19 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import { verifyEmail } from "@/server/actions/auth.actions";
 import { LoadingInline } from "@/components/ui/loading-indicator";
+
+/** Cierra la sesión actual (si existe) y navega al login con hard redirect. */
+async function goToLogin() {
+  try {
+    await signOut({ redirect: false });
+  } catch {
+    // Sin sesión activa — continuar igual.
+  }
+  window.location.assign(`${window.location.origin}/login?registered=1`);
+}
 
 function VerifyContent() {
   const params = useSearchParams();
@@ -12,6 +23,7 @@ function VerifyContent() {
   const email = params.get("email") ?? "";
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(4);
   const attempted = useRef(false);
 
   useEffect(() => {
@@ -42,6 +54,22 @@ function VerifyContent() {
     };
   }, [token, email]);
 
+  // Auto-redirigir al login 4 segundos después de verificar exitosamente.
+  useEffect(() => {
+    if (status !== "ok") return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          void goToLogin();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status]);
+
   if (status === "loading") {
     return (
       <div className="mt-6">
@@ -71,12 +99,16 @@ function VerifyContent() {
       <p className="rounded-lg bg-primary/10 px-4 py-3 text-sm">
         ¡Email verificado! Ya podés iniciar sesión.
       </p>
-      <Link
-        href="/login"
+      <p className="mt-2 text-xs text-foreground/50">
+        Serás redirigido en {countdown} segundo{countdown !== 1 ? "s" : ""}…
+      </p>
+      <button
+        type="button"
+        onClick={() => void goToLogin()}
         className="mt-4 inline-block rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground"
       >
-        Ir al login
-      </Link>
+        Ir al login ahora
+      </button>
     </div>
   );
 }
