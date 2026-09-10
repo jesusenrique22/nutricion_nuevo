@@ -11,6 +11,7 @@ import { isPatientDeactivated } from "@/server/queries/patient-profile";
 import { getCartCount } from "@/server/actions/cart.actions";
 import { getNavMenu, getProducts } from "@/server/queries/landing.queries";
 import { isStoreVisible, storeNavLabel } from "@/lib/store-visibility";
+import { prisma } from "@/server/db/prisma";
 
 export default async function DashboardLayout({
   children,
@@ -19,6 +20,22 @@ export default async function DashboardLayout({
 }) {
   const session = await getSession();
   if (!session?.user) redirect("/login");
+
+  // Verificar que el usuario aún existe en la BD.
+  // Protege contra sesiones JWT con IDs de usuarios eliminados.
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true },
+    });
+    if (!dbUser) {
+      // Sesión huérfana: el usuario fue eliminado de la BD.
+      await signOut({ redirect: false });
+      redirect("/login");
+    }
+  } catch {
+    // Si la BD no responde, continuar (evitar loop de login).
+  }
 
   const isAdmin = session.user.role === "ADMIN";
 
