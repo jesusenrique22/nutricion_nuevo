@@ -29,6 +29,8 @@ export async function notifyAppointmentBooked(params: {
 }) {
   await safeNotify(async () => {
     const adminIds = await getAdminUserIds();
+    const patientUrl = `/dashboard/admin/patients/${params.patientId}?appointmentId=${params.appointmentId}`;
+
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
@@ -37,7 +39,7 @@ export async function notifyAppointmentBooked(params: {
           title: "Nueva cita solicitada",
           body: `${params.patientName} agendó ${params.consultationName} para el ${fmtDate(params.startTime)}.`,
           payload: {
-            deepLink: "/dashboard/admin/calendar",
+            deepLink: patientUrl,
             appointmentId: params.appointmentId,
           },
         }),
@@ -66,13 +68,13 @@ export async function notifyAppointmentBooked(params: {
               <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
             </div>
             <p style="margin:24px 0">
-              <a href="${absoluteUrl("/dashboard/admin/calendar")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
-                Ver en mi panel
+              <a href="${absoluteUrl(patientUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                Revisar cita del paciente
               </a>
             </p>
           </div>
         `,
-        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nVer: ${absoluteUrl("/dashboard/admin/calendar")}`,
+        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nRevisar: ${absoluteUrl(patientUrl)}`,
       });
     }
   });

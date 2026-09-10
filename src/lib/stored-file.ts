@@ -51,7 +51,9 @@ export function normalizeStoredUrl(url: string): string {
 export function parseMediaIdFromUrl(url: string): string | null {
   const normalized = normalizeStoredUrl(url).split("?")[0] ?? "";
   const match = normalized.match(/^\/api\/media\/([^/?#]+)$/);
-  return match?.[1] ?? null;
+  if (match?.[1]) return match[1];
+  const gridMatch = normalized.match(/^stored:\/\/mongo-gridfs\/([^/?#]+)$/);
+  return gridMatch?.[1] ?? null;
 }
 
 export function isUploadsPath(url: string): boolean {

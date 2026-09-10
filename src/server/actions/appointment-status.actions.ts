@@ -45,6 +45,7 @@ const ADMIN_TRANSITIONS: Record<string, string[]> = {
 async function revalidateAppointmentPaths(patientId: string) {
   revalidatePath("/dashboard/admin/calendar");
   revalidatePath("/dashboard/admin/patients");
+  revalidatePath(`/dashboard/admin/patients/${patientId}`);
   revalidatePath("/dashboard/patient/appointments");
   revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard");

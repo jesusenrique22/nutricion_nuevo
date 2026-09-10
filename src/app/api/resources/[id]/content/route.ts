@@ -6,8 +6,44 @@ import {
 import { canAccessResourceContent } from "@/server/services/media-access.service";
 import { prisma } from "@/server/db/prisma";
 
-function isPdfBuffer(buffer: Buffer): boolean {
-  return buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+function detectMimeType(buffer: Buffer, fallbackMime?: string): string {
+  if (buffer.length >= 5 && buffer.subarray(0, 5).toString("ascii") === "%PDF-") {
+    return "application/pdf";
+  }
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  if (
+    buffer.length >= 6 &&
+    buffer.subarray(0, 6).toString("ascii").startsWith("GIF8")
+  ) {
+    return "image/gif";
+  }
+  if (fallbackMime && fallbackMime !== "application/octet-stream") {
+    return fallbackMime;
+  }
+  return "application/octet-stream";
 }
 
 export async function GET(
@@ -39,35 +75,22 @@ export async function GET(
         resource.contentUrl,
       );
       return new Response(
-        "Archivo no encontrado. Volvé a subir el PDF desde Admin → Recursos.",
+        "Archivo no encontrado. Volvé a subir el PDF o archivo desde Admin → Recursos.",
         { status: 404 },
       );
     }
 
     const file = await openStoredFileUrl(resource.contentUrl);
-    const mimeType = file?.mimeType ?? "application/octet-stream";
-    const expectsPdf =
-      resource.type === "EBOOK" ||
-      resource.type === "PACKAGE" ||
-      mimeType === "application/pdf";
-
-    if (expectsPdf && !isPdfBuffer(buffer)) {
-      console.warn(
-        "[resources/content] contenido no es PDF válido",
-        resource.contentUrl,
-        mimeType,
-      );
-      return new Response(
-        "El archivo no es un PDF válido. Editá el recurso y volvé a subir el documento.",
-        { status: 422 },
-      );
-    }
+    const fallbackMime = file?.mimeType ?? "application/octet-stream";
+    const mimeType = detectMimeType(buffer, fallbackMime);
+    const kind = mimeType.startsWith("image/") ? "image" : mimeType === "application/pdf" ? "pdf" : "unknown";
 
     const headers: Record<string, string> = {
-      "Content-Type": expectsPdf ? "application/pdf" : mimeType,
+      "Content-Type": mimeType,
       "Content-Length": String(buffer.length),
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "X-Content-Kind": kind,
       "Content-Disposition": "inline",
     };
 

@@ -138,3 +138,41 @@ export function LibraryResourceList({
     </div>
   );
 }
+
+export function PendingResourceList({
+  resources,
+}: {
+  resources: ResourceDTO[];
+}) {
+  if (resources.length === 0) return null;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {resources.map((r) => (
+        <article
+          key={r.id}
+          className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 shadow-sm"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-amber-900/80">
+              {typeLabels[r.type] ?? r.type}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              En proceso
+            </span>
+          </div>
+          <h3 className="mt-1.5 font-semibold text-foreground">{r.title}</h3>
+          {r.description && (
+            <p className="mt-1 line-clamp-2 text-sm text-foreground/65">
+              {r.description}
+            </p>
+          )}
+          <p className="mt-3 text-xs text-amber-800/80">
+            Tu pago está siendo verificado por la administración. Se desbloqueará automáticamente aquí ni bien sea aprobado.
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}

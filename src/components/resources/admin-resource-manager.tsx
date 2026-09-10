@@ -92,6 +92,12 @@ export function AdminResourceManager({
     setUploading(true);
     setMessage(null);
     try {
+      if (file.size > 4.5 * 1024 * 1024) {
+        throw new Error(
+          `El archivo pesa ${(file.size / (1024 * 1024)).toFixed(1)} MB y supera el límite de 4.5 MB soportado en la nube. Por favor comprímelo antes de subirlo.`,
+        );
+      }
+
       const kind =
         target === "coverUrl"
           ? "image"
@@ -109,16 +115,24 @@ export function AdminResourceManager({
       const nextForm = { ...form, [target]: url };
       setForm(nextForm);
 
-      if (target === "coverUrl" && editing && editing !== "new") {
+      if (editing && editing !== "new") {
         const saveRes = await upsertResource(
           buildPayload(nextForm, editing),
         );
         setMessage(
-          saveRes.ok ? "Portada actualizada en la tienda." : saveRes.message,
+          saveRes.ok
+            ? target === "coverUrl"
+              ? "Portada actualizada y guardada."
+              : "Archivo principal actualizado y guardado correctamente."
+            : saveRes.message,
         );
         if (saveRes.ok) router.refresh();
-      } else if (target === "coverUrl") {
-        setMessage("Imagen subida. Pulsa Guardar para publicarla.");
+      } else {
+        setMessage(
+          target === "coverUrl"
+            ? "Portada subida. Pulsa Guardar para publicarla."
+            : "Archivo subido. Pulsa Guardar para publicarlo.",
+        );
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Error al subir");

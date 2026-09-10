@@ -128,6 +128,21 @@ export async function getMyLibraryResources(): Promise<ResourceDTO[]> {
   );
 }
 
+export async function getMyPendingResources(): Promise<ResourceDTO[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const purchases = await prisma.resourcePurchase.findMany({
+    where: { userId: session.user.id, status: "PENDING" },
+    include: { resource: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return purchases.map((p) =>
+    mapResource(p.resource, { owned: false, accessStatus: "PENDING" }),
+  );
+}
+
 export async function getAvailableResourcesForPatient(): Promise<ResourceDTO[]> {
   const session = await auth();
   if (!session?.user?.id) return getPublishedResources();

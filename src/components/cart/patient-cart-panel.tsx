@@ -111,6 +111,11 @@ export function PatientCartPanel({
     const discounted =
       pct > 0 ? Math.round(fullSum * (100 - pct)) / 100 : fullSum;
     const totalLabel = formatMoney(discounted, displayCurrency);
+    if (pct > 0) {
+      const origLabel = formatMoney(fullSum, displayCurrency);
+      const savingsLabel = formatMoney(fullSum - discounted, displayCurrency);
+      return `Descuento aplicado al total: ${totalLabel} (antes ${origLabel} · ahorro de ${savingsLabel}). Aquí abonas únicamente el adelanto correspondiente con el descuento proporcional ya aplicado.`;
+    }
     return `Total de la cita: ${totalLabel} · acá pagás solo la cuota de esta etapa`;
   }, [items, convert, displayCurrency, appliedCoupon?.percentOff]);
 

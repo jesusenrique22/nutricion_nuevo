@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   resourceContentStreamUrl,
   resourceVideoStreamUrl,
@@ -22,10 +22,40 @@ export function ProtectedContentViewer({
 }) {
   const contentUrl = hasContent ? resourceContentStreamUrl(resourceId) : null;
   const videoUrl = hasVideo ? resourceVideoStreamUrl(resourceId) : null;
+  const [effectiveKind, setEffectiveKind] = useState<"pdf" | "image" | "video" | "unknown">(contentKind);
+
+  useEffect(() => {
+    setEffectiveKind(contentKind);
+  }, [contentKind]);
+
+  useEffect(() => {
+    if (!hasContent || !contentUrl) return;
+    let cancelled = false;
+    fetch(contentUrl, { method: "HEAD" })
+      .then((res) => {
+        if (cancelled) return;
+        const kindHeader = res.headers.get("x-content-kind");
+        const ct = res.headers.get("content-type") || "";
+        if (kindHeader === "image" || ct.startsWith("image/")) {
+          setEffectiveKind("image");
+        } else if (kindHeader === "pdf" || ct === "application/pdf") {
+          setEffectiveKind("pdf");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [contentUrl, hasContent]);
+
   const showPdf =
     hasContent &&
     contentUrl &&
-    (contentKind === "pdf" || contentKind === "unknown");
+    effectiveKind === "pdf";
+  const showImage =
+    hasContent &&
+    contentUrl &&
+    effectiveKind === "image";
 
   useEffect(() => {
     function blockSave(e: KeyboardEvent) {
@@ -57,7 +87,7 @@ export function ProtectedContentViewer({
         </div>
       )}
 
-      {hasContent && contentUrl && contentKind === "image" && (
+      {showImage && (
         <div className="overflow-hidden rounded-2xl bg-muted/20 p-2 ring-1 ring-foreground/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
