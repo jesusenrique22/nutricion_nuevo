@@ -21,6 +21,7 @@ import {
 } from "@/lib/scheduling-errors";
 import { applyPercentOff } from "@/lib/coupon-math";
 import { clampPercentOff } from "@/lib/coupons";
+import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 
 export type CartPaymentPayload = {
   patientPaymentMethod: string;
@@ -407,6 +408,49 @@ export async function fulfillCartCheckout(params: {
       "@/server/services/google-calendar-sync.service"
     );
     await syncAppointmentToGoogleCalendar(appt.id);
+  }
+
+  if (
+    (params.resourceItems.length > 0 || params.productItems.length > 0) &&
+    isEmailDeliveryConfigured()
+  ) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: params.patientId },
+        select: { email: true, name: true },
+      });
+      if (user?.email) {
+        const patientName = user.name || params.patientName || "Estimado/a";
+        const itemsList = [
+          ...params.resourceItems.map((r) => r.resource.title),
+          ...params.productItems.map((p) => p.product.name),
+        ].join(", ");
+
+        await sendEmail({
+          to: user.email,
+          subject: `Anttova — Recibimos tu pedido`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#5a1728">Recibimos tu pedido</h1>
+              <p>Hola ${patientName}, registramos tu solicitud de compra para:</p>
+              <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Ítems:</strong> ${itemsList}</p>
+              </div>
+              <p style="font-size:14px;color:#555">Tu comprobante de pago está siendo verificado. Te avisaremos apenas esté confirmado para que puedas acceder a tus materiales o recibir tu pedido.</p>
+              <p style="margin:24px 0">
+                <a href="${absoluteUrl("/dashboard/patient/library")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                  Ver mis recursos
+                </a>
+              </p>
+            </div>
+          `,
+          text: `Recibimos tu pedido\nHola ${patientName},\nÍtems: ${itemsList}\nTu pago está en revisión. Podés ver tus recursos en: ${absoluteUrl("/dashboard/patient/library")}`,
+        });
+      }
+    } catch (err) {
+      console.error("[fulfillCartCheckout:email]", err);
+    }
   }
 
   return { ok: true, newAppointmentIds };

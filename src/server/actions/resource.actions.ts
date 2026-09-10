@@ -11,6 +11,7 @@ import { createNotification } from "@/server/services/notification.service";
 import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import { syncUser } from "@/server/realtime/sync";
 import { formatActionError } from "@/lib/db-errors";
+import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 
 export type ResourceActionResult =
   | { ok: true; id?: string }
@@ -240,6 +241,42 @@ export async function grantResourceAccess(
       itemKind: "RESOURCE",
       entityId: resource.id,
     });
+
+    if (isEmailDeliveryConfigured()) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: parsed.data.userId },
+          select: { email: true, name: true },
+        });
+        if (user?.email) {
+          const patientName = user.name || "Estimado/a";
+          await sendEmail({
+            to: user.email,
+            subject: `Anttova — ¡Tu recurso «${resource.title}» ya está disponible!`,
+            html: `
+              <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+                <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+                <h1 style="font-size:20px;font-weight:600;color:#15803d">¡Recurso desbloqueado!</h1>
+                <p>Hola ${patientName}, tu acceso al material digital <strong>«${resource.title}»</strong> ya se encuentra activo en tu cuenta.</p>
+                <div style="background:#f0fdf4;border-left:4px solid #15803d;padding:16px;margin:20px 0;border-radius:4px">
+                  <p style="margin:4px 0"><strong>Material:</strong> ${resource.title}</p>
+                  <p style="margin:4px 0"><strong>Tipo:</strong> ${resource.type}</p>
+                </div>
+                <p style="font-size:14px;color:#555">Podés leerlo y consultarlo en cualquier momento desde tu biblioteca digital dentro de Anttova.</p>
+                <p style="margin:24px 0">
+                  <a href="${absoluteUrl(`/dashboard/patient/library/${resource.id}`)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                    Abrir recurso en mi panel
+                  </a>
+                </p>
+              </div>
+            `,
+            text: `¡Recurso desbloqueado!\nHola ${patientName},\nTu acceso a «${resource.title}» ya está activo.\nVer en biblioteca: ${absoluteUrl(`/dashboard/patient/library/${resource.id}`)}`,
+          });
+        }
+      } catch (err) {
+        console.error("[grantResourceAccess:email]", err);
+      }
+    }
 
     await syncUser(parsed.data.userId, "notifications", { action: "created" });
     revalidateResourcePaths(parsed.data.userId);

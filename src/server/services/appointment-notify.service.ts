@@ -1,6 +1,7 @@
 import { getAdminUserIds } from "@/lib/admin-users";
 import { createNotification } from "@/server/services/notification.service";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import { prisma } from "@/server/db/prisma";
 
 function fmtDate(iso: Date | string) {
   return new Date(iso).toLocaleString("es", {
@@ -15,8 +16,8 @@ function fmtDate(iso: Date | string) {
 async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
     await fn();
-  } catch {
-    // Notificaciones no deben bloquear el flujo principal
+  } catch (err) {
+    console.error("[appointment-notify] Error en notificación:", err);
   }
 }
 
@@ -54,6 +55,8 @@ export async function notifyAppointmentBooked(params: {
         hour: "2-digit",
         minute: "2-digit",
       });
+
+      // 1. Notificación a la Nutricionista
       await sendEmail({
         to: "ma.lanzahuerta@gmail.com",
         subject: `Anttova — Nueva cita agendada: ${params.patientName}`,
@@ -76,6 +79,39 @@ export async function notifyAppointmentBooked(params: {
         `,
         text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nRevisar: ${absoluteUrl(patientUrl)}`,
       });
+
+      // 2. Correo de confirmación inmediata al Paciente
+      const patient = await prisma.user.findUnique({
+        where: { id: params.patientId },
+        select: { email: true, name: true },
+      });
+
+      if (patient?.email) {
+        const patientName = patient.name || params.patientName || "Estimado/a";
+        await sendEmail({
+          to: patient.email,
+          subject: `Anttova — Confirmación de tu turno: ${params.consultationName}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#5a1728">¡Tu cita ha sido agendada con éxito!</h1>
+              <p>Hola ${patientName}, registramos tu solicitud de turno en Anttova:</p>
+              <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+                <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
+                <p style="margin:4px 0"><strong>Profesional:</strong> Lic. Ma Antonieta Lanza</p>
+              </div>
+              <p style="font-size:14px;color:#555">Podés revisar el estado de tu turno, información previa o acceder a la plataforma desde tu panel.</p>
+              <p style="margin:24px 0">
+                <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                  Ver mi cita en el panel
+                </a>
+              </p>
+            </div>
+          `,
+          text: `¡Tu cita ha sido agendada!\nHola ${patientName},\nConsulta: ${params.consultationName}\nFecha y Hora: ${when}\nProfesional: Lic. Ma Antonieta Lanza\nVer detalles: ${absoluteUrl("/dashboard/patient/appointments")}`,
+        });
+      }
     }
   });
 }
@@ -100,6 +136,48 @@ export async function notifyAppointmentStatusChange(params: {
         appointmentId: params.appointmentId,
       },
     });
+
+    if (isEmailDeliveryConfigured()) {
+      const patient = await prisma.user.findUnique({
+        where: { id: params.patientId },
+        select: { email: true, name: true },
+      });
+
+      if (patient?.email) {
+        const patientName = patient.name || "Estimado/a";
+        const when = new Date(params.startTime).toLocaleString("es", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        await sendEmail({
+          to: patient.email,
+          subject: `Anttova — ¡Tu cita fue confirmada! 🎉`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#15803d">¡Tu turno fue confirmado! 🎉</h1>
+              <p>Hola ${patientName}, la Lic. Ma Antonieta Lanza ha confirmado tu turno de consulta:</p>
+              <div style="background:#f0fdf4;border-left:4px solid #15803d;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+                <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
+                <p style="margin:4px 0"><strong>Profesional:</strong> Lic. Ma Antonieta Lanza</p>
+              </div>
+              <p style="font-size:14px;color:#555">Tu lugar está asegurado. Ingresá a tu panel para ver más detalles.</p>
+              <p style="margin:24px 0">
+                <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#15803d;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                  Ir a mis citas
+                </a>
+              </p>
+            </div>
+          `,
+          text: `¡Tu cita fue confirmada!\nHola ${patientName},\nTu consulta de ${params.consultationName} para el ${when} ha sido confirmada por la profesional.\nVer: ${absoluteUrl("/dashboard/patient/appointments")}`,
+        });
+      }
+    }
   });
 }
 
@@ -130,19 +208,80 @@ export async function notifyAppointmentCancelled(params: {
           }),
         ),
       );
-      return;
+    } else {
+      await createNotification({
+        recipientId: params.patientId,
+        type: "APPOINTMENT_CANCELLED",
+        title: "Cita cancelada",
+        body: `Tu cita de ${params.consultationName} del ${when} fue cancelada por Anttova.`,
+        payload: {
+          deepLink: "/dashboard/patient/appointments",
+          appointmentId: params.appointmentId,
+        },
+      });
     }
 
-    await createNotification({
-      recipientId: params.patientId,
-      type: "APPOINTMENT_CANCELLED",
-      title: "Cita cancelada",
-      body: `Tu cita de ${params.consultationName} del ${when} fue cancelada por Anttova.`,
-      payload: {
-        deepLink: "/dashboard/patient/appointments",
-        appointmentId: params.appointmentId,
-      },
-    });
+    if (isEmailDeliveryConfigured()) {
+      const patient = await prisma.user.findUnique({
+        where: { id: params.patientId },
+        select: { email: true, name: true },
+      });
+
+      if (patient?.email) {
+        const patientName = patient.name || params.patientName || "Estimado/a";
+        const subject =
+          params.cancelledBy === "ADMIN"
+            ? `Anttova — Cita cancelada: ${params.consultationName}`
+            : `Anttova — Confirmación de cancelación de turno`;
+
+        await sendEmail({
+          to: patient.email,
+          subject,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#dc2626">Cita cancelada</h1>
+              <p>Hola ${patientName}, ${
+                params.cancelledBy === "ADMIN"
+                  ? "tu cita ha sido cancelada por la administración de Anttova."
+                  : "confirmamos que tu cita ha sido cancelada exitosamente."
+              }</p>
+              <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+                <p style="margin:4px 0"><strong>Fecha:</strong> ${when}</p>
+              </div>
+              <p style="font-size:14px;color:#555">Si deseás elegir un nuevo horario, podés agendarlo desde la plataforma cuando gustes.</p>
+              <p style="margin:24px 0">
+                <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                  Agendar nuevo turno
+                </a>
+              </p>
+            </div>
+          `,
+          text: `Cita cancelada\nHola ${patientName},\nConsulta: ${params.consultationName}\nFecha: ${when}\nAgendar nuevo turno: ${absoluteUrl("/dashboard/patient/appointments")}`,
+        });
+      }
+
+      // También avisar por email a la nutricionista si canceló el paciente
+      if (params.cancelledBy === "PATIENT") {
+        await sendEmail({
+          to: "ma.lanzahuerta@gmail.com",
+          subject: `Anttova — Cita cancelada por paciente: ${params.patientName}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#dc2626">Cita cancelada por paciente</h1>
+              <p>El paciente <strong>${params.patientName}</strong> canceló su cita:</p>
+              <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+                <p style="margin:4px 0"><strong>Fecha:</strong> ${when}</p>
+              </div>
+            </div>
+          `,
+          text: `Cita cancelada por paciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}`,
+        });
+      }
+    }
   });
 }
 
@@ -174,6 +313,32 @@ export async function notifyAppointmentReminder(params: {
         appointmentId: params.appointmentId,
       },
     });
+
+    if (isEmailDeliveryConfigured() && params.patientEmail) {
+      const when = fmtDate(params.startTime);
+      await sendEmail({
+        to: params.patientEmail,
+        subject: `Anttova — Recordatorio de tu turno mañana: ${params.consultationName}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+            <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+            <h1 style="font-size:20px;font-weight:600;color:#5a1728">Recordatorio de tu turno</h1>
+            <p>Hola ${params.patientName || "Estimado/a"}, te recordamos tu consulta de mañana:</p>
+            <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+              <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+              <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
+              <p style="margin:4px 0"><strong>Profesional:</strong> Lic. Ma Antonieta Lanza</p>
+            </div>
+            <p style="margin:24px 0">
+              <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                Ver mi cita
+              </a>
+            </p>
+          </div>
+        `,
+        text: `Recordatorio de cita: mañana tienes ${params.consultationName} a las ${when}. Ver: ${absoluteUrl("/dashboard/patient/appointments")}`,
+      });
+    }
   });
 }
 
@@ -216,6 +381,42 @@ export async function notifyAppointmentRescheduled(params: {
           appointmentId: params.appointmentId,
         },
       });
+    }
+
+    if (isEmailDeliveryConfigured()) {
+      let patientEmail = params.patientEmail;
+      if (!patientEmail) {
+        const u = await prisma.user.findUnique({
+          where: { id: params.patientId },
+          select: { email: true },
+        });
+        patientEmail = u?.email;
+      }
+
+      if (patientEmail) {
+        await sendEmail({
+          to: patientEmail,
+          subject: `Anttova — Cita reagendada: ${params.consultationName}`,
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+              <h1 style="font-size:20px;font-weight:600;color:#5a1728">Tu cita fue reagendada</h1>
+              <p>Hola ${params.patientName}, tu turno de consulta tiene un nuevo horario:</p>
+              <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+                <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+                <p style="margin:4px 0"><strong>Nuevo Horario:</strong> ${when}</p>
+                <p style="margin:4px 0"><strong>Profesional:</strong> Lic. Ma Antonieta Lanza</p>
+              </div>
+              <p style="margin:24px 0">
+                <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                  Ver mi cita
+                </a>
+              </p>
+            </div>
+          `,
+          text: `Tu cita fue reagendada\nConsulta: ${params.consultationName}\nNuevo Horario: ${when}\nVer: ${absoluteUrl("/dashboard/patient/appointments")}`,
+        });
+      }
     }
   });
 }
