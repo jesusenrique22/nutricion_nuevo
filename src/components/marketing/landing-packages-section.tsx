@@ -36,26 +36,26 @@ function ConsultationPackageCard({
 }) {
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 ${
+      className={`flex h-full flex-1 flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 ${
         highlight
           ? "bg-accent-soft text-foreground ring-1 ring-primary/15"
           : "border border-white/10 bg-white/5 backdrop-blur-sm"
       }`}
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-muted/20">
+      <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-muted/20">
         <Image
           src={imageSrc}
           alt={pkg.name}
           fill
           className="object-cover object-top"
-          sizes="380px"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
           loading="lazy"
           unoptimized={shouldUnoptimizeImage(imageSrc)}
         />
         {!highlight && <div className="absolute inset-0 bg-primary/25" />}
       </div>
       <div className="flex flex-1 flex-col p-6 sm:p-7">
-        <h3 className="text-xl font-bold">{pkg.name}</h3>
+        <h3 className="text-xl font-bold min-h-[3.25rem] flex items-start line-clamp-2">{pkg.name}</h3>
         <p
           className={`mt-3 flex-1 text-sm leading-relaxed ${
             highlight ? "text-foreground/80" : "text-primary-foreground/70"
@@ -115,7 +115,7 @@ export function LandingPackagesSection({
           ) : (
             <PackageCarousel ariaLabel="Paquetes de consulta">
               {consultations.map((pkg, i) => (
-                <RevealScale key={pkg.id} delay={i * 0.08}>
+                <RevealScale key={pkg.id} delay={i * 0.08} className="flex h-full flex-1 flex-col">
                   <ConsultationPackageCard
                     pkg={pkg}
                     highlight={i === 0}
