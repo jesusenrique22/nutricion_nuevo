@@ -10,6 +10,7 @@ export type CalendarEventInput = {
   description: string;
   startTime: Date;
   endTime: Date;
+  attendees?: Array<{ email: string; displayName?: string }>;
 };
 
 export async function createGoogleCalendarEvent(
@@ -28,11 +29,13 @@ export async function createGoogleCalendarEvent(
 
   const res = await calendar.events.insert({
     calendarId: connection.calendarId,
+    sendUpdates: "all",
     requestBody: {
       summary: input.summary,
       description: input.description,
       start: { dateTime: input.startTime.toISOString(), timeZone },
       end: { dateTime: input.endTime.toISOString(), timeZone },
+      ...(input.attendees?.length ? { attendees: input.attendees } : {}),
     },
   });
 
@@ -57,11 +60,13 @@ export async function updateGoogleCalendarEvent(
   await calendar.events.patch({
     calendarId: connection.calendarId,
     eventId,
+    sendUpdates: "all",
     requestBody: {
       summary: input.summary,
       description: input.description,
       start: { dateTime: input.startTime.toISOString(), timeZone },
       end: { dateTime: input.endTime.toISOString(), timeZone },
+      ...(input.attendees?.length ? { attendees: input.attendees } : {}),
     },
   });
 }

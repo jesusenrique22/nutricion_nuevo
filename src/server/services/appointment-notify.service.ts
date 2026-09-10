@@ -1,5 +1,6 @@
 import { getAdminUserIds } from "@/lib/admin-users";
 import { createNotification } from "@/server/services/notification.service";
+import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 
 function fmtDate(iso: Date | string) {
   return new Date(iso).toLocaleString("es", {
@@ -42,6 +43,38 @@ export async function notifyAppointmentBooked(params: {
         }),
       ),
     );
+
+    if (isEmailDeliveryConfigured()) {
+      const when = new Date(params.startTime).toLocaleString("es", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      await sendEmail({
+        to: "ma.lanzahuerta@gmail.com",
+        subject: `Anttova — Nueva cita agendada: ${params.patientName}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+            <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+            <h1 style="font-size:20px;font-weight:600;color:#5a1728">Nueva cita agendada</h1>
+            <p>Hola Licenciada, se ha registrado una nueva cita en la plataforma:</p>
+            <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+              <p style="margin:4px 0"><strong>Paciente:</strong> ${params.patientName}</p>
+              <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+              <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
+            </div>
+            <p style="margin:24px 0">
+              <a href="${absoluteUrl("/dashboard/admin/calendar")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                Ver en mi panel
+              </a>
+            </p>
+          </div>
+        `,
+        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nVer: ${absoluteUrl("/dashboard/admin/calendar")}`,
+      });
+    }
   });
 }
 

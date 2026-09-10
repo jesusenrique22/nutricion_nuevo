@@ -44,6 +44,16 @@ function buildEventPayload(appt: {
   const modalityLabel = modalityLabels[appt.modality] ?? appt.modality;
   const flowLabel = appt.flow === "INTAKE" ? "Primera cita" : "Seguimiento";
 
+  const attendees: Array<{ email: string; displayName?: string }> = [
+    { email: "ma.lanzahuerta@gmail.com", displayName: "Lic. Ma Antonieta Lanza" },
+  ];
+  if (appt.patient.email && appt.patient.email.toLowerCase() !== "ma.lanzahuerta@gmail.com") {
+    attendees.push({
+      email: appt.patient.email,
+      displayName: appt.patient.name,
+    });
+  }
+
   return {
     summary: `[Anttova] ${appt.consultationType.name} · ${appt.patient.name}`,
     description: [
@@ -57,6 +67,7 @@ function buildEventPayload(appt: {
     ].join("\n"),
     startTime: appt.startTime,
     endTime: appt.endTime,
+    attendees,
   };
 }
 
