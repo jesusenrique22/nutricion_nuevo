@@ -9,6 +9,8 @@ import {
 } from "@/server/actions/booking.queries";
 import { getCartItems } from "@/server/actions/cart.actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function PatientAppointmentsPage() {
   const [types, appointments, cartItems, availability] = await Promise.all([
     getConsultationTypes(),
