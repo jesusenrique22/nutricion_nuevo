@@ -46,6 +46,13 @@ function detectMimeType(buffer: Buffer, fallbackMime?: string): string {
   return "application/octet-stream";
 }
 
+export async function HEAD(
+  req: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  return GET(req, context);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },

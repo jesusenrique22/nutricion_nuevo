@@ -3,6 +3,13 @@ import { openStoredFileUrl, storedFileToResponse } from "@/lib/stored-file";
 import { canAccessResourceVideo } from "@/server/services/media-access.service";
 import { prisma } from "@/server/db/prisma";
 
+export async function HEAD(
+  req: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  return GET(req, context);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
