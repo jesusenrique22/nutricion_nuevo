@@ -59,9 +59,8 @@ function buildEventPayload(appt: {
     description: [
       `Paciente: ${appt.patient.name}`,
       `Email: ${appt.patient.email}`,
-      `Estado: ${statusLabel}`,
       `Modalidad: ${modalityLabel}`,
-      `Tipo: ${flowLabel}`,
+      `Estado: ${statusLabel}`,
       "",
       "Creado desde Anttova.",
     ].join("\n"),
