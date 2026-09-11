@@ -127,7 +127,8 @@ export async function syncAppointmentToGoogleCalendar(
         consultationType: true,
       },
     });
-    if (!appt || appt.status === "CANCELLED") return false;
+    // Solo se sincroniza a Google Calendar si la cita está CONFIRMADA/ACEPTADA por la administradora
+    if (!appt || appt.status !== "CONFIRMED") return false;
 
     if (!isAppointmentEligibleForGoogleSync(appt.startTime)) {
       return false;
@@ -199,7 +200,7 @@ export async function syncUnsyncedAppointmentsForAdmin(
 
   const alreadySynced = await prisma.appointment.count({
     where: {
-      status: { not: "CANCELLED" },
+      status: "CONFIRMED",
       googleEventId: { not: null },
       startTime: { gte: since },
     },
@@ -207,7 +208,7 @@ export async function syncUnsyncedAppointmentsForAdmin(
 
   const appointments = await prisma.appointment.findMany({
     where: {
-      status: { not: "CANCELLED" },
+      status: "CONFIRMED",
       googleEventId: null,
       startTime: { gte: since },
     },
@@ -264,7 +265,7 @@ export async function refreshAppointmentGoogleCalendar(
     });
     if (!appt) return;
 
-    if (appt.status === "CANCELLED") {
+    if (appt.status !== "CONFIRMED") {
       await removeAppointmentFromGoogleCalendar(appointmentId);
       return;
     }

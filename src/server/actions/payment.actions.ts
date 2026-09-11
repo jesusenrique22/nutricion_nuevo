@@ -99,6 +99,27 @@ async function applyPaymentPhase(
     appointmentId: appt.id,
   });
 
+  if (appt.status === "PENDING" && (phase === "advance" || phase === "full")) {
+    await prisma.appointment.update({
+      where: { id: appt.id },
+      data: { status: "CONFIRMED" },
+    });
+    const { refreshAppointmentGoogleCalendar } = await import(
+      "@/server/services/google-calendar-sync.service"
+    );
+    await refreshAppointmentGoogleCalendar(appt.id);
+    const { notifyAppointmentStatusChange } = await import(
+      "@/server/services/appointment-notify.service"
+    );
+    await notifyAppointmentStatusChange({
+      patientId: appt.patientId,
+      consultationName: appt.consultationType.name,
+      startTime: appt.startTime,
+      status: "CONFIRMED",
+      appointmentId: appt.id,
+    });
+  }
+
   await revalidatePaymentPaths(appt.patientId);
   return { ok: true };
 }
