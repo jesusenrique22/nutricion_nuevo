@@ -68,6 +68,7 @@ export default async function PatientDetailPage({
         <DeletePatientAccountButton
           patientId={patient.id}
           patientName={patient.name}
+          patientEmail={patient.email}
           redirectTo="/dashboard/admin/patients"
           className="shrink-0 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
         />

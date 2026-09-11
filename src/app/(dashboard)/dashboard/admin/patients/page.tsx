@@ -66,6 +66,7 @@ export default async function PatientsPage({
               <DeletePatientAccountButton
                 patientId={p.id}
                 patientName={p.name}
+                patientEmail={p.email}
               />
             </div>
           </div>
@@ -125,6 +126,7 @@ export default async function PatientsPage({
                     <DeletePatientAccountButton
                 patientId={p.id}
                 patientName={p.name}
+                patientEmail={p.email}
               />
                   </div>
                 </td>

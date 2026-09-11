@@ -99,16 +99,8 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
     prisma.appointment.findMany({
       where: {
         payment: {
-          OR: [
-            {
-              advanceStatus: "PENDING",
-              advanceInboxDismissedAt: null,
-            },
-            {
-              remainderStatus: "PENDING",
-              remainderInboxDismissedAt: null,
-            },
-          ],
+          advanceStatus: "PENDING",
+          advanceInboxDismissedAt: null,
         },
       },
       include: {
@@ -169,14 +161,16 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
   for (const appt of appointmentRows) {
     if (!appt.payment) continue;
     const payment = appt.payment;
+    if (payment.advanceInboxDismissedAt) continue;
+
+    const phases = toPaymentPhaseView(payment);
     if (
-      payment.advanceInboxDismissedAt &&
-      payment.remainderInboxDismissedAt
+      phases.advanceStatus !== "PENDING" ||
+      Number(phases.advanceAmount) <= 0
     ) {
       continue;
     }
 
-    const phases = toPaymentPhaseView(payment);
     const dateLabel = new Date(appt.startTime).toLocaleString("es", {
       day: "2-digit",
       month: "short",
@@ -184,49 +178,23 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
       minute: "2-digit",
     });
 
-    if (
-      phases.advanceStatus === "PENDING" &&
-      Number(phases.advanceAmount) > 0 &&
-      !payment.advanceInboxDismissedAt
-    ) {
-      items.push({
-        id: `appt-advance-${appt.id}`,
-        kind: "APPOINTMENT_ADVANCE",
-        patientId: appt.patientId,
-        patientName: appt.patient.name,
-        patientEmail: appt.patient.email,
-        title: appt.consultationType.name,
-        subtitle: `Adelanto · Cita ${dateLabel}`,
-        amount: phases.advanceAmount,
-        totalAmount: payment.amount.toString(),
-        createdAt: appt.createdAt.toISOString(),
-        trashedAt: payment.advanceInboxTrashedAt?.toISOString() ?? null,
-        appointmentId: appt.id,
-        ...appointmentPatientPaymentMeta(payment),
-      });
-    }
-
-    if (
-      phases.remainderStatus === "PENDING" &&
-      Number(phases.remainderAmount) > 0 &&
-      !payment.remainderInboxDismissedAt
-    ) {
-      items.push({
-        id: `appt-remainder-${appt.id}`,
-        kind: "APPOINTMENT_REMAINDER",
-        patientId: appt.patientId,
-        patientName: appt.patient.name,
-        patientEmail: appt.patient.email,
-        title: appt.consultationType.name,
-        subtitle: `Saldo final · Cita ${dateLabel}`,
-        amount: phases.remainderAmount,
-        totalAmount: payment.amount.toString(),
-        createdAt: appt.createdAt.toISOString(),
-        trashedAt: payment.remainderInboxTrashedAt?.toISOString() ?? null,
-        appointmentId: appt.id,
-        ...appointmentPatientPaymentMeta(payment),
-      });
-    }
+    // El comprobante del pedido es una sola petición (adelanto). El saldo se
+    // registra luego desde el calendario del admin, no como fila duplicada.
+    items.push({
+      id: `appt-advance-${appt.id}`,
+      kind: "APPOINTMENT_ADVANCE",
+      patientId: appt.patientId,
+      patientName: appt.patient.name,
+      patientEmail: appt.patient.email,
+      title: appt.consultationType.name,
+      subtitle: `Cita ${dateLabel}`,
+      amount: phases.advanceAmount,
+      totalAmount: payment.amount.toString(),
+      createdAt: appt.createdAt.toISOString(),
+      trashedAt: payment.advanceInboxTrashedAt?.toISOString() ?? null,
+      appointmentId: appt.id,
+      ...appointmentPatientPaymentMeta(payment),
+    });
   }
 
   return items.sort(

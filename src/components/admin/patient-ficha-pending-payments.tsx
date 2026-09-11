@@ -15,8 +15,8 @@ import {
 const kindLabels: Record<AdminPendingPaymentItem["kind"], string> = {
   RESOURCE: "Recurso",
   PRODUCT: "Producto",
-  APPOINTMENT_ADVANCE: "Adelanto cita",
-  APPOINTMENT_REMAINDER: "Saldo cita",
+  APPOINTMENT_ADVANCE: "Pago de cita",
+  APPOINTMENT_REMAINDER: "Saldo de cita",
 };
 
 function fmtDateTime(iso: string) {

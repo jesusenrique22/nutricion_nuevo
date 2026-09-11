@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { dispatchNotificationCountUpdate } from "@/lib/notification-count-events";
+import { resolveNotificationHref } from "@/lib/notification-links";
 import { safeRouterRefresh } from "@/lib/safe-router";
 import type { NotificationDTO } from "@/server/actions/notification.actions";
 import {
@@ -22,8 +23,10 @@ function fmt(iso: string) {
 
 export function NotificationsList({
   initialNotifications,
+  isAdmin = false,
 }: {
   initialNotifications: NotificationDTO[];
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
@@ -105,7 +108,9 @@ export function NotificationsList({
             No tienes notificaciones.
           </div>
         )}
-        {notifications.map((n) => (
+        {notifications.map((n) => {
+          const viewHref = resolveNotificationHref(n, isAdmin);
+          return (
           <div
             key={n.id}
             className={`rounded-2xl border p-4 transition ${
@@ -121,9 +126,9 @@ export function NotificationsList({
                 <span className="mt-2 block text-xs text-foreground/40">
                   {fmt(n.createdAt)}
                 </span>
-                {typeof n.payload?.deepLink === "string" ? (
+                {viewHref ? (
                   <Link
-                    href={n.payload.deepLink}
+                    href={viewHref}
                     onClick={() => handleViewLink(n.id)}
                     className="mt-2 inline-block text-sm font-semibold text-primary hover:underline"
                   >
@@ -147,7 +152,8 @@ export function NotificationsList({
               )}
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

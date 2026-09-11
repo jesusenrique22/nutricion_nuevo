@@ -101,3 +101,35 @@ export function isCouponCurrentlyValid(coupon: {
   if (coupon.expiresAt && coupon.expiresAt.getTime() <= now) return false;
   return true;
 }
+
+/** null = ilimitado; number inválido si no es entero >= 1 */
+export function parseMaxRedemptionsInput(
+  raw: string,
+): number | null | "invalid" {
+  const trimmed = raw.trim().toLowerCase();
+  if (
+    !trimmed ||
+    trimmed === "0" ||
+    trimmed === "ilimitado" ||
+    trimmed === "sin limite" ||
+    trimmed === "sin límite" ||
+    trimmed === "∞"
+  ) {
+    return null;
+  }
+  const n = Number(raw.trim());
+  if (!Number.isInteger(n) || n < 1) return "invalid";
+  return n;
+}
+
+export function hasRedemptionsRemaining(coupon: {
+  maxRedemptions: number | null;
+  redemptionCount: number;
+}): boolean {
+  if (coupon.maxRedemptions === null) return true;
+  return coupon.redemptionCount < coupon.maxRedemptions;
+}
+
+export function formatMaxRedemptionsLabel(max: number | null): string {
+  return max === null ? "Ilimitado" : String(max);
+}

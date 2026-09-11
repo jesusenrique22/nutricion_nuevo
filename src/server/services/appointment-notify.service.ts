@@ -30,7 +30,7 @@ export async function notifyAppointmentBooked(params: {
 }) {
   await safeNotify(async () => {
     const adminIds = await getAdminUserIds();
-    const patientUrl = `/dashboard/admin/patients/${params.patientId}?appointmentId=${params.appointmentId}`;
+    const calendarUrl = `/dashboard/admin/calendar?appointmentId=${params.appointmentId}`;
 
     await Promise.all(
       adminIds.map((id) =>
@@ -40,8 +40,9 @@ export async function notifyAppointmentBooked(params: {
           title: "Nueva cita solicitada",
           body: `${params.patientName} agendó ${params.consultationName} para el ${fmtDate(params.startTime)}.`,
           payload: {
-            deepLink: patientUrl,
+            deepLink: calendarUrl,
             appointmentId: params.appointmentId,
+            patientId: params.patientId,
           },
         }),
       ),
@@ -71,13 +72,13 @@ export async function notifyAppointmentBooked(params: {
               <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
             </div>
             <p style="margin:24px 0">
-              <a href="${absoluteUrl(patientUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
-                Revisar cita del paciente
+              <a href="${absoluteUrl(calendarUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                Ver cita en el calendario
               </a>
             </p>
           </div>
         `,
-        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nRevisar: ${absoluteUrl(patientUrl)}`,
+        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nVer: ${absoluteUrl(calendarUrl)}`,
       });
 
       // 2. Correo de confirmación inmediata al Paciente
@@ -202,8 +203,9 @@ export async function notifyAppointmentCancelled(params: {
             title: "Cita cancelada por paciente",
             body: `${params.patientName} canceló ${params.consultationName} (${when}).`,
             payload: {
-              deepLink: `/dashboard/admin/patients/${params.patientId}`,
+              deepLink: `/dashboard/admin/calendar?appointmentId=${params.appointmentId}`,
               appointmentId: params.appointmentId,
+              patientId: params.patientId,
             },
           }),
         ),
@@ -364,8 +366,9 @@ export async function notifyAppointmentRescheduled(params: {
             title: "Cita reagendada por paciente",
             body: `${params.patientName} movió ${params.consultationName} al ${when}.`,
             payload: {
-              deepLink: "/dashboard/admin/calendar",
+              deepLink: `/dashboard/admin/calendar?appointmentId=${params.appointmentId}`,
               appointmentId: params.appointmentId,
+              patientId: params.patientId,
             },
           }),
         ),

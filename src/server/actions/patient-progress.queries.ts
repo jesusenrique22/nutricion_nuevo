@@ -221,16 +221,8 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
       where: {
         patientId,
         payment: {
-          OR: [
-            {
-              advanceStatus: "PENDING",
-              advanceInboxDismissedAt: null,
-            },
-            {
-              remainderStatus: "PENDING",
-              remainderInboxDismissedAt: null,
-            },
-          ],
+          advanceStatus: "PENDING",
+          advanceInboxDismissedAt: null,
         },
       },
       include: { consultationType: true, payment: true },
@@ -266,37 +258,20 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
       minute: "2-digit",
     });
 
-    if (
+    // El comprobante del carrito es una sola petición (adelanto). El saldo se
+    // confirma después desde el calendario, no como segunda tarjeta aquí.
+    const advancePending =
       phases.advanceStatus === "PENDING" &&
       Number(phases.advanceAmount) > 0 &&
-      !payment.advanceInboxDismissedAt
-    ) {
+      !payment.advanceInboxDismissedAt;
+
+    if (advancePending) {
       items.push({
         id: `appt-advance-${appt.id}`,
         kind: "APPOINTMENT_ADVANCE",
         title: appt.consultationType.name,
-        subtitle: `Adelanto · Cita ${dateLabel}`,
+        subtitle: `Cita ${dateLabel}`,
         amount: phases.advanceAmount,
-        totalAmount: payment.amount.toString(),
-        createdAt: appt.createdAt.toISOString(),
-        paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),
-        patientReference: payment.patientPaymentReference,
-        patientNote: payment.patientPaymentNote,
-        proofUrls: parseProofUrls(payment.patientPaymentProofUrls),
-      });
-    }
-
-    if (
-      phases.remainderStatus === "PENDING" &&
-      Number(phases.remainderAmount) > 0 &&
-      !payment.remainderInboxDismissedAt
-    ) {
-      items.push({
-        id: `appt-remainder-${appt.id}`,
-        kind: "APPOINTMENT_REMAINDER",
-        title: appt.consultationType.name,
-        subtitle: `Saldo final · Cita ${dateLabel}`,
-        amount: phases.remainderAmount,
         totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
         paymentMethod: mapPaymentMethod(payment.patientPaymentMethod),

@@ -8,10 +8,12 @@ import {
   clampPercentOff,
   expiresAtFromDuration,
   generateRandomCouponCode,
+  hasRedemptionsRemaining,
   isCouponCurrentlyValid,
   isCouponDuration,
   isValidCouponCodeFormat,
   normalizeCouponCode,
+  parseMaxRedemptionsInput,
   type CouponDuration,
 } from "@/lib/coupons";
 import { prisma } from "@/server/db/prisma";
@@ -26,12 +28,14 @@ export type AdminCouponDTO = {
   code: string;
   percentOff: number;
   duration: CouponDuration;
+  maxRedemptions: number | null;
   startsAt: string;
   expiresAt: string | null;
   active: boolean;
   redemptionCount: number;
   createdAt: string;
   isExpired: boolean;
+  isExhausted: boolean;
 };
 
 export type AppliedCouponDTO = {
@@ -45,6 +49,7 @@ function toAdminDto(row: {
   code: string;
   percentOff: number;
   duration: CouponDuration;
+  maxRedemptions: number | null;
   startsAt: Date;
   expiresAt: Date | null;
   active: boolean;
@@ -53,17 +58,23 @@ function toAdminDto(row: {
 }): AdminCouponDTO {
   const expired =
     row.expiresAt !== null && row.expiresAt.getTime() <= Date.now();
+  const exhausted = !hasRedemptionsRemaining({
+    maxRedemptions: row.maxRedemptions,
+    redemptionCount: row._count.redemptions,
+  });
   return {
     id: row.id,
     code: row.code,
     percentOff: row.percentOff,
     duration: row.duration,
+    maxRedemptions: row.maxRedemptions,
     startsAt: row.startsAt.toISOString(),
     expiresAt: row.expiresAt?.toISOString() ?? null,
     active: row.active,
     redemptionCount: row._count.redemptions,
     createdAt: row.createdAt.toISOString(),
     isExpired: expired,
+    isExhausted: exhausted,
   };
 }
 
@@ -84,6 +95,7 @@ export async function createCoupon(input: {
   code?: string;
   percentOff: number;
   duration: string;
+  maxRedemptions?: string;
 }): Promise<CouponActionResult & { code?: string }> {
   try {
     const admin = await requireAdmin();
@@ -117,6 +129,15 @@ export async function createCoupon(input: {
       }
     }
 
+    const maxParsed = parseMaxRedemptionsInput(input.maxRedemptions ?? "");
+    if (maxParsed === "invalid") {
+      return {
+        ok: false,
+        message:
+          "El límite de canjes debe ser un número entero mayor a 0, o dejalo vacío para ilimitado.",
+      };
+    }
+
     const startsAt = new Date();
     const expiresAt = expiresAtFromDuration(input.duration, startsAt);
 
@@ -126,6 +147,7 @@ export async function createCoupon(input: {
           code,
           percentOff,
           duration: input.duration,
+          maxRedemptions: maxParsed,
           startsAt,
           expiresAt,
           active: true,
@@ -147,6 +169,53 @@ export async function createCoupon(input: {
 
     revalidatePath("/dashboard/admin/cupones");
     return { ok: true, code };
+  } catch (err) {
+    return { ok: false, message: formatActionError(err) };
+  }
+}
+
+export async function updateCouponMaxRedemptions(input: {
+  couponId: string;
+  maxRedemptions: string;
+}): Promise<CouponActionResult> {
+  try {
+    const admin = await requireAdmin();
+    if (!admin) return { ok: false, message: "No autorizado." };
+
+    const parsed = parseMaxRedemptionsInput(input.maxRedemptions);
+    if (parsed === "invalid") {
+      return {
+        ok: false,
+        message:
+          "El límite de canjes debe ser un número entero mayor a 0, o dejalo vacío para ilimitado.",
+      };
+    }
+
+    const coupon = await prisma.coupon.findUnique({
+      where: { id: input.couponId },
+      include: { _count: { select: { redemptions: true } } },
+    });
+    if (!coupon || !coupon.active) {
+      return { ok: false, message: "Cupón no encontrado." };
+    }
+
+    if (
+      parsed !== null &&
+      parsed < coupon._count.redemptions
+    ) {
+      return {
+        ok: false,
+        message: `No podés bajar el límite por debajo de los canjes actuales (${coupon._count.redemptions}).`,
+      };
+    }
+
+    await prisma.coupon.update({
+      where: { id: input.couponId },
+      data: { maxRedemptions: parsed },
+    });
+
+    revalidatePath("/dashboard/admin/cupones");
+    return { ok: true };
   } catch (err) {
     return { ok: false, message: formatActionError(err) };
   }
@@ -189,9 +258,21 @@ export async function validateCouponForCart(
     const code = normalizeCouponCode(rawCode);
     if (!code) return { ok: false, message: "Ingresá un código de cupón." };
 
-    const coupon = await prisma.coupon.findUnique({ where: { code } });
+    const coupon = await prisma.coupon.findUnique({
+      where: { code },
+      include: { _count: { select: { redemptions: true } } },
+    });
     if (!coupon || !isCouponCurrentlyValid(coupon)) {
       return { ok: false, message: "Cupón inválido o vencido." };
+    }
+
+    if (
+      !hasRedemptionsRemaining({
+        maxRedemptions: coupon.maxRedemptions,
+        redemptionCount: coupon._count.redemptions,
+      })
+    ) {
+      return { ok: false, message: "Este cupón ya alcanzó el límite de usos." };
     }
 
     const already = await prisma.couponRedemption.findUnique({
@@ -229,9 +310,21 @@ export async function resolveCouponForCheckout(params: {
   if (!raw) return { ok: true, coupon: null };
 
   const code = normalizeCouponCode(raw);
-  const coupon = await prisma.coupon.findUnique({ where: { code } });
+  const coupon = await prisma.coupon.findUnique({
+    where: { code },
+    include: { _count: { select: { redemptions: true } } },
+  });
   if (!coupon || !isCouponCurrentlyValid(coupon)) {
     return { ok: false, message: "Cupón inválido o vencido." };
+  }
+
+  if (
+    !hasRedemptionsRemaining({
+      maxRedemptions: coupon.maxRedemptions,
+      redemptionCount: coupon._count.redemptions,
+    })
+  ) {
+    return { ok: false, message: "Este cupón ya alcanzó el límite de usos." };
   }
 
   const already = await prisma.couponRedemption.findUnique({

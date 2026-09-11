@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 import { updateAppointmentStatus } from "@/server/actions/appointment-status.actions";
@@ -116,12 +117,32 @@ export function AppointmentAdminPanel({
   const phases = appointment.paymentPhases;
   const overallStatus = phases?.overallStatus ?? appointment.paymentStatus;
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-[2px]">
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex justify-end"
+      role="presentation"
+    >
       <button
         type="button"
         aria-label="Cerrar panel"
-        className="absolute inset-0"
+        className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
         onClick={onClose}
       />
       <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-surface shadow-2xl sm:max-h-[100dvh] sm:rounded-l-3xl">
@@ -372,6 +393,7 @@ export function AppointmentAdminPanel({
         )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

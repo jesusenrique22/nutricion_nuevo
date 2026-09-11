@@ -437,7 +437,7 @@ model TrainingFormSubmission {
 model Payment {
   id              String        @id @default(cuid())
   appointmentId   String        @unique
-  appointment     Appointment   @relation(fields: [appointmentId], references: [id])
+  appointment     Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   amount          Decimal       @db.Decimal(10, 2)
   advanceAmount   Decimal       @default(0) @db.Decimal(10, 2)
   remainderAmount Decimal       @default(0) @db.Decimal(10, 2)
@@ -625,13 +625,15 @@ model CartItem {
 // ──────────────────────────────────────────────
 
 model Coupon {
-  id          String         @id @default(cuid())
-  code        String         @unique
-  percentOff  Int
-  duration    CouponDuration
-  startsAt    DateTime       @default(now())
-  expiresAt   DateTime?
-  active      Boolean        @default(true)
+  id              String         @id @default(cuid())
+  code            String         @unique
+  percentOff      Int
+  duration        CouponDuration
+  /// Límite total de canjes (null = ilimitado). Cada paciente sigue pudiendo usarlo una vez.
+  maxRedemptions  Int?
+  startsAt        DateTime       @default(now())
+  expiresAt       DateTime?
+  active          Boolean        @default(true)
   createdById String?
   createdBy   User?          @relation("CouponsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())

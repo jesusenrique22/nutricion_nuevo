@@ -12,7 +12,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function CalendarPage() {
+export default async function CalendarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ appointmentId?: string }>;
+}) {
+  const { appointmentId: initialAppointmentId } = await searchParams;
   const session = await auth();
   const adminUserId = session?.user?.id;
 
@@ -65,7 +70,10 @@ export default async function CalendarPage() {
       />
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
-        <CalendarWithPanel appointments={appointments} />
+        <CalendarWithPanel
+          appointments={appointments}
+          initialAppointmentId={initialAppointmentId ?? null}
+        />
       </div>
     </div>
   );

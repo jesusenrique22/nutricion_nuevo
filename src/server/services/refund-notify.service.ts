@@ -28,7 +28,10 @@ export async function notifyRefundRequested(params: {
           title: "Solicitud de reembolso",
           body: `${params.patientName} pidió reembolso de ${kindLabel}: ${params.itemTitle}. Contactá al paciente y resolvé la solicitud.`,
           payload: {
-            deepLink: "/dashboard/admin/payments",
+            deepLink:
+              params.itemKind === "APPOINTMENT"
+                ? `/dashboard/admin/calendar?appointmentId=${params.entityId}`
+                : `/dashboard/admin/patients/${params.patientId}`,
             patientId: params.patientId,
             entityId: params.entityId,
             itemKind: params.itemKind,

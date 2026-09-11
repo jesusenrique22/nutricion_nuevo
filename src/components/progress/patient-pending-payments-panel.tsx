@@ -6,7 +6,7 @@ import type { PatientPendingPaymentItem } from "@/server/actions/patient-progres
 
 const kindLabels: Record<PatientPendingPaymentItem["kind"], string> = {
   RESOURCE: "Recurso",
-  APPOINTMENT_ADVANCE: "Adelanto de cita",
+  APPOINTMENT_ADVANCE: "Pago de cita",
   APPOINTMENT_REMAINDER: "Saldo de cita",
 };
 

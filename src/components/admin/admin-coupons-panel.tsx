@@ -1,10 +1,17 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   COUPON_DURATION_LABELS,
   COUPON_DURATION_OPTIONS,
+  formatMaxRedemptionsLabel,
   generateRandomCouponCode,
   normalizeCouponCode,
   type CouponDuration,
@@ -12,6 +19,7 @@ import {
 import {
   createCoupon,
   deleteCoupon,
+  updateCouponMaxRedemptions,
   type AdminCouponDTO,
 } from "@/server/actions/coupon.actions";
 
@@ -29,6 +37,89 @@ function fmtDate(iso: string | null) {
   });
 }
 
+function maxRedemptionsToInput(max: number | null): string {
+  return max === null ? "" : String(max);
+}
+
+function CouponMaxRedemptionsEditor({
+  coupon,
+  disabled,
+  onSaved,
+}: {
+  coupon: AdminCouponDTO;
+  disabled: boolean;
+  onSaved: () => void;
+}) {
+  const [value, setValue] = useState(maxRedemptionsToInput(coupon.maxRedemptions));
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, startSave] = useTransition();
+
+  useEffect(() => {
+    setValue(maxRedemptionsToInput(coupon.maxRedemptions));
+    setError(null);
+  }, [coupon.id, coupon.maxRedemptions]);
+
+  const dirty = value !== maxRedemptionsToInput(coupon.maxRedemptions);
+
+  function handleSave() {
+    setError(null);
+    startSave(async () => {
+      const res = await updateCouponMaxRedemptions({
+        couponId: coupon.id,
+        maxRedemptions: value,
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      onSaved();
+    });
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <label className="block text-xs text-foreground/55">
+        Límite de canjes{" "}
+        <span className="font-normal text-foreground/40">
+          (vacío = ilimitado)
+        </span>
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-foreground/50">
+          Canjes: {coupon.redemptionCount} /{" "}
+          {formatMaxRedemptionsLabel(coupon.maxRedemptions)}
+        </span>
+        <input
+          type="number"
+          min={coupon.redemptionCount || 1}
+          step={1}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Ilimitado"
+          disabled={disabled || isSaving}
+          className="w-28 rounded-lg border border-foreground/15 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-primary disabled:opacity-50"
+        />
+        {dirty && (
+          <button
+            type="button"
+            disabled={disabled || isSaving}
+            onClick={handleSave}
+            className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {isSaving ? "Guardando…" : "Guardar"}
+          </button>
+        )}
+      </div>
+      {coupon.isExhausted && (
+        <p className="text-xs font-medium text-amber-700">
+          Límite alcanzado — no acepta nuevos canjes hasta que subas el tope.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -36,6 +127,7 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
   const [code, setCode] = useState("");
   const [percentOff, setPercentOff] = useState("10");
   const [duration, setDuration] = useState<CouponDuration>("ONE_MONTH");
+  const [maxRedemptions, setMaxRedemptions] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lastCreated, setLastCreated] = useState<string | null>(null);
 
@@ -63,6 +155,7 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
         code: codeMode === "custom" ? code : undefined,
         percentOff: Number(percentOff),
         duration,
+        maxRedemptions,
       });
       if (!res.ok) {
         setError(res.message);
@@ -72,6 +165,7 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
       setCode("");
       setPercentOff("10");
       setDuration("ONE_MONTH");
+      setMaxRedemptions("");
       router.refresh();
     });
   }
@@ -165,7 +259,7 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
             )}
           </fieldset>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-foreground/55">
                 Descuento (%)
@@ -199,6 +293,21 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-foreground/55">
+                Límite de canjes
+              </span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={maxRedemptions}
+                onChange={(e) => setMaxRedemptions(e.target.value)}
+                placeholder="Ilimitado"
+                className={inputClass}
+              />
             </label>
           </div>
 
@@ -247,9 +356,11 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
                     {COUPON_DURATION_LABELS[coupon.duration]} · vence{" "}
                     {fmtDate(coupon.expiresAt)}
                   </p>
-                  <p className="mt-0.5 text-xs text-foreground/45">
-                    Canjes: {coupon.redemptionCount}
-                  </p>
+                  <CouponMaxRedemptionsEditor
+                    coupon={coupon}
+                    disabled={isPending}
+                    onSaved={() => router.refresh()}
+                  />
                 </div>
                 <button
                   type="button"
@@ -282,6 +393,10 @@ export function AdminCouponsPanel({ coupons }: { coupons: AdminCouponDTO[] }) {
                   </p>
                   <p className="text-sm text-foreground/50">
                     {coupon.percentOff}% · venció {fmtDate(coupon.expiresAt)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-foreground/45">
+                    Canjes: {coupon.redemptionCount} /{" "}
+                    {formatMaxRedemptionsLabel(coupon.maxRedemptions)}
                   </p>
                 </div>
                 <button

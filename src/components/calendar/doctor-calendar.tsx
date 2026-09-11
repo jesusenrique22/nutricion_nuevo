@@ -25,9 +25,12 @@ const VIEWS: { id: CalendarView; label: string }[] = [
 
 export function DoctorCalendar({
   appointments,
+  focusDate,
   onSelectAppointment,
 }: {
   appointments: AppointmentDTO[];
+  /** Salta al día de una cita (p. ej. desde una notificación). */
+  focusDate?: Date | null;
   onSelectAppointment?: (appointment: AppointmentDTO) => void;
 }) {
   const isMobile = useMediaQuery("(max-width: 1023px)");
@@ -36,6 +39,13 @@ export function DoctorCalendar({
   const [miniMonth, setMiniMonth] = useState(() =>
     startOfMonth(new Date()),
   );
+
+  useEffect(() => {
+    if (!focusDate || Number.isNaN(focusDate.getTime())) return;
+    setSelectedDate(focusDate);
+    setMiniMonth(startOfMonth(focusDate));
+    if (isMobile) setView("day");
+  }, [focusDate, isMobile]);
 
   useEffect(() => {
     if (isMobile) setView("day");
@@ -72,10 +82,14 @@ export function DoctorCalendar({
   }
 
   const realToday = new Date();
-  const isSelectedToday = isSameDay(selectedDate, realToday);
-  const focusDayLabel = isSelectedToday
-    ? "Hoy"
-    : format(selectedDate, "d MMM", { locale: es });
+  const selectedDateValid = !Number.isNaN(selectedDate.getTime());
+  const isSelectedToday =
+    selectedDateValid && isSameDay(selectedDate, realToday);
+  const focusDayLabel = !selectedDateValid
+    ? "—"
+    : isSelectedToday
+      ? "Hoy"
+      : format(selectedDate, "d MMM", { locale: es });
 
   return (
     <div className="anttova-calendar flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col overflow-hidden">
