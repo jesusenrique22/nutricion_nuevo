@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -24,7 +24,10 @@ function groupItems(items: CartItemDTO[]) {
   const products = items.filter((i) => i.type === "PRODUCT");
   const resources = items.filter((i) => i.type === "RESOURCE");
   const appointments = items.filter((i) => i.type === "APPOINTMENT");
-  return { products, resources, appointments };
+  const remainderAppointments = items.filter(
+    (i) => i.type === "APPOINTMENT_REMAINDER",
+  );
+  return { products, resources, appointments, remainderAppointments };
 }
 
 function CartSection({
@@ -58,6 +61,7 @@ export function PatientCartPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const appointmentAdded = searchParams.get("cita") === "agregada";
+  const remainderAdded = searchParams.get("saldo") === "agregado";
   const { convert, displayCurrency } = useDisplayPrice();
   const [isPending, startTransition] = useTransition();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -97,9 +101,21 @@ export function PatientCartPanel({
 
   const appointmentTotalHint = useMemo(() => {
     const splitAppts = items.filter(
-      (i) => i.type === "APPOINTMENT" && i.fullPrice,
+      (i) =>
+        (i.type === "APPOINTMENT" || i.type === "APPOINTMENT_REMAINDER") &&
+        i.fullPrice,
     );
     if (splitAppts.length === 0) return undefined;
+
+    const hasRemainder = splitAppts.some(
+      (i) => i.type === "APPOINTMENT_REMAINDER",
+    );
+    const hasAdvance = splitAppts.some((i) => i.type === "APPOINTMENT");
+
+    if (hasRemainder) {
+      return "Saldo de cita (cuota 2). Se muestra lo ya abonado y lo que falta pagar. Solo podés confirmar el día de la consulta, dentro del horario agendado.";
+    }
+
     let fullSum = 0;
     for (const item of splitAppts) {
       fullSum += convert(
@@ -116,7 +132,10 @@ export function PatientCartPanel({
       const savingsLabel = formatMoney(fullSum - discounted, displayCurrency);
       return `Descuento aplicado al total: ${totalLabel} (antes ${origLabel} · ahorro de ${savingsLabel}). Aquí abonas únicamente el adelanto correspondiente con el descuento proporcional ya aplicado.`;
     }
-    return `Total de la cita: ${totalLabel} · acá pagás solo la cuota de esta etapa`;
+    if (hasAdvance) {
+      return `Total de la cita: ${totalLabel} · acá pagás solo la cuota de adelanto`;
+    }
+    return undefined;
   }, [items, convert, displayCurrency, appliedCoupon?.percentOff]);
 
   const missingFields = useMemo(() => {
@@ -137,6 +156,12 @@ export function PatientCartPanel({
 
   const isCheckoutComplete = missingFields.length === 0;
 
+  useEffect(() => {
+    if (items.length > 0 && (appointmentAdded || remainderAdded)) {
+      setCheckoutOpen(true);
+    }
+  }, [items.length, appointmentAdded, remainderAdded]);
+
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-foreground/15 bg-muted/20 px-6 py-14 text-center">
@@ -144,8 +169,19 @@ export function PatientCartPanel({
           Tu carrito está vacío
         </p>
         <p className="mt-2 text-sm text-foreground/50">
-          Explorá productos, recursos o agendá una cita para empezar tu pedido.
+          {appointmentAdded || remainderAdded
+            ? "Tu cita se agregó pero no pudimos cargar el carrito. Recargá la página o volvé a agendar la cita."
+            : "Explorá productos, recursos o agendá una cita para empezar tu pedido."}
         </p>
+        {(appointmentAdded || remainderAdded) && (
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Recargar carrito
+          </button>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
             href="/dashboard/patient/products"
@@ -241,6 +277,12 @@ export function PatientCartPanel({
             pedido cuando quieras.
           </p>
         )}
+        {remainderAdded && (
+          <p className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-foreground/75">
+            Saldo agregado al carrito. Confirmá el pago dentro del horario de tu
+            cita.
+          </p>
+        )}
 
         <CartSection
           title="Productos"
@@ -257,8 +299,17 @@ export function PatientCartPanel({
           ))}
         </CartSection>
 
-        <CartSection title="Citas" count={grouped.appointments.length}>
+        <CartSection title="Citas · adelanto" count={grouped.appointments.length}>
           {grouped.appointments.map((item) => (
+            <CartLineItem key={item.id} item={item} disabled={isPending} />
+          ))}
+        </CartSection>
+
+        <CartSection
+          title="Citas · saldo"
+          count={grouped.remainderAppointments.length}
+        >
+          {grouped.remainderAppointments.map((item) => (
             <CartLineItem key={item.id} item={item} disabled={isPending} />
           ))}
         </CartSection>
@@ -301,8 +352,16 @@ export function PatientCartPanel({
             )}
             {grouped.appointments.length > 0 && (
               <div className="flex justify-between gap-4">
-                <dt className="text-foreground/55">Citas</dt>
+                <dt className="text-foreground/55">Citas (adelanto)</dt>
                 <dd className="font-medium">{grouped.appointments.length}</dd>
+              </div>
+            )}
+            {grouped.remainderAppointments.length > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-foreground/55">Citas (saldo)</dt>
+                <dd className="font-medium">
+                  {grouped.remainderAppointments.length}
+                </dd>
               </div>
             )}
             <div className="flex justify-between gap-4 border-t border-foreground/10 pt-3">

@@ -69,31 +69,71 @@ function getMongoUri(): string {
   return normalizeMongoUri(uri);
 }
 
-function resetMongoConnection(): void {
-  globalForMongo._mongoClientPromise = undefined;
-  globalForMongo._mongoClient = undefined;
+function isTopologyClosedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === "MongoTopologyClosedError" ||
+    error.message.includes("Topology is closed")
+  );
 }
 
-function getMongoClient(): MongoClient {
-  if (!globalForMongo._mongoClient) {
-    globalForMongo._mongoClient = new MongoClient(
-      getMongoUri(),
-      getClientOptions(),
-    );
+function resetMongoConnection(): void {
+  const previous = globalForMongo._mongoClient;
+  globalForMongo._mongoClientPromise = undefined;
+  globalForMongo._mongoClient = undefined;
+  if (previous) {
+    void previous.close().catch(() => {});
   }
-  return globalForMongo._mongoClient;
+}
+
+async function pingClient(
+  client: MongoClient,
+  timeoutMs: number,
+): Promise<boolean> {
+  try {
+    await Promise.race([
+      client.db(dbName).command({ ping: 1 }),
+      sleep(timeoutMs).then(() => {
+        throw new Error("mongo-ping-timeout");
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Cliente conectado; reabre si la topología quedó cerrada (VPN, idle, hot reload). */
+async function getConnectedClient(): Promise<MongoClient> {
+  if (globalForMongo._mongoClient) {
+    if (await pingClient(globalForMongo._mongoClient, 2_500)) {
+      return globalForMongo._mongoClient;
+    }
+    resetMongoConnection();
+  }
+
+  if (globalForMongo._mongoClientPromise) {
+    try {
+      const client = await globalForMongo._mongoClientPromise;
+      if (await pingClient(client, 2_500)) {
+        globalForMongo._mongoClient = client;
+        return client;
+      }
+    } catch {
+      /* reconectar abajo */
+    }
+    resetMongoConnection();
+  }
+
+  const client = new MongoClient(getMongoUri(), getClientOptions());
+  await client.connect();
+  globalForMongo._mongoClient = client;
+  globalForMongo._mongoClientPromise = Promise.resolve(client);
+  return client;
 }
 
 function getClientPromise(): Promise<MongoClient> {
-  if (!globalForMongo._mongoClientPromise) {
-    globalForMongo._mongoClientPromise = getMongoClient()
-      .connect()
-      .catch((error) => {
-        resetMongoConnection();
-        throw error;
-      });
-  }
-  return globalForMongo._mongoClientPromise;
+  return getConnectedClient();
 }
 
 let indexesEnsured = false;
@@ -183,16 +223,10 @@ export async function tryGetMongoDbFast(): Promise<Db | null> {
   if (!isMongoConfigured()) return null;
 
   if (globalForMongo._mongoClient) {
-    try {
-      const db = globalForMongo._mongoClient.db(dbName);
-      await Promise.race([
-        db.command({ ping: 1 }),
-        sleep(2_500),
-      ]);
-      return db;
-    } catch {
-      resetMongoConnection();
+    if (await pingClient(globalForMongo._mongoClient, 2_500)) {
+      return globalForMongo._mongoClient.db(dbName);
     }
+    resetMongoConnection();
   }
 
   const client = new MongoClient(getMongoUri(), {
@@ -224,9 +258,27 @@ export async function tryGetMongoDb(): Promise<Db | null> {
   for (let i = 1; i <= attempts; i++) {
     try {
       return await getMongoDb();
-    } catch {
+    } catch (err) {
       resetMongoConnection();
-      if (i < attempts) await sleep(2_000);
+      if (i < attempts) await sleep(isTopologyClosedError(err) ? 500 : 2_000);
+    }
+  }
+  return null;
+}
+
+/** Ejecuta una lectura GridFS reintentando si la topología Mongo quedó cerrada. */
+export async function withMongoDb<T>(
+  fn: (db: Db) => Promise<T>,
+): Promise<T | null> {
+  if (!isMongoConfigured()) return null;
+
+  for (let i = 1; i <= 2; i++) {
+    try {
+      const db = await getMongoDb();
+      return await fn(db);
+    } catch (err) {
+      resetMongoConnection();
+      if (!isTopologyClosedError(err) || i === 2) return null;
     }
   }
   return null;

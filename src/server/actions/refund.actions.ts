@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import {
   notifyRefundRequested,
@@ -31,9 +32,14 @@ export async function requestAppointmentRefund(params: {
     return { ok: false, message: "No autorizado." };
   }
 
+  const paymentSelect = await getPaymentQuerySelect();
   const appt = await prisma.appointment.findUnique({
     where: { id: params.appointmentId },
-    include: { payment: true, consultationType: true, patient: true },
+    include: {
+      payment: { select: paymentSelect },
+      consultationType: true,
+      patient: true,
+    },
   });
 
   if (!appt || appt.patientId !== session.user.id) {
@@ -135,9 +141,13 @@ export async function resolveAppointmentRefund(params: {
     return { ok: false, message: "No autorizado." };
   }
 
+  const paymentSelect = await getPaymentQuerySelect();
   const appt = await prisma.appointment.findUnique({
     where: { id: params.appointmentId },
-    include: { payment: true, consultationType: true },
+    include: {
+      payment: { select: paymentSelect },
+      consultationType: true,
+    },
   });
 
   if (!appt?.payment) {

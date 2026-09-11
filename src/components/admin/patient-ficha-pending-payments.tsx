@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { AdminAppointmentSplitPayment } from "@/components/admin/admin-appointment-split-payment";
 import { DisplayPrice } from "@/components/currency/display-price";
 import { PaymentPatientEvidence } from "@/components/payments/payment-patient-evidence";
 import type { AdminPendingPaymentItem } from "@/server/actions/payment-admin.queries";
@@ -15,8 +17,8 @@ import {
 const kindLabels: Record<AdminPendingPaymentItem["kind"], string> = {
   RESOURCE: "Recurso",
   PRODUCT: "Producto",
-  APPOINTMENT_ADVANCE: "Pago de cita",
-  APPOINTMENT_REMAINDER: "Saldo de cita",
+  APPOINTMENT_ADVANCE: "Adelanto de cita",
+  APPOINTMENT_REMAINDER: "Cita · plan 2 cuotas",
 };
 
 function fmtDateTime(iso: string) {
@@ -70,55 +72,94 @@ export function PatientFichaPendingPayments({
 
   return (
     <div className="space-y-3">
-      {items.map((item) => (
-        <article
-          key={item.id}
-          className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-4"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                {kindLabels[item.kind]}
-              </span>
-              <h3 className="mt-2 font-semibold">{item.title}</h3>
-              <p className="text-sm text-foreground/60">{item.subtitle}</p>
-              <div className="mt-3">
-                <PaymentPatientEvidence
-                  paymentMethod={item.paymentMethod}
-                  patientReference={item.patientReference}
-                  patientNote={item.patientNote}
-                  proofUrls={item.proofUrls}
-                />
+      {items.map((item) => {
+        const isSplitRemainder =
+          item.kind === "APPOINTMENT_REMAINDER" &&
+          !!item.paidAdvanceAmount &&
+          !!item.totalAmount;
+        const canApprove =
+          !item.awaitingPatientPayment &&
+          (item.kind !== "APPOINTMENT_REMAINDER" ||
+            (item.proofUrls?.length ?? 0) > 0);
+
+        return (
+          <article
+            key={item.id}
+            className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                  {kindLabels[item.kind]}
+                </span>
+                <h3 className="mt-2 font-semibold">{item.title}</h3>
+                <p className="text-sm text-foreground/60">{item.subtitle}</p>
+                {isSplitRemainder && (
+                  <AdminAppointmentSplitPayment
+                    paidAdvanceAmount={item.paidAdvanceAmount!}
+                    remainderAmount={item.amount}
+                    totalAmount={item.totalAmount!}
+                    appointmentStart={item.appointmentStart}
+                    awaitingPatientPayment={item.awaitingPatientPayment}
+                  />
+                )}
+                {!item.awaitingPatientPayment && (
+                  <div className="mt-3">
+                    <PaymentPatientEvidence
+                      paymentMethod={item.paymentMethod}
+                      patientReference={item.patientReference}
+                      patientNote={item.patientNote}
+                      proofUrls={item.proofUrls}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/45">
+                  {isSplitRemainder ? "Saldo pendiente" : "Monto"}
+                </p>
+                <p className="text-lg font-bold text-primary">
+                  <DisplayPrice amount={item.amount} currency="ARS" />
+                </p>
+                {item.totalAmount ? (
+                  <p className="mt-1 text-xs text-foreground/50">
+                    Total cita:{" "}
+                    <DisplayPrice amount={item.totalAmount} currency="ARS" />
+                  </p>
+                ) : null}
+                <p className="text-xs text-foreground/45">
+                  {fmtDateTime(item.createdAt)}
+                </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-foreground/45">
-                {item.totalAmount ? "Cuota" : "Monto"}
+            {item.awaitingPatientPayment ? (
+              <p className="mt-3 text-xs text-foreground/55">
+                El paciente debe pagar el saldo el día de la cita desde el
+                carrito.
               </p>
-              <p className="text-lg font-bold text-primary">
-                <DisplayPrice amount={item.amount} currency="ARS" />
-              </p>
-              {item.totalAmount ? (
-                <p className="mt-1 text-xs text-foreground/50">
-                  Total cita:{" "}
-                  <DisplayPrice amount={item.totalAmount} currency="ARS" />
-                </p>
-              ) : null}
-              <p className="text-xs text-foreground/45">
-                {fmtDateTime(item.createdAt)}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={() => approve(item)}
-            className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            Confirmar pago
-          </button>
-        </article>
-      ))}
+            ) : canApprove ? (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => approve(item)}
+                className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {item.kind === "APPOINTMENT_REMAINDER"
+                  ? "Confirmar saldo"
+                  : "Confirmar pago"}
+              </button>
+            ) : null}
+            {item.appointmentId && (
+              <Link
+                href={`/dashboard/admin/calendar?appointmentId=${encodeURIComponent(item.appointmentId)}`}
+                className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+              >
+                Ver cita en calendario →
+              </Link>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }

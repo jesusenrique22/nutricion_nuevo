@@ -154,6 +154,27 @@ export function PatientFichaAppointmentCard({
         </p>
       </div>
 
+      {a.paymentPhases &&
+        isTwoPhaseSplit(a.paymentPhases.advancePercent) &&
+        a.paymentPhases.advanceStatus === "PAID" &&
+        a.paymentPhases.remainderStatus === "PENDING" && (
+          <div className="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/50 px-3 py-2 text-xs text-amber-950">
+            <strong>Plan 2 cuotas:</strong> adelanto pagado · falta saldo{" "}
+            <DisplayPrice
+              amount={a.paymentPhases.remainderAmount}
+              currency="ARS"
+            />{" "}
+            el día de la cita (
+            {new Date(a.start).toLocaleString("es", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            )
+          </div>
+        )}
+
       {a.paymentPhases && (
         <p className="mt-3 text-xs text-foreground/55">
           {isTwoPhaseSplit(a.paymentPhases.advancePercent) ? (

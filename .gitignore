@@ -93,6 +93,8 @@ Anttova _ Brandbook/
 *.db
 *.db-journal
 
-# tests e2e (si se agregan)
+# tests e2e
 /playwright-report/
 /test-results/
+/e2e/node_modules/
+/e2e/test-results/

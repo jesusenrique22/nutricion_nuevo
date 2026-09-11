@@ -8,10 +8,8 @@ import {
 import { getMyAppointments } from "@/server/actions/booking.queries";
 import { getMyAdminResource } from "@/server/actions/patient.queries";
 import { getCartCount } from "@/server/actions/cart.actions";
-import {
-  getCachedUnreadNotificationCount,
-  getSession,
-} from "@/server/queries/cached-dashboard";
+import { getUnreadNotificationCount } from "@/server/actions/notification.actions";
+import { getSession } from "@/server/queries/cached-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +20,7 @@ export default async function DashboardHome() {
 
   const [unreadNotifs, appointments, adminToday, adminOverview, cartCount, adminResource] =
     await Promise.all([
-    getCachedUnreadNotificationCount(),
+    getUnreadNotificationCount(),
     isPatient ? getMyAppointments() : Promise.resolve([]),
     isPatient ? Promise.resolve(null) : getAdminTodayDashboard(),
     isPatient ? Promise.resolve(null) : getAdminDashboardOverview(),

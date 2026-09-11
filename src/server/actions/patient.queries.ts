@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { areFormsEnabled } from "@/lib/feature-flags";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import {
   type ConsultationFormType,
@@ -361,9 +362,13 @@ export async function getPatientAppointmentsAdmin(
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
 
+  const paymentSelect = await getPaymentQuerySelect();
   const appts = await prisma.appointment.findMany({
     where: { patientId },
-    include: { consultationType: true, payment: true },
+    include: {
+      consultationType: true,
+      payment: { select: paymentSelect },
+    },
     orderBy: { startTime: "desc" },
   });
 

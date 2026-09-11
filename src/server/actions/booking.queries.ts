@@ -4,6 +4,11 @@ import { cache } from "react";
 import { auth } from "@/lib/auth";
 import type { BookingAvailabilitySnapshot } from "@/lib/booking-slots";
 import { clinicDateAtMinutes, clinicDateTimeToUtc, dateKeyInClinicTz } from "@/lib/clinic-timezone";
+import {
+  buildAppointmentPaymentPlan,
+  type AppointmentPaymentPlan,
+} from "@/lib/appointment-remainder";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 import { dateRangeKeys, weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
@@ -308,6 +313,7 @@ export interface AppointmentDTO {
   price?: string;
   paymentStatus?: string | null;
   paymentPhases?: PaymentPhaseDTO | null;
+  paymentPlan?: AppointmentPaymentPlan | null;
   notes?: string | null;
   cancelledBy?: "PATIENT" | "ADMIN" | null;
   cancelledAt?: string | null;
@@ -319,31 +325,56 @@ export async function getMyAppointments(): Promise<AppointmentDTO[]> {
   if (!session?.user?.id) return [];
 
   try {
+    const paymentSelect = await getPaymentQuerySelect();
     const appts = await prisma.appointment.findMany({
       where: {
         patientId: session.user.id,
         status: { not: "CANCELLED" },
       },
-      include: { consultationType: true, payment: true },
+      include: {
+        consultationType: true,
+        payment: { select: paymentSelect },
+      },
       orderBy: { startTime: "desc" },
     });
 
-    return appts.map((a) => ({
-      id: a.id,
-      start: a.startTime.toISOString(),
-      end: a.endTime.toISOString(),
-      title: a.consultationType.name,
-      status: a.status,
-      modality: a.modality,
-      flow: a.flow,
-      consultationCode: a.consultationType.code,
-      consultationName: a.consultationType.name,
-      price: a.consultationType.price.toString(),
-      paymentStatus: a.payment?.status ?? null,
-      paymentPhases: a.payment ? toPaymentPhaseView(a.payment) : null,
-      notes: a.notes,
-    }));
-  } catch {
+    return appts.map((a) => {
+      const paymentPhases = a.payment ? toPaymentPhaseView(a.payment) : null;
+      const payment = a.payment;
+      const remainderSubmittedAt =
+        payment && "remainderSubmittedAt" in payment
+          ? (payment.remainderSubmittedAt as Date | null | undefined) ?? null
+          : null;
+      const paymentPlan =
+        payment && paymentPhases
+          ? buildAppointmentPaymentPlan({
+              phases: paymentPhases,
+              totalAmount: payment.amount.toString(),
+              dueAt: a.startTime,
+              endAt: a.endTime,
+              remainderSubmittedAt,
+            })
+          : null;
+
+      return {
+        id: a.id,
+        start: a.startTime.toISOString(),
+        end: a.endTime.toISOString(),
+        title: a.consultationType.name,
+        status: a.status,
+        modality: a.modality,
+        flow: a.flow,
+        consultationCode: a.consultationType.code,
+        consultationName: a.consultationType.name,
+        price: a.consultationType.price.toString(),
+        paymentStatus: payment?.status ?? null,
+        paymentPhases,
+        paymentPlan,
+        notes: a.notes,
+      };
+    });
+  } catch (err) {
+    console.error("[getMyAppointments]", err);
     return [];
   }
 }
@@ -353,8 +384,13 @@ export async function getAllAppointments(): Promise<AppointmentDTO[]> {
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
 
+  const paymentSelect = await getPaymentQuerySelect();
   const appts = await prisma.appointment.findMany({
-    include: { consultationType: true, patient: true, payment: true },
+    include: {
+      consultationType: true,
+      patient: true,
+      payment: { select: paymentSelect },
+    },
     orderBy: { startTime: "asc" },
   });
 

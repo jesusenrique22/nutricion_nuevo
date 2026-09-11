@@ -16,8 +16,11 @@ import { getProductPrimaryImage } from "@/lib/product-images";
 import { getProducts } from "@/server/queries/landing.queries";
 import { createNotification } from "@/server/services/notification.service";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import { validateRemainderCartPayment } from "@/lib/appointment-remainder-checkout";
 import { formatActionError } from "@/lib/db-errors";
 import { modalityLabels } from "@/lib/appointment-labels";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
+import { toPaymentPhaseView } from "@/lib/payment-split";
 import { Prisma } from "@prisma/client";
 // cart-checkout (y su cadena hacia googleapis) se importa dinámico solo en
 // submitCart — evita meter ~200 MB de googleapis en cada página del dashboard.
@@ -28,21 +31,26 @@ export type CartActionResult =
 
 export interface CartItemDTO {
   id: string;
-  type: "RESOURCE" | "APPOINTMENT" | "PRODUCT";
+  type: "RESOURCE" | "APPOINTMENT" | "APPOINTMENT_REMAINDER" | "PRODUCT";
   title: string;
   subtitle: string;
-  /** Precio cobrado ahora (unidad). En citas a 2 cuotas, es el adelanto. */
+  /** Precio cobrado ahora (unidad). En citas a 2 cuotas, es el adelanto o el saldo. */
   price: string | null;
   /** Precio total de la cita (solo citas con pago en etapas). */
   fullPrice?: string | null;
+  /** Monto ya abonado (adelanto confirmado). */
+  paidAmount?: string | null;
   /** Porcentaje de adelanto cuando aplica pago en 2 partes. */
   advancePercent?: number | null;
+  /** Etapa del pago de cita en el carrito. */
+  paymentPhase?: "advance" | "remainder";
   currency?: string;
   quantity: number;
   imageUrl?: string | null;
   resourceId?: string;
   productId?: string;
   consultationTypeId?: string;
+  appointmentId?: string;
   appointmentStart?: string;
   modality?: string;
 }
@@ -71,6 +79,24 @@ function formatAppointmentSubtitle(
   return mod ? `${when} · ${mod}` : when;
 }
 
+async function loadRemainderAppointmentsById(
+  appointmentIds: string[],
+  patientId: string,
+) {
+  if (appointmentIds.length === 0) return new Map();
+
+  const paymentSelect = await getPaymentQuerySelect();
+  const rows = await prisma.appointment.findMany({
+    where: { id: { in: appointmentIds }, patientId },
+    include: {
+      consultationType: true,
+      payment: { select: paymentSelect },
+    },
+  });
+
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
 export async function getCartItems(): Promise<CartItemDTO[]> {
   try {
     const session = await requirePatient();
@@ -78,9 +104,30 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
 
     const items = await prisma.cartItem.findMany({
       where: { userId: session.user.id },
-      include: { resource: true, consultationType: true },
+      include: {
+        resource: true,
+        consultationType: true,
+      },
       orderBy: { createdAt: "asc" },
     });
+
+    const remainderAppointmentIds = items
+      .filter((item) => item.type === "APPOINTMENT_REMAINDER" && item.appointmentId)
+      .map((item) => item.appointmentId!);
+
+    let remainderAppointments: Awaited<
+      ReturnType<typeof loadRemainderAppointmentsById>
+    > = new Map();
+    if (remainderAppointmentIds.length > 0) {
+      try {
+        remainderAppointments = await loadRemainderAppointmentsById(
+          remainderAppointmentIds,
+          session.user.id,
+        );
+      } catch (err) {
+        console.error("[getCartItems] remainder appointments", err);
+      }
+    }
 
     const productsCatalog =
       items.some((item) => item.type === "PRODUCT")
@@ -165,6 +212,7 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
           price: duePrice,
           fullPrice: catalogFullPrice,
           advancePercent,
+          paymentPhase: "advance",
           currency: "ARS",
           quantity: 1,
           imageUrl: item.consultationType?.imageUrl ?? null,
@@ -172,10 +220,34 @@ export async function getCartItems(): Promise<CartItemDTO[]> {
           appointmentStart: item.appointmentStart?.toISOString(),
           modality: item.modality ?? undefined,
         });
+        continue;
+      }
+      if (item.type === "APPOINTMENT_REMAINDER" && item.appointmentId) {
+        const appt = remainderAppointments.get(item.appointmentId);
+        if (!appt?.payment) continue;
+        const phases = toPaymentPhaseView(appt.payment);
+        result.push({
+          id: item.id,
+          type: "APPOINTMENT_REMAINDER",
+          title: appt.consultationType.name,
+          subtitle: formatAppointmentSubtitle(appt.startTime, appt.modality),
+          price: phases.remainderAmount,
+          fullPrice: appt.payment.amount.toString(),
+          paidAmount: phases.advanceAmount,
+          advancePercent: phases.advancePercent,
+          paymentPhase: "remainder",
+          currency: "ARS",
+          quantity: 1,
+          imageUrl: appt.consultationType.imageUrl ?? null,
+          appointmentId: appt.id,
+          appointmentStart: appt.startTime.toISOString(),
+          modality: appt.modality,
+        });
       }
     }
     return result;
-  } catch {
+  } catch (err) {
+    console.error("[getCartItems]", err);
     return [];
   }
 }
@@ -360,6 +432,42 @@ export async function addAppointmentToCart(params: {
   return { ok: true };
 }
 
+export async function addAppointmentRemainderToCart(
+  appointmentId: string,
+): Promise<CartActionResult> {
+  const session = await requirePatient();
+  if (!session) return { ok: false, message: "Debes iniciar sesión." };
+
+  const check = await validateRemainderCartPayment({
+    patientId: session.user.id,
+    appointmentId,
+  });
+  if (!check.ok) return check;
+
+  const existing = await prisma.cartItem.findFirst({
+    where: {
+      userId: session.user.id,
+      type: "APPOINTMENT_REMAINDER",
+      appointmentId,
+    },
+  });
+  if (existing) {
+    return { ok: false, message: "El saldo de esta cita ya está en tu carrito." };
+  }
+
+  await prisma.cartItem.create({
+    data: {
+      userId: session.user.id,
+      type: "APPOINTMENT_REMAINDER",
+      appointmentId,
+    },
+  });
+
+  revalidatePath("/dashboard/patient/cart");
+  revalidatePath("/dashboard/patient/appointments");
+  return { ok: true };
+}
+
 export async function updateCartItemQuantity(
   itemId: string,
   quantity: number,
@@ -416,7 +524,10 @@ export async function submitCart(options?: {
 
     const items = await prisma.cartItem.findMany({
       where: { userId: session.user.id },
-      include: { resource: true, consultationType: true },
+      include: {
+        resource: true,
+        consultationType: true,
+      },
     });
     if (items.length === 0) {
       return { ok: false, message: "Tu carrito está vacío." };
@@ -464,6 +575,11 @@ export async function submitCart(options?: {
         ? applyPercentOff(amount, couponPercentOff).toNumber()
         : amount;
 
+    const remainderItems = items.filter(
+      (item): item is typeof item & { appointmentId: string } =>
+        item.type === "APPOINTMENT_REMAINDER" && !!item.appointmentId,
+    );
+
     const requiresPayment =
       items.some(
         (i) =>
@@ -474,6 +590,7 @@ export async function submitCart(options?: {
             i.consultationType &&
             discountedAmount(i.consultationType.price.toNumber()) > 0),
       ) ||
+      remainderItems.length > 0 ||
       productItems.some(
         (item) =>
           discountedAmount(item.product.price * (item.quantity ?? 1)) > 0,
@@ -556,6 +673,16 @@ export async function submitCart(options?: {
       }
     }
 
+    for (const item of remainderItems) {
+      const check = await validateRemainderCartPayment({
+        patientId: session.user.id,
+        appointmentId: item.appointmentId,
+      });
+      if (!check.ok) {
+        return { ok: false, message: check.message };
+      }
+    }
+
     const result = await fulfillCartCheckout({
       patientId: session.user.id,
       patientName: session.user.name ?? "Paciente",
@@ -564,6 +691,9 @@ export async function submitCart(options?: {
         appointmentStart: item.appointmentStart,
         modality: item.modality,
         consultationType: item.consultationType,
+      })),
+      remainderItems: remainderItems.map((item) => ({
+        appointmentId: item.appointmentId,
       })),
       resourceItems: resourceItems.map((item) => ({
         resourceId: item.resourceId,

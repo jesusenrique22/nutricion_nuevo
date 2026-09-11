@@ -26,6 +26,13 @@ export function resolveNotificationHref(
 
   if (isAdmin) {
     if (
+      deepLink?.startsWith("/dashboard/admin/payments") ||
+      deepLink?.startsWith("/dashboard/admin/patients/")
+    ) {
+      return deepLink;
+    }
+
+    if (
       appointmentId &&
       APPOINTMENT_NOTIFICATION_TYPES.has(notification.type)
     ) {
@@ -51,6 +58,14 @@ export function resolveNotificationHref(
         return `/dashboard/admin/patients/${encodeURIComponent(patientId)}`;
       }
     }
+  }
+
+  if (
+    !isAdmin &&
+    notification.type === "PAYMENT_DUE_REMINDER" &&
+    deepLink
+  ) {
+    return deepLink;
   }
 
   return deepLink;

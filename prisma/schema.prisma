@@ -52,6 +52,7 @@ enum ResourceAccessStatus {
 enum CartItemType {
   RESOURCE
   APPOINTMENT
+  APPOINTMENT_REMAINDER
   PRODUCT
 }
 
@@ -80,6 +81,7 @@ enum NotificationType {
   REVIEW_SUBMITTED
   REVIEW_PUBLISHED
   REVIEW_REQUESTED
+  PAYMENT_DUE_REMINDER
 }
 
 enum ReviewStatus {
@@ -213,6 +215,10 @@ model Appointment {
   flow               AppointmentFlow
   notes              String?
   reminderSentAt     DateTime?
+  remainderReminder7dSentAt DateTime?
+  remainderReminder3dSentAt DateTime?
+  remainderReminder1dSentAt DateTime?
+  remainderAdminDueDaySentAt DateTime?
   cancelledBy        AppointmentCancelledBy?
   cancelledAt        DateTime?
   googleEventId      String?
@@ -221,6 +227,7 @@ model Appointment {
   calendarAdmin      User?   @relation("CalendarAdminAppointments", fields: [calendarAdminId], references: [id], onDelete: SetNull)
 
   payment Payment?
+  cartItems CartItem[]
 
   followUpSubmission          FollowUpSubmission?
   anthropometryFormSubmission AnthropometryFormSubmission?
@@ -455,6 +462,11 @@ model Payment {
   patientPaymentReference String?
   patientPaymentNote      String?
   patientPaymentProofUrls Json?
+  remainderPatientPaymentMethod    String?
+  remainderPatientPaymentReference String?
+  remainderPatientPaymentNote      String?
+  remainderPatientPaymentProofUrls Json?
+  remainderSubmittedAt    DateTime?
   paidAt          DateTime?
   advancePaidAt   DateTime?
   remainderPaidAt DateTime?
@@ -613,10 +625,13 @@ model CartItem {
   quantity           Int                   @default(1)
   appointmentStart   DateTime?
   modality           ConsultationModality?
+  appointmentId      String?
+  appointment        Appointment?          @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   createdAt          DateTime              @default(now())
 
   @@unique([userId, resourceId])
   @@unique([userId, productId])
+  @@unique([userId, appointmentId])
   @@index([userId])
 }
 

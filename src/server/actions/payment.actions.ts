@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import {
   markPaymentPhaseSchema,
@@ -40,9 +41,13 @@ async function applyPaymentPhase(
   const parsed = markPaymentPhaseSchema.safeParse({ ...(formData as object), phase });
   if (!parsed.success) return { ok: false, message: "Datos inválidos." };
 
+  const paymentSelect = await getPaymentQuerySelect();
   const appt = await prisma.appointment.findUnique({
     where: { id: parsed.data.appointmentId },
-    include: { payment: true, consultationType: true },
+    include: {
+      payment: { select: paymentSelect },
+      consultationType: true,
+    },
   });
   if (!appt?.payment) {
     return { ok: false, message: "No hay registro de pago para esta cita." };
@@ -168,6 +173,7 @@ export async function markPaymentRefunded(
 
   const payment = await prisma.payment.findUnique({
     where: { appointmentId },
+    select: { id: true },
   });
   if (!payment) return { ok: false, message: "Pago no encontrado." };
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import {
   cancelAppointmentSchema,
@@ -53,9 +54,14 @@ async function revalidateAppointmentPaths(patientId: string) {
 }
 
 async function loadAppointment(appointmentId: string) {
+  const paymentSelect = await getPaymentQuerySelect();
   return prisma.appointment.findUnique({
     where: { id: appointmentId },
-    include: { consultationType: true, payment: true, patient: true },
+    include: {
+      consultationType: true,
+      payment: { select: paymentSelect },
+      patient: true,
+    },
   });
 }
 

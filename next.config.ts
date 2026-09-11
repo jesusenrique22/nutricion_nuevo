@@ -61,6 +61,9 @@ const useRecaptchaEnterprise = Boolean(
 );
 
 const nextConfig: NextConfig = {
+  // Playwright / tests en 127.0.0.1 vs localhost — permitir HMR en dev
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
+
   // No enviar el header "X-Powered-By: Next.js" en producción
   poweredByHeader: false,
 

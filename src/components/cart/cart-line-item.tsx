@@ -16,7 +16,8 @@ import type { SupportedCurrency } from "@/lib/currency/types";
 const TYPE_LABELS: Record<CartItemDTO["type"], string> = {
   PRODUCT: "Producto",
   RESOURCE: "Recurso",
-  APPOINTMENT: "Cita",
+  APPOINTMENT: "Cita · Cuota 1",
+  APPOINTMENT_REMAINDER: "Cita · Cuota 2 (saldo)",
 };
 
 function lineAmount(item: CartItemDTO): number {
@@ -123,9 +124,11 @@ export function CartLineItem({
           <div className="space-y-1">
             {unit > 0 ? (
               <p className="text-xs text-foreground/50">
-                {item.type === "APPOINTMENT" && item.fullPrice
-                  ? "Cuota de esta etapa: "
-                  : "Precio unitario: "}
+                {item.paymentPhase === "remainder"
+                  ? "Saldo a pagar: "
+                  : item.type === "APPOINTMENT" && item.fullPrice
+                    ? "Cuota de esta etapa: "
+                    : "Precio unitario: "}
                 <DisplayPrice amount={item.price!} currency={currency} />
               </p>
             ) : (
@@ -168,11 +171,13 @@ export function CartLineItem({
 
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/40">
-              {item.type === "APPOINTMENT" && item.fullPrice
-                ? item.advancePercent != null && item.advancePercent > 0
-                  ? `A pagar ahora (${item.advancePercent}%)`
-                  : "A pagar ahora"
-                : "Subtotal"}
+              {item.paymentPhase === "remainder"
+                ? "Saldo · cuota 2"
+                : item.type === "APPOINTMENT" && item.fullPrice
+                  ? item.advancePercent != null && item.advancePercent > 0
+                    ? `A pagar ahora (${item.advancePercent}%)`
+                    : "A pagar ahora"
+                  : "Subtotal"}
             </p>
             <p className="text-xl font-bold tabular-nums text-primary">
               {lineTotal > 0 ? (
@@ -181,10 +186,22 @@ export function CartLineItem({
                 "Gratis"
               )}
             </p>
-            {item.type === "APPOINTMENT" && item.fullPrice ? (
+            {item.fullPrice ? (
               <p className="mt-1 text-xs text-foreground/50">
-                Total de la cita:{" "}
-                <DisplayPrice amount={item.fullPrice} currency={currency} />
+                {item.paymentPhase === "remainder" && item.paidAmount ? (
+                  <>
+                    Ya abonado:{" "}
+                    <DisplayPrice amount={item.paidAmount} currency={currency} />
+                    {" · "}
+                    Total cita:{" "}
+                    <DisplayPrice amount={item.fullPrice} currency={currency} />
+                  </>
+                ) : item.type === "APPOINTMENT" ? (
+                  <>
+                    Total de la cita:{" "}
+                    <DisplayPrice amount={item.fullPrice} currency={currency} />
+                  </>
+                ) : null}
               </p>
             ) : null}
           </div>

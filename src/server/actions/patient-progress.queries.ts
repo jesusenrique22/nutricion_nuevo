@@ -3,6 +3,10 @@
 import { auth } from "@/lib/auth";
 import { paymentMethodLabel, type PaymentMethodId } from "@/lib/payment-methods";
 import { parseProofUrls } from "@/lib/payment-checkout-policy";
+import {
+  getPaymentQuerySelect,
+  hasPaymentRemainderColumns,
+} from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 
@@ -46,6 +50,7 @@ function appointmentStatusLabel(
   paymentStatus: string,
   refundStatus: string,
   appointmentStatus: string,
+  phases?: { advanceStatus: string; remainderStatus: string },
 ): string {
   if (appointmentStatus === "CANCELLED") return "Cancelada";
   if (refundStatus === "REQUESTED") return "Reembolso en revisión";
@@ -54,7 +59,15 @@ function appointmentStatusLabel(
   }
   if (refundStatus === "DENIED") return "Reembolso no aceptado";
   if (paymentStatus === "PENDING") return "Procesando pago";
-  if (paymentStatus === "PARTIAL") return "Procesando adelanto";
+  if (paymentStatus === "PARTIAL") {
+    if (
+      phases?.advanceStatus === "PAID" &&
+      phases.remainderStatus === "PENDING"
+    ) {
+      return "Saldo pendiente";
+    }
+    return "Procesando adelanto";
+  }
   if (paymentStatus === "PAID") return "Pagado";
   if (appointmentStatus === "CONFIRMED") return "Cita confirmada";
   if (appointmentStatus === "COMPLETED") return "Consulta completada";
@@ -73,13 +86,18 @@ export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
 
+  const paymentSelect = await getPaymentQuerySelect();
+
   const [appointments, purchases, products] = await Promise.all([
     prisma.appointment.findMany({
       where: {
         patientId: session.user.id,
         payment: { isNot: null },
       },
-      include: { consultationType: true, payment: true },
+      include: {
+        consultationType: true,
+        payment: { select: paymentSelect },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.resourcePurchase.findMany({
@@ -119,6 +137,7 @@ export async function getMyProgressPurchases(): Promise<PatientProgressItem[]> {
         paymentStatus,
         refundStatus,
         appt.status,
+        phases,
       ),
       paymentStatus,
       refundStatus,
@@ -206,6 +225,8 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
   if (!session?.user?.id) return [];
 
   const patientId = session.user.id;
+  const paymentSelect = await getPaymentQuerySelect();
+  const remainderColumns = await hasPaymentRemainderColumns();
 
   const [resourceRows, appointmentRows] = await Promise.all([
     prisma.resourcePurchase.findMany({
@@ -221,11 +242,28 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
       where: {
         patientId,
         payment: {
-          advanceStatus: "PENDING",
-          advanceInboxDismissedAt: null,
+          OR: [
+            {
+              advanceStatus: "PENDING",
+              advanceInboxDismissedAt: null,
+            },
+            ...(remainderColumns
+              ? [
+                  {
+                    advanceStatus: "PAID" as const,
+                    remainderStatus: "PENDING" as const,
+                    remainderSubmittedAt: { not: null },
+                    remainderInboxDismissedAt: null,
+                  },
+                ]
+              : []),
+          ],
         },
       },
-      include: { consultationType: true, payment: true },
+      include: {
+        consultationType: true,
+        payment: { select: paymentSelect },
+      },
       orderBy: { startTime: "desc" },
     }),
   ]);
@@ -258,8 +296,6 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
       minute: "2-digit",
     });
 
-    // El comprobante del carrito es una sola petición (adelanto). El saldo se
-    // confirma después desde el calendario, no como segunda tarjeta aquí.
     const advancePending =
       phases.advanceStatus === "PENDING" &&
       Number(phases.advanceAmount) > 0 &&
@@ -270,7 +306,7 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
         id: `appt-advance-${appt.id}`,
         kind: "APPOINTMENT_ADVANCE",
         title: appt.consultationType.name,
-        subtitle: `Cita ${dateLabel}`,
+        subtitle: `Adelanto · Cita ${dateLabel}`,
         amount: phases.advanceAmount,
         totalAmount: payment.amount.toString(),
         createdAt: appt.createdAt.toISOString(),
@@ -278,6 +314,46 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
         patientReference: payment.patientPaymentReference,
         patientNote: payment.patientPaymentNote,
         proofUrls: parseProofUrls(payment.patientPaymentProofUrls),
+      });
+    }
+
+    const remainderSubmittedAt =
+      "remainderSubmittedAt" in payment
+        ? (payment.remainderSubmittedAt as Date | null | undefined)
+        : null;
+    const remainderInReview =
+      phases.advanceStatus === "PAID" &&
+      phases.remainderStatus === "PENDING" &&
+      remainderSubmittedAt &&
+      !payment.remainderInboxDismissedAt;
+
+    if (remainderInReview) {
+      items.push({
+        id: `appt-remainder-${appt.id}`,
+        kind: "APPOINTMENT_REMAINDER",
+        title: appt.consultationType.name,
+        subtitle: `Saldo en revisión · Cita ${dateLabel}`,
+        amount: phases.remainderAmount,
+        totalAmount: payment.amount.toString(),
+        createdAt: remainderSubmittedAt.toISOString(),
+        paymentMethod: mapPaymentMethod(
+          "remainderPatientPaymentMethod" in payment
+            ? (payment.remainderPatientPaymentMethod as string | null)
+            : null,
+        ),
+        patientReference:
+          "remainderPatientPaymentReference" in payment
+            ? (payment.remainderPatientPaymentReference as string | null)
+            : null,
+        patientNote:
+          "remainderPatientPaymentNote" in payment
+            ? (payment.remainderPatientPaymentNote as string | null)
+            : null,
+        proofUrls: parseProofUrls(
+          "remainderPatientPaymentProofUrls" in payment
+            ? payment.remainderPatientPaymentProofUrls
+            : null,
+        ),
       });
     }
   }
@@ -309,13 +385,15 @@ export async function getAdminRefundRequests(): Promise<
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return [];
 
+  const paymentSelect = await getPaymentQuerySelect();
+
   const [appointmentRows, resourceRows] = await Promise.all([
     prisma.appointment.findMany({
       where: { payment: { refundStatus: "REQUESTED" } },
       include: {
         patient: true,
         consultationType: true,
-        payment: true,
+        payment: { select: paymentSelect },
       },
       orderBy: { updatedAt: "desc" },
     }),

@@ -7,7 +7,9 @@ export function PatientCartPendingBanner({
 }: {
   items: CartItemDTO[];
 }) {
-  const appointments = items.filter((i) => i.type === "APPOINTMENT");
+  const appointments = items.filter(
+    (i) => i.type === "APPOINTMENT" || i.type === "APPOINTMENT_REMAINDER",
+  );
   if (appointments.length === 0) return null;
 
   return (
@@ -22,7 +24,9 @@ export function PatientCartPendingBanner({
             className="rounded-[24px] border border-primary/20 bg-primary/5 p-4 shadow-sm"
           >
             <p className="text-xs font-bold uppercase tracking-wide text-primary">
-              Cita pendiente de pago
+              {a.type === "APPOINTMENT_REMAINDER"
+                ? "Saldo de cita en carrito"
+                : "Cita pendiente de pago"}
             </p>
             <p className="mt-1 font-semibold">{a.title}</p>
             <p className="mt-1 text-sm text-foreground/60">{a.subtitle}</p>

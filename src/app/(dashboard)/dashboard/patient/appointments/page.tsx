@@ -1,5 +1,5 @@
 import { BrandFlowShell } from "@/components/brand/brand-flow-shell";
-import { PatientAppointmentHistory } from "@/components/appointments/patient-appointment-history";
+import { PatientAppointmentsPayment } from "@/components/appointments/patient-appointments-payment";
 import { BookingForm } from "@/components/booking/booking-form";
 import { PatientCartPendingBanner } from "@/components/cart/patient-cart-pending-banner";
 import {
@@ -28,7 +28,7 @@ export default async function PatientAppointmentsPage() {
     >
       <BookingForm types={types} availability={availability} />
       <PatientCartPendingBanner items={cartItems} />
-      <PatientAppointmentHistory appointments={appointments} />
+      <PatientAppointmentsPayment appointments={appointments} />
     </BrandFlowShell>
   );
 }

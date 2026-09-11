@@ -7,18 +7,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
 import { syncUser } from "@/server/realtime/sync";
 import type { NotificationType } from "@/types/chat";
-import { VISIBLE_NOTIFICATION_TYPES } from "@/types/chat";
+import { getDbVisibleNotificationTypes } from "@/lib/notification-db-types";
 
 const notificationIdSchema = z.string().min(1);
-
-/** Solo tipos que el cliente Prisma actual conoce (evita crash si falta migrate/generate). */
-const prismaNotificationTypes = new Set(
-  Object.values(PrismaNotificationType),
-);
-
-const visibleTypes = VISIBLE_NOTIFICATION_TYPES.filter((t) =>
-  prismaNotificationTypes.has(t as PrismaNotificationType),
-) as PrismaNotificationType[];
 
 function toDto(n: {
   id: string;
@@ -55,7 +46,10 @@ export interface NotificationDTO {
 
 export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
   const session = await auth();
-  if (!session?.user?.id || visibleTypes.length === 0) return [];
+  if (!session?.user?.id) return [];
+
+  const visibleTypes = await getDbVisibleNotificationTypes();
+  if (visibleTypes.length === 0) return [];
 
   try {
     const docs = await prisma.notification.findMany({
@@ -76,7 +70,10 @@ export async function getNotifications(limit = 30): Promise<NotificationDTO[]> {
 
 export async function getUnreadNotificationCount(): Promise<number> {
   const session = await auth();
-  if (!session?.user?.id || visibleTypes.length === 0) return 0;
+  if (!session?.user?.id) return 0;
+
+  const visibleTypes = await getDbVisibleNotificationTypes();
+  if (visibleTypes.length === 0) return 0;
 
   try {
     return await prisma.notification.count({

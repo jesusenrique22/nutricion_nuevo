@@ -1,6 +1,10 @@
-import { GridFSBucket, ObjectId } from "mongodb";
+import { GridFSBucket, ObjectId, type Db } from "mongodb";
 import { Readable } from "node:stream";
-import { tryGetMongoDb, tryGetMongoDbFast } from "@/server/db/mongo";
+import {
+  tryGetMongoDb,
+  tryGetMongoDbFast,
+  withMongoDb,
+} from "@/server/db/mongo";
 
 const BUCKET = "media";
 
@@ -48,20 +52,30 @@ async function resolveMongoDb() {
 
 export async function getMongoFileMeta(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await resolveMongoDb();
-  if (!db) return null;
-  const bucket = new GridFSBucket(db, { bucketName: BUCKET });
-  const files = await bucket
-    .find({ _id: new ObjectId(fileId) })
-    .limit(1)
-    .toArray();
-  return files[0] ?? null;
+  return withMongoDb(async (db) => {
+    const bucket = new GridFSBucket(db, { bucketName: BUCKET });
+    const files = await bucket
+      .find({ _id: new ObjectId(fileId) })
+      .limit(1)
+      .toArray();
+    return files[0] ?? null;
+  });
 }
 
 export async function openGridFsDownloadStream(fileId: string) {
   if (!ObjectId.isValid(fileId)) return null;
-  const db = await resolveMongoDb();
-  if (!db) return null;
+
+  const fastDb = await resolveMongoDb();
+  if (!fastDb) return null;
+
+  try {
+    return await openGridFsDownloadStreamOnDb(fastDb, fileId);
+  } catch {
+    return withMongoDb((db) => openGridFsDownloadStreamOnDb(db, fileId));
+  }
+}
+
+async function openGridFsDownloadStreamOnDb(db: Db, fileId: string) {
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
     .find({ _id: new ObjectId(fileId) })

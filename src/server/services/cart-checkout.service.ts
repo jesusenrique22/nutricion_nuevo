@@ -4,6 +4,7 @@ import type {
   Resource,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import type { ProductItem } from "@/types/products";
 import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
@@ -21,6 +22,7 @@ import {
 } from "@/lib/scheduling-errors";
 import { applyPercentOff } from "@/lib/coupon-math";
 import { clampPercentOff } from "@/lib/coupons";
+import { applyRemainderCartPayment } from "@/lib/appointment-remainder-checkout";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 
 export type CartPaymentPayload = {
@@ -48,12 +50,17 @@ type CartProductItem = {
   quantity: number;
 };
 
+type CartRemainderItem = {
+  appointmentId: string;
+};
+
 /** Cita PENDING del mismo slot aún sin confirmar por admin (reintento tras checkout parcial). */
 export async function findReusableCartAppointment(params: {
   patientId: string;
   consultationTypeId: string;
   startTime: Date;
 }) {
+  const paymentSelect = await getPaymentQuerySelect();
   const candidates = await prisma.appointment.findMany({
     where: {
       patientId: params.patientId,
@@ -61,7 +68,7 @@ export async function findReusableCartAppointment(params: {
       startTime: params.startTime,
       status: "PENDING",
     },
-    include: { payment: true },
+    include: { payment: { select: paymentSelect } },
     orderBy: { createdAt: "desc" },
     take: 5,
   });
@@ -176,6 +183,7 @@ export async function fulfillCartCheckout(params: {
   patientId: string;
   patientName: string;
   appointmentItems: CartAppointmentItem[];
+  remainderItems?: CartRemainderItem[];
   resourceItems: CartResourceItem[];
   productItems: CartProductItem[];
   paymentPayload: CartPaymentPayload | null;
@@ -251,6 +259,24 @@ export async function fulfillCartCheckout(params: {
 
     if (params.paymentPayload && discountedDec.toNumber() > 0) {
       await applyAppointmentPayment(appointmentId, params.paymentPayload);
+    }
+  }
+
+  for (const item of params.remainderItems ?? []) {
+    if (!params.paymentPayload) {
+      return {
+        ok: false,
+        message: "Seleccioná un modo de pago para el saldo de la cita.",
+      };
+    }
+    const res = await applyRemainderCartPayment({
+      patientId: params.patientId,
+      patientName: params.patientName,
+      appointmentId: item.appointmentId,
+      payload: params.paymentPayload,
+    });
+    if (!res.ok) {
+      return { ok: false, message: res.message };
     }
   }
 

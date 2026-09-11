@@ -296,6 +296,159 @@ export async function notifyPaymentRegistered(_params: {
   // Pagos ya no generan notificación al paciente
 }
 
+export async function notifyRemainderPaymentSubmitted(params: {
+  patientId: string;
+  patientName: string;
+  consultationName: string;
+  appointmentId: string;
+  amount: string;
+  dueAt: Date;
+}) {
+  await safeNotify(async () => {
+    const adminIds = await getAdminUserIds();
+    const paymentsUrl = "/dashboard/admin/payments";
+
+    await Promise.all(
+      adminIds.map((id) =>
+        createNotification({
+          recipientId: id,
+          type: "APPOINTMENT_REMINDER",
+          title: "Comprobante de saldo recibido",
+          body: `${params.patientName} envió el pago del saldo de ${params.consultationName} ($${params.amount}).`,
+          payload: {
+            deepLink: paymentsUrl,
+            appointmentId: params.appointmentId,
+            patientId: params.patientId,
+          },
+        }),
+      ),
+    );
+
+    await createNotification({
+      recipientId: params.patientId,
+      type: "APPOINTMENT_CONFIRMED",
+      title: "Saldo en revisión",
+      body: `Recibimos tu comprobante de saldo por $${params.amount}. Te avisaremos cuando se confirme.`,
+      payload: {
+        deepLink: "/dashboard/patient/appointments",
+        appointmentId: params.appointmentId,
+      },
+    });
+  });
+}
+
+/** Avisa a admins que hoy hay cita con saldo pendiente (adelanto ya pagado). */
+export async function notifyAdminRemainderDueToday(params: {
+  patientId: string;
+  patientName: string;
+  consultationName: string;
+  appointmentId: string;
+  remainderAmount: string;
+  startTime: Date;
+}) {
+  await safeNotify(async () => {
+    const adminIds = await getAdminUserIds();
+    const when = fmtDate(params.startTime);
+    const calendarUrl = `/dashboard/admin/calendar?appointmentId=${params.appointmentId}`;
+    const paymentsUrl = "/dashboard/admin/payments";
+
+    await Promise.all(
+      adminIds.map((id) =>
+        createNotification({
+          recipientId: id,
+          type: "APPOINTMENT_REMINDER",
+          title: "Saldo pendiente hoy",
+          body: `${params.patientName} tiene ${params.consultationName} hoy (${when}) y aún debe el saldo de $${params.remainderAmount}.`,
+          payload: {
+            deepLink: paymentsUrl,
+            appointmentId: params.appointmentId,
+            patientId: params.patientId,
+            calendarLink: calendarUrl,
+          },
+        }),
+      ),
+    );
+  });
+}
+
+export async function notifyRemainderDueReminder(params: {
+  patientId: string;
+  consultationName: string;
+  appointmentId: string;
+  amount: string;
+  dueAt: Date;
+  daysUntilDue: number;
+  patientEmail?: string | null;
+  patientName?: string;
+}) {
+  await safeNotify(async () => {
+    const dueLabel =
+      params.daysUntilDue <= 0
+        ? "hoy (día de tu consulta)"
+        : params.daysUntilDue === 1
+          ? "mañana"
+          : `en ${params.daysUntilDue} días`;
+
+    const body = `Tu saldo de $${params.amount} por ${params.consultationName} vence ${dueLabel}. Podés pagarlo desde el carrito el día de tu cita.`;
+
+    try {
+      await createNotification({
+        recipientId: params.patientId,
+        type: "PAYMENT_DUE_REMINDER",
+        title:
+          params.daysUntilDue <= 1
+            ? "¡Tu saldo vence pronto!"
+            : "Recordatorio de saldo pendiente",
+        body,
+        payload: {
+          deepLink: "/dashboard/patient/cart",
+          appointmentId: params.appointmentId,
+        },
+      });
+    } catch {
+      await createNotification({
+        recipientId: params.patientId,
+        type: "APPOINTMENT_REMINDER",
+        title:
+          params.daysUntilDue <= 1
+            ? "¡Tu saldo vence pronto!"
+            : "Recordatorio de saldo pendiente",
+        body,
+        payload: {
+          deepLink: "/dashboard/patient/cart",
+          appointmentId: params.appointmentId,
+        },
+      });
+    }
+
+    if (isEmailDeliveryConfigured() && params.patientEmail) {
+      await sendEmail({
+        to: params.patientEmail,
+        subject: `Anttova — Saldo pendiente de tu cita (${params.consultationName})`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+            <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+            <h1 style="font-size:20px;font-weight:600;color:#5a1728">Saldo pendiente de tu cita</h1>
+            <p>Hola ${params.patientName || "Estimado/a"},</p>
+            <p>${body}</p>
+            <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:16px;margin:20px 0;border-radius:4px">
+              <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+              <p style="margin:4px 0"><strong>Saldo:</strong> $${params.amount}</p>
+              <p style="margin:4px 0"><strong>Fecha límite:</strong> ${fmtDate(params.dueAt)}</p>
+            </div>
+            <p style="margin:24px 0">
+              <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                Pagar saldo ahora
+              </a>
+            </p>
+          </div>
+        `,
+        text: `${body}\nPagar: ${absoluteUrl("/dashboard/patient/appointments")}`,
+      });
+    }
+  });
+}
+
 export async function notifyAppointmentReminder(params: {
   patientId: string;
   consultationName: string;
