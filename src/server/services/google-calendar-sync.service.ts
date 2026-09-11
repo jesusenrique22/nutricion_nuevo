@@ -68,6 +68,7 @@ function buildEventPayload(appt: {
     startTime: appt.startTime,
     endTime: appt.endTime,
     attendees,
+    isOnline: appt.modality === "ONLINE",
   };
 }
 

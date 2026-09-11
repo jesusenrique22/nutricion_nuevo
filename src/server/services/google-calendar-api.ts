@@ -11,6 +11,7 @@ export type CalendarEventInput = {
   startTime: Date;
   endTime: Date;
   attendees?: Array<{ email: string; displayName?: string }>;
+  isOnline?: boolean;
 };
 
 export async function createGoogleCalendarEvent(
@@ -27,16 +28,42 @@ export async function createGoogleCalendarEvent(
   });
   const { timeZone } = getGoogleCalendarConfig();
 
+  const baseBody = {
+    summary: input.summary,
+    description: input.description,
+    start: { dateTime: input.startTime.toISOString(), timeZone },
+    end: { dateTime: input.endTime.toISOString(), timeZone },
+    ...(input.attendees?.length ? { attendees: input.attendees } : {}),
+  };
+
+  if (input.isOnline) {
+    try {
+      const res = await calendar.events.insert({
+        calendarId: connection.calendarId,
+        sendUpdates: "all",
+        conferenceDataVersion: 1,
+        requestBody: {
+          ...baseBody,
+          conferenceData: {
+            createRequest: {
+              requestId: `meet-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              conferenceSolutionKey: {
+                type: "hangoutsMeet",
+              },
+            },
+          },
+        },
+      });
+      return res.data.id ?? null;
+    } catch (confErr) {
+      console.warn("[google-calendar/api] Fallback sin conferenceData:", confErr);
+    }
+  }
+
   const res = await calendar.events.insert({
     calendarId: connection.calendarId,
     sendUpdates: "all",
-    requestBody: {
-      summary: input.summary,
-      description: input.description,
-      start: { dateTime: input.startTime.toISOString(), timeZone },
-      end: { dateTime: input.endTime.toISOString(), timeZone },
-      ...(input.attendees?.length ? { attendees: input.attendees } : {}),
-    },
+    requestBody: baseBody,
   });
 
   return res.data.id ?? null;
