@@ -376,7 +376,7 @@ export function NutricionistaCvEditor({
                   setMessage(null);
                 }}
                 folder="cv"
-                hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 25 MB por archivo."
+                hint="Podés subir uno o varios PDFs (por ejemplo, si el CV tiene varias partes). Se muestran en orden. Máx. 20 MB por archivo."
               >
                 <PdfMedia.Label>CV en PDF</PdfMedia.Label>
                 <PdfMedia.Hint />

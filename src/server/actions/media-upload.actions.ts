@@ -16,7 +16,7 @@ export type AdminMediaUploadActionResult =
   | { ok: false; message: string };
 
 /**
- * Subida de archivos del panel admin vía Server Action (hasta 50 MB).
+ * Subida de archivos del panel admin vía Server Action (hasta 20 MB por archivo).
  * Evita el límite ~4.5 MB de los Route Handlers en Vercel.
  */
 export async function uploadAdminMediaFile(

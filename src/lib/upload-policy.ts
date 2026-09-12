@@ -1,11 +1,14 @@
 /** Política central de uploads — sin restricciones de dimensiones, solo tipo y peso. */
 
+const MB = 1024 * 1024;
+
+/** Tope por archivo en panel admin / recursos (equilibrio Vercel + PDFs habituales). */
 export const UPLOAD_LIMITS = {
-  image: 50 * 1024 * 1024,
-  pdf: 50 * 1024 * 1024,
-  video: 100 * 1024 * 1024,
-  proof: 15 * 1024 * 1024,
-  default: 50 * 1024 * 1024,
+  image: 20 * MB,
+  pdf: 20 * MB,
+  video: 20 * MB,
+  proof: 15 * MB,
+  default: 20 * MB,
 } as const;
 
 export type UploadKind = "image" | "pdf" | "video" | "proof" | "any";

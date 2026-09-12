@@ -73,10 +73,11 @@ const nextConfig: NextConfig = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: "50mb",
+      // 22 MB: 20 MB archivo + overhead multipart FormData
+      bodySizeLimit: "22mb",
     },
     // proxy.ts clona el body; sin esto se trunca a 10 MB y falla la subida por Server Action.
-    proxyClientMaxBodySize: "50mb",
+    proxyClientMaxBodySize: "22mb",
     ...(isProduction
       ? {
           staleTimes: {
