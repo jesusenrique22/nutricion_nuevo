@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import {
+  normalizeStoredUrl,
   openStoredFileUrl,
   readStoredFileUrlToBuffer,
 } from "@/lib/stored-file";
@@ -75,11 +76,12 @@ export async function GET(
       return new Response("Sin contenido", { status: 404 });
     }
 
-    const buffer = await readStoredFileUrlToBuffer(resource.contentUrl);
+    const contentUrl = normalizeStoredUrl(resource.contentUrl);
+    const buffer = await readStoredFileUrlToBuffer(contentUrl);
     if (!buffer || buffer.length === 0) {
       console.warn(
         "[resources/content] archivo no encontrado o vacío",
-        resource.contentUrl,
+        contentUrl,
       );
       return new Response(
         "Archivo no encontrado. Volvé a subir el PDF o archivo desde Admin → Recursos.",
@@ -87,7 +89,7 @@ export async function GET(
       );
     }
 
-    const file = await openStoredFileUrl(resource.contentUrl);
+    const file = await openStoredFileUrl(contentUrl);
     const fallbackMime = file?.mimeType ?? "application/octet-stream";
     const mimeType = detectMimeType(buffer, fallbackMime);
     const kind = mimeType.startsWith("image/") ? "image" : mimeType === "application/pdf" ? "pdf" : "unknown";

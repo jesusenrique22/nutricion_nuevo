@@ -7,6 +7,7 @@ import {
 } from "@/lib/upload-policy";
 import { prepareImageForUpload } from "@/lib/client-image-upload";
 import { parseUploadResponse } from "@/lib/upload-response";
+import { uploadAdminMediaFile } from "@/server/actions/media-upload.actions";
 
 export type UploadEndpoint = "/api/resources/upload" | "/api/payments/upload-proof";
 
@@ -21,7 +22,7 @@ export async function uploadFile(
     kind?: UploadKind;
     endpoint?: UploadEndpoint;
   } = {},
-): Promise<{ url: string; id?: string; mimeType?: string }> {
+): Promise<{ url: string; id?: string; mimeType?: string; fileName?: string }> {
   const kind = options.kind ?? "any";
   const shouldNormalizeImage =
     kind === "image" ||
@@ -57,6 +58,20 @@ export async function uploadFile(
   fd.append("kind", kind);
 
   const endpoint = options.endpoint ?? "/api/resources/upload";
+
+  if (endpoint === "/api/resources/upload") {
+    const result = await uploadAdminMediaFile(fd);
+    if (!result.ok) {
+      throw new Error(result.message);
+    }
+    return {
+      url: result.url,
+      id: result.id,
+      mimeType: result.mimeType,
+      fileName: result.fileName,
+    };
+  }
+
   const res = await fetch(endpoint, { method: "POST", body: fd });
   const json = await parseUploadResponse(res);
 

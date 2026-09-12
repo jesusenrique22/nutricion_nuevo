@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { isPublicMediaFolder } from "@/lib/media-access-policy";
-import { revalidatePublicSiteMediaCache } from "@/lib/public-site-media";
-import { validateUploadFile } from "@/lib/upload-policy";
-import { storePublicFile } from "@/server/services/file-storage";
-import { registerMediaAsset } from "@/server/services/media-library.service";
+import type { UploadKind } from "@/lib/upload-policy";
+import { processAdminMediaUpload } from "@/server/services/admin-media-upload.service";
 import { limitUploadByKey } from "@/lib/ratelimit";
 
 export const maxDuration = 120;
@@ -40,41 +36,29 @@ export async function POST(req: NextRequest) {
         : "resources";
 
     const kind =
-      kindRaw === "pdf" || kindRaw === "image" || kindRaw === "video"
-        ? kindRaw
+      kindRaw === "pdf" ||
+      kindRaw === "image" ||
+      kindRaw === "video" ||
+      kindRaw === "proof" ||
+      kindRaw === "any"
+        ? (kindRaw as UploadKind)
         : "any";
 
-    const validation = validateUploadFile(file, kind);
-    if (!validation.ok) {
-      return NextResponse.json({ error: validation.message }, { status: 400 });
-    }
-
-    const stored = await storePublicFile(file, safeFolder, {
+    const result = await processAdminMediaUpload(file, {
+      folder: safeFolder,
+      kind,
       ownerId: session.user.id,
     });
 
-    let assetId: string | undefined;
-    if (validation.mime.startsWith("image/")) {
-      const asset = await registerMediaAsset(stored, {
-        folder: safeFolder,
-        fileName: file.name,
-        ownerId: session.user.id,
-      });
-      assetId = asset.id;
-    }
-
-    if (isPublicMediaFolder(safeFolder)) {
-      revalidatePublicSiteMediaCache();
-      revalidatePath("/");
-      revalidatePath("/login");
-      revalidatePath("/register");
-      revalidatePath("/dashboard/admin/personalizar");
+    if (!result.ok) {
+      return NextResponse.json({ error: result.message }, { status: 400 });
     }
 
     return NextResponse.json({
-      url: stored.url,
-      mimeType: stored.mimeType,
-      id: assetId,
+      url: result.url,
+      mimeType: result.mimeType,
+      fileName: result.fileName,
+      id: result.id,
     });
   } catch (err) {
     console.error("[resources/upload]", err);

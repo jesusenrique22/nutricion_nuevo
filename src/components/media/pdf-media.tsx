@@ -10,10 +10,9 @@ import {
   mediaUrlInputClass,
   useMediaUpload,
 } from "@/components/media/media-upload-context";
-
-function fileLabel(url: string) {
-  return decodeURIComponent(url.split("/").pop() ?? "documento.pdf");
-}
+import { StoredFileName } from "@/components/media/stored-file-name";
+import { isInternalStoredMediaUrl } from "@/lib/stored-file-label";
+import { secureStoredFileUrl } from "@/lib/secure-media-url";
 
 function Root({
   value,
@@ -90,11 +89,12 @@ function Hint({ children }: { children?: ReactNode }) {
 }
 
 function UrlField({
-  placeholder = "URL del archivo o subilo desde el botón",
+  placeholder = "Enlace externo al PDF (opcional si subís archivo)",
 }: {
   placeholder?: string;
 }) {
   const { value, onChange, busy, labelId } = useMediaUpload();
+  if (value && isInternalStoredMediaUrl(value)) return null;
   return (
     <input
       aria-labelledby={labelId}
@@ -114,10 +114,10 @@ function FileChip() {
     <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-foreground/10 bg-white px-3 py-2.5 text-sm">
       <DocumentIcon className="h-5 w-5 shrink-0 text-primary/50" />
       <span className="min-w-0 flex-1 truncate text-foreground/70">
-        {fileLabel(value)}
+        <StoredFileName url={value} />
       </span>
       <a
-        href={value}
+        href={secureStoredFileUrl(value)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
@@ -165,7 +165,7 @@ function ListItems({ emptyMessage }: { emptyMessage?: string }) {
               Parte {index + 1}
             </span>
             <span className="block truncate text-foreground/70">
-              {fileLabel(url)}
+              <StoredFileName url={url} />
             </span>
           </span>
           <div className="flex shrink-0 flex-wrap gap-1">
@@ -188,7 +188,7 @@ function ListItems({ emptyMessage }: { emptyMessage?: string }) {
               ↓
             </button>
             <a
-              href={url}
+              href={secureStoredFileUrl(url)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/5"

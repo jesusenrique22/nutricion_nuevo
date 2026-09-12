@@ -31,7 +31,7 @@ export function ProtectedContentViewer({
   useEffect(() => {
     if (!hasContent || !contentUrl) return;
     let cancelled = false;
-    fetch(contentUrl, { method: "HEAD" })
+    fetch(contentUrl, { method: "HEAD", credentials: "include" })
       .then((res) => {
         if (cancelled) return;
         const kindHeader = res.headers.get("x-content-kind");

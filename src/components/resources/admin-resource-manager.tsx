@@ -14,6 +14,11 @@ import type { ResourceDTO } from "@/server/actions/resource.queries";
 import { DeleteResourceDialog } from "@/components/resources/delete-resource-dialog";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { uploadFile as uploadPublicFile } from "@/lib/client-upload";
+import { isInternalStoredMediaUrl } from "@/lib/stored-file-label";
+import { secureStoredFileUrl } from "@/lib/secure-media-url";
+import { uploadLimitLabel } from "@/lib/upload-policy";
+import { StoredFileName } from "@/components/media/stored-file-name";
+import { DocumentIcon, ExternalLinkIcon } from "@/components/ui/link-icons";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { CurrencyFieldSelect } from "@/components/currency/currency-field-select";
 
@@ -26,6 +31,7 @@ const emptyForm = {
   type: "EBOOK" as "EBOOK" | "VIDEO" | "LINK" | "PACKAGE",
   coverUrl: "",
   contentUrl: "",
+  contentFileName: "",
   videoUrl: "",
   linkUrl: "",
   body: "",
@@ -54,9 +60,10 @@ export function AdminResourceManager({
   const [isPending, startTransition] = useTransition();
 
   function buildPayload(nextForm: typeof form, id?: string) {
+    const { contentFileName: _label, ...rest } = nextForm;
     return {
       id,
-      ...nextForm,
+      ...rest,
       price: Number(nextForm.price),
       sortOrder: Number(nextForm.sortOrder),
     };
@@ -76,6 +83,7 @@ export function AdminResourceManager({
       type: r.type as typeof emptyForm.type,
       coverUrl: r.coverUrl ?? "",
       contentUrl: r.contentUrl ?? "",
+      contentFileName: "",
       videoUrl: r.videoUrl ?? "",
       linkUrl: r.linkUrl ?? "",
       body: r.body ?? "",
@@ -92,12 +100,6 @@ export function AdminResourceManager({
     setUploading(true);
     setMessage(null);
     try {
-      if (file.size > 4.5 * 1024 * 1024) {
-        throw new Error(
-          `El archivo pesa ${(file.size / (1024 * 1024)).toFixed(1)} MB y supera el límite de 4.5 MB soportado en la nube. Por favor comprímelo antes de subirlo.`,
-        );
-      }
-
       const kind =
         target === "coverUrl"
           ? "image"
@@ -107,12 +109,19 @@ export function AdminResourceManager({
                 file.name.toLowerCase().endsWith(".pdf")
               ? "pdf"
               : "any";
-      const { url } = await uploadPublicFile(file, {
+      const uploaded = await uploadPublicFile(file, {
         folder: "resources",
         kind,
       });
 
-      const nextForm = { ...form, [target]: url };
+      const nextForm =
+        target === "contentUrl"
+          ? {
+              ...form,
+              contentUrl: uploaded.url,
+              contentFileName: uploaded.fileName ?? file.name,
+            }
+          : { ...form, [target]: uploaded.url };
       setForm(nextForm);
 
       if (editing && editing !== "new") {
@@ -363,31 +372,75 @@ export function AdminResourceManager({
                 </div>
               )}
             </label>
-            <label className="block text-sm sm:col-span-2">
+            <div className="block text-sm sm:col-span-2">
               <span className="font-semibold">Archivo principal (PDF)</span>
               <span className="mt-0.5 block text-xs font-normal text-foreground/55">
                 Documento que el paciente lee al desbloquear el recurso. Subí
-                el PDF aquí; es obligatorio para e-books.
+                el PDF aquí; es obligatorio para e-books. Máx.{" "}
+                {uploadLimitLabel("pdf")}.
               </span>
-              <input
-                value={form.contentUrl}
-                onChange={(e) =>
-                  setForm({ ...form, contentUrl: e.target.value })
-                }
-                className={inputClass}
-                placeholder="URL del archivo o subilo desde el botón"
-              />
-              <button
-                type="button"
-                className="mt-1 text-xs font-semibold text-primary"
-                onClick={() => {
-                  setUploadTarget("contentUrl");
-                  fileRef.current?.click();
-                }}
-              >
-                Subir PDF
-              </button>
-            </label>
+              {form.contentUrl && isInternalStoredMediaUrl(form.contentUrl) ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-foreground/10 bg-white px-3 py-2.5 text-sm">
+                  <DocumentIcon className="h-5 w-5 shrink-0 text-primary/50" />
+                  <span className="min-w-0 flex-1 truncate text-foreground/70">
+                    {form.contentFileName ? (
+                      form.contentFileName
+                    ) : (
+                      <StoredFileName url={form.contentUrl} />
+                    )}
+                  </span>
+                  <a
+                    href={secureStoredFileUrl(form.contentUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  >
+                    Ver PDF
+                    <ExternalLinkIcon className="h-3 w-3" />
+                  </a>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    className="text-xs font-semibold text-foreground/50 disabled:opacity-50"
+                    onClick={() =>
+                      setForm({ ...form, contentUrl: "", contentFileName: "" })
+                    }
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <input
+                  value={form.contentUrl}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      contentUrl: e.target.value,
+                      contentFileName: "",
+                    })
+                  }
+                  className={inputClass}
+                  placeholder="Enlace externo al PDF (opcional si subís archivo)"
+                />
+              )}
+              <div className="mt-2 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  className="text-xs font-semibold text-primary disabled:opacity-50"
+                  onClick={() => {
+                    setUploadTarget("contentUrl");
+                    fileRef.current?.click();
+                  }}
+                >
+                  {uploading && uploadTarget === "contentUrl"
+                    ? "Subiendo…"
+                    : form.contentUrl && isInternalStoredMediaUrl(form.contentUrl)
+                      ? "Reemplazar PDF"
+                      : "Subir PDF"}
+                </button>
+              </div>
+            </div>
             <label className="block text-sm sm:col-span-2">
               <span className="font-semibold">Texto al abrir el recurso</span>
               <span className="mt-0.5 block text-xs font-normal text-foreground/55">
