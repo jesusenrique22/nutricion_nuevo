@@ -75,6 +75,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "50mb",
     },
+    // proxy.ts clona el body; sin esto se trunca a 10 MB y falla la subida por Server Action.
+    proxyClientMaxBodySize: "50mb",
     ...(isProduction
       ? {
           staleTimes: {
