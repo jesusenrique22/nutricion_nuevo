@@ -5,6 +5,7 @@ import {
   type UploadKind,
   validateUploadFile,
 } from "@/lib/upload-policy";
+import { readStoredFileUrlToBuffer } from "@/lib/stored-file";
 import { storePublicFile } from "@/server/services/file-storage";
 import { registerMediaAsset } from "@/server/services/media-library.service";
 
@@ -44,6 +45,25 @@ export async function processAdminMediaUpload(
   const stored = await storePublicFile(file, safeFolder, {
     ownerId: options.ownerId,
   });
+
+  const storedBytes = await readStoredFileUrlToBuffer(stored.url);
+  if (!storedBytes || storedBytes.length === 0) {
+    return {
+      ok: false,
+      message:
+        "No se pudo verificar el archivo subido. Intentá de nuevo en unos segundos.",
+    };
+  }
+
+  if (
+    kind === "pdf" &&
+    storedBytes.subarray(0, 5).toString("ascii") !== "%PDF-"
+  ) {
+    return {
+      ok: false,
+      message: "El archivo no es un PDF válido. Probá exportarlo de nuevo.",
+    };
+  }
 
   const asset = await registerMediaAsset(stored, {
     folder: safeFolder,

@@ -1,10 +1,13 @@
+import { normalizeStoredUrl } from "@/lib/stored-file-url";
+
 /** URL autenticada para mostrar archivos almacenados en el panel. */
 export function secureStoredFileUrl(originalUrl: string): string {
-  if (originalUrl.startsWith("/api/media/")) {
-    return originalUrl;
-  }
-  if (originalUrl.startsWith("/uploads/")) {
-    return `/api/secure-file?src=${encodeURIComponent(originalUrl)}`;
+  const normalized = normalizeStoredUrl(originalUrl);
+  if (
+    normalized.startsWith("/api/media/") ||
+    normalized.startsWith("/uploads/")
+  ) {
+    return `/api/secure-file?src=${encodeURIComponent(normalized)}`;
   }
   return originalUrl;
 }

@@ -18,6 +18,7 @@ import { isInternalStoredMediaUrl } from "@/lib/stored-file-label";
 import { secureStoredFileUrl } from "@/lib/secure-media-url";
 import { uploadLimitLabel } from "@/lib/upload-policy";
 import { StoredFileName } from "@/components/media/stored-file-name";
+import { ClientPdfDocumentViewer } from "@/components/pdf/client-pdf-document-viewer";
 import { DocumentIcon, ExternalLinkIcon } from "@/components/ui/link-icons";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { CurrencyFieldSelect } from "@/components/currency/currency-field-select";
@@ -57,6 +58,7 @@ export function AdminResourceManager({
   const [message, setMessage] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ResourceDTO | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function buildPayload(nextForm: typeof form, id?: string) {
@@ -123,6 +125,7 @@ export function AdminResourceManager({
             }
           : { ...form, [target]: uploaded.url };
       setForm(nextForm);
+      if (target === "contentUrl") setShowPdfPreview(true);
 
       if (editing && editing !== "new") {
         const saveRes = await upsertResource(
@@ -389,22 +392,30 @@ export function AdminResourceManager({
                       <StoredFileName url={form.contentUrl} />
                     )}
                   </span>
+                  <button
+                    type="button"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    onClick={() => setShowPdfPreview((v) => !v)}
+                  >
+                    {showPdfPreview ? "Ocultar vista previa" : "Vista previa"}
+                  </button>
                   <a
                     href={secureStoredFileUrl(form.contentUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-foreground/45 hover:text-primary"
                   >
-                    Ver PDF
+                    Abrir en pestaña
                     <ExternalLinkIcon className="h-3 w-3" />
                   </a>
                   <button
                     type="button"
                     disabled={uploading}
                     className="text-xs font-semibold text-foreground/50 disabled:opacity-50"
-                    onClick={() =>
-                      setForm({ ...form, contentUrl: "", contentFileName: "" })
-                    }
+                    onClick={() => {
+                      setShowPdfPreview(false);
+                      setForm({ ...form, contentUrl: "", contentFileName: "" });
+                    }}
                   >
                     Quitar
                   </button>
@@ -440,6 +451,16 @@ export function AdminResourceManager({
                       : "Subir PDF"}
                 </button>
               </div>
+              {showPdfPreview &&
+                form.contentUrl &&
+                isInternalStoredMediaUrl(form.contentUrl) && (
+                  <div className="mt-4 max-h-[min(70vh,720px)] overflow-y-auto rounded-2xl ring-1 ring-foreground/10">
+                    <ClientPdfDocumentViewer
+                      pdfUrl={secureStoredFileUrl(form.contentUrl)}
+                      maxWidth={900}
+                    />
+                  </div>
+                )}
             </div>
             <label className="block text-sm sm:col-span-2">
               <span className="font-semibold">Texto al abrir el recurso</span>
