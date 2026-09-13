@@ -206,3 +206,63 @@ export function validateUploadFile(
 
   return { ok: true, mime };
 }
+
+/** Validación server-side para buffers ensamblados (subida por fragmentos). */
+export function validateUploadBuffer(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string,
+  kind: UploadKind,
+): UploadValidationResult {
+  const file = new File([new Uint8Array(buffer)], fileName, { type: mimeType });
+  return validateUploadFile(file, kind);
+}
+
+/** Validación por metadatos (subida por fragmentos antes de ensamblar). */
+export function validateUploadMetadata(
+  fileName: string,
+  mimeType: string,
+  totalSize: number,
+  kind: UploadKind,
+): UploadValidationResult {
+  const maxBytes =
+    UPLOAD_LIMITS[kind === "any" ? "default" : kind] ?? UPLOAD_LIMITS.default;
+
+  if (totalSize <= 0) {
+    return { ok: false, message: "El archivo está vacío." };
+  }
+
+  if (totalSize > maxBytes) {
+    return {
+      ok: false,
+      message: `Archivo demasiado grande (máx. ${formatBytes(maxBytes)}).`,
+    };
+  }
+
+  const ext = fileExtension(fileName);
+  const allowed = ALLOWED_MIME[kind];
+  const mimeOk = allowed.has(mimeType);
+  const extOk = ext ? extMatchesKind(ext, kind) : false;
+
+  if (!mimeOk && !extOk) {
+    const labels: Record<UploadKind, string> = {
+      image: "imágenes (JPG, PNG o WebP)",
+      pdf: "archivos PDF",
+      video: "videos MP4 o WebM",
+      proof: "capturas JPG, PNG o WebP",
+      any: "imágenes web (JPG/PNG/WebP), PDF o video",
+    };
+    return {
+      ok: false,
+      message: `Tipo no permitido. Usá ${labels[kind]}.`,
+    };
+  }
+
+  return { ok: true, mime: mimeType };
+}
+
+/** Umbral seguro bajo el límite de body en Vercel (~4.5 MB). */
+export const VERCEL_SAFE_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/** Tamaño de cada fragmento en subidas grandes. */
+export const CHUNKED_UPLOAD_PART_BYTES = 3 * 1024 * 1024;

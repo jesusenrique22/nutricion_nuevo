@@ -1,6 +1,9 @@
 export async function parseUploadResponse(res: Response): Promise<{
   url?: string;
   id?: string;
+  mimeType?: string;
+  sessionId?: string;
+  totalChunks?: number;
   error?: string;
 }> {
   const text = await res.text();
@@ -12,7 +15,14 @@ export async function parseUploadResponse(res: Response): Promise<{
     };
   }
   try {
-    return JSON.parse(text) as { url?: string; id?: string; error?: string };
+    return JSON.parse(text) as {
+      url?: string;
+      id?: string;
+      mimeType?: string;
+      sessionId?: string;
+      totalChunks?: number;
+      error?: string;
+    };
   } catch {
     return {
       error: res.ok

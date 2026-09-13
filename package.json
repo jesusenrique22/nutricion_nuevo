@@ -34,6 +34,7 @@
     "db:check": "node scripts/check-db.mjs",
     "db:verify": "node scripts/check-db.mjs && node scripts/check-db-schema.mjs",
     "db:check:mongo": "node --env-file=.env scripts/check-mongo.mjs",
+    "test:resources": "tsx --env-file=.env scripts/test-resource-upload.mjs",
     "email:check": "tsx --env-file=.env scripts/check-smtp.ts",
     "socket": "tsx src/server/socket/server.ts",
     "reminders": "node scripts/reminders.mjs"
