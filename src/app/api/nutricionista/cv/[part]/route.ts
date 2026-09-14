@@ -2,6 +2,8 @@ import { isAllowedCvPdfRequest } from "@/lib/cv-pdf-access";
 import { openStoredFileUrl, storedFileToResponse } from "@/lib/stored-file";
 import { getNutricionistaPage } from "@/server/queries/nutricionista-cv.queries";
 
+export const maxDuration = 60;
+
 /**
  * Sirve el PDF del CV (bytes). El render a páginas se hace en el cliente
  * para no empaquetar pdfjs + canvas nativo en la función de Vercel (~250 MB).

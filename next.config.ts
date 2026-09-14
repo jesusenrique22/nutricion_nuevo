@@ -94,43 +94,11 @@ const nextConfig: NextConfig = {
   // Mantener funciones Vercel < 250 MB.
   // googleapis (~202 MB) NO debe entrar en páginas de paciente / medios:
   // el sync de Calendar solo corre en admin + APIs de Google.
+  // Un solo patrón: configs distintas por ruta crean lambdas extra y Hobby solo admite 12.
   outputFileTracingExcludes: {
     "*": [
       "./node_modules/pdfjs-dist/**",
       "./node_modules/@napi-rs/canvas/**",
-    ],
-    "/dashboard/patient/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
-    ],
-    "/dashboard/patient/library/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
-      "./node_modules/mongodb/**",
-      "./node_modules/bson/**",
-      "./node_modules/@mongodb-js/**",
-    ],
-    "/api/media/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
-    ],
-    "/api/resources/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
-    ],
-    "/api/payments/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
-    ],
-    "/api/secure-file/**": [
-      "./node_modules/googleapis/**",
-      "./node_modules/google-auth-library/**",
-      "./node_modules/googleapis-common/**",
     ],
   },
 
@@ -179,19 +147,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      ...(isProduction
-        ? [
-            {
-              source: "/_next/static/(.*)",
-              headers: [
-                {
-                  key: "Cache-Control",
-                  value: "public, max-age=31536000, immutable",
-                },
-              ],
-            },
-          ]
-        : [
+      ...(isProduction ? [] : [
             // Evita chunks Turbopack stale en el navegador durante desarrollo
             {
               source: "/_next/(.*)",
