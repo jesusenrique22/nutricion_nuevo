@@ -13,6 +13,10 @@ import {
 import { parseAdminPaymentItemId } from "@/lib/admin-payment-item";
 import { formatActionError } from "@/lib/db-errors";
 import { notifyReviewRequested } from "@/server/services/review-notify.service";
+import {
+  notifyPurchaseApproved,
+  notifyPurchaseRejected,
+} from "@/server/services/purchase-notify.service";
 
 export type PaymentAdminActionResult =
   | { ok: true }
@@ -95,7 +99,12 @@ export async function rejectResourcePayment(
 
       const purchase = await prisma.resourcePurchase.findUnique({
         where: { id: purchaseId },
-        select: { userId: true, resourceId: true, status: true },
+        select: {
+          userId: true,
+          resourceId: true,
+          status: true,
+          resource: { select: { title: true } },
+        },
       });
       if (!purchase || purchase.status !== "PENDING") {
         return { ok: false, message: "Solicitud no encontrada." };
@@ -110,6 +119,12 @@ export async function rejectResourcePayment(
         }),
         prisma.resourcePurchase.delete({ where: { id: purchaseId } }),
       ]);
+
+      await notifyPurchaseRejected({
+        patientId: purchase.userId,
+        itemTitle: purchase.resource?.title ?? "tu recurso",
+        kind: "RESOURCE",
+      });
 
       revalidateAll(purchase.userId);
       return { ok: true };
@@ -146,6 +161,13 @@ export async function approveProductPayment(params: {
         },
       });
 
+      await notifyPurchaseApproved({
+        patientId: purchase.userId,
+        itemTitle: purchase.productName,
+        kind: "PRODUCT",
+        entityId: params.purchaseId,
+      });
+
       await notifyReviewRequested({
         patientId: purchase.userId,
         itemTitle: purchase.productName,
@@ -172,7 +194,12 @@ export async function rejectProductPayment(
 
       const purchase = await prisma.productPurchase.findUnique({
         where: { id: purchaseId },
-        select: { userId: true, productId: true, status: true },
+        select: {
+          userId: true,
+          productId: true,
+          status: true,
+          productName: true,
+        },
       });
       if (!purchase || purchase.status !== "PENDING") {
         return { ok: false, message: "Solicitud no encontrada." };
@@ -187,6 +214,12 @@ export async function rejectProductPayment(
         }),
         prisma.productPurchase.delete({ where: { id: purchaseId } }),
       ]);
+
+      await notifyPurchaseRejected({
+        patientId: purchase.userId,
+        itemTitle: purchase.productName,
+        kind: "PRODUCT",
+      });
 
       revalidateAll(purchase.userId);
       return { ok: true };

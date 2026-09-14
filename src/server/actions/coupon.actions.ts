@@ -258,6 +258,18 @@ export async function validateCouponForCart(
     const code = normalizeCouponCode(rawCode);
     if (!code) return { ok: false, message: "Ingresá un código de cupón." };
 
+    // Los cupones son exclusivos de las consultas.
+    const appointmentsInCart = await prisma.cartItem.count({
+      where: { userId: session.user.id, type: "APPOINTMENT" },
+    });
+    if (appointmentsInCart === 0) {
+      return {
+        ok: false,
+        message:
+          "Los cupones solo aplican a las consultas. Agregá una cita al carrito para usarlo.",
+      };
+    }
+
     const coupon = await prisma.coupon.findUnique({
       where: { code },
       include: { _count: { select: { redemptions: true } } },
@@ -308,6 +320,18 @@ export async function resolveCouponForCheckout(params: {
 > {
   const raw = params.rawCode?.trim();
   if (!raw) return { ok: true, coupon: null };
+
+  // Los cupones son exclusivos de las consultas.
+  const appointmentsInCart = await prisma.cartItem.count({
+    where: { userId: params.userId, type: "APPOINTMENT" },
+  });
+  if (appointmentsInCart === 0) {
+    return {
+      ok: false,
+      message:
+        "Los cupones solo aplican a las consultas. Agregá una cita al carrito para usarlo.",
+    };
+  }
 
   const code = normalizeCouponCode(raw);
   const coupon = await prisma.coupon.findUnique({

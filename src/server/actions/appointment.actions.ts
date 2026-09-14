@@ -128,6 +128,8 @@ export async function createAppointment(
     consultationName: consultationType.name,
     startTime: new Date(startTime),
     appointmentId: appointment.id,
+    // La cita se confirma recién cuando el admin aprueba el pago.
+    awaitingPayment: consultationType.price.toNumber() > 0,
   });
 
   const { syncAppointmentToGoogleCalendar } = await import(
@@ -244,26 +246,6 @@ export async function createAppointmentForPatient(
     consultationName: consultationType.name,
     startTime: new Date(startTime),
     appointmentId: appointment.id,
-  });
-
-  const { createNotification } = await import(
-    "@/server/services/notification.service"
-  );
-  await createNotification({
-    recipientId: patientId,
-    type: "APPOINTMENT_REMINDER",
-    title: "Nueva cita agendada",
-    body: `${consultationType.name} · ${new Date(startTime).toLocaleString("es", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`,
-    payload: {
-      deepLink: "/dashboard/patient/appointments",
-      appointmentId: appointment.id,
-    },
   });
 
   const { syncAppointmentToGoogleCalendar } = await import(

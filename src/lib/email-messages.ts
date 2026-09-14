@@ -1,3 +1,5 @@
+import { formatClinicDateTimeLong } from "@/lib/clinic-timezone";
+
 const brand = "Anttova";
 
 export function passwordResetEmail(resetUrl: string) {
@@ -61,15 +63,7 @@ export function verifyEmailMessage(verifyUrl: string, name: string) {
   return { subject, text, html };
 }
 
-function fmtAppointmentDate(d: Date | string) {
-  return new Date(d).toLocaleString("es", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const fmtAppointmentDate = formatClinicDateTimeLong;
 
 export function appointmentReminderEmail(params: {
   name: string;

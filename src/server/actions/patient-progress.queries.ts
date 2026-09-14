@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
 import { paymentMethodLabel, type PaymentMethodId } from "@/lib/payment-methods";
 import { parseProofUrls } from "@/lib/payment-checkout-policy";
 import {
@@ -29,6 +30,7 @@ export interface PatientProgressItem {
 
 function fmtDate(iso: Date | string) {
   return new Date(iso).toLocaleString("es", {
+    timeZone: CLINIC_TIMEZONE,
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -290,6 +292,7 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
     const payment = appt.payment;
     const phases = toPaymentPhaseView(payment);
     const dateLabel = new Date(appt.startTime).toLocaleString("es", {
+      timeZone: CLINIC_TIMEZONE,
       day: "2-digit",
       month: "short",
       hour: "2-digit",

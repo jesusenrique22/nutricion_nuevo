@@ -211,6 +211,10 @@ export function CartLineItem({
   );
 }
 
+/**
+ * Total a pagar ahora. El cupón NO se descuenta acá: aplica solo a consultas y
+ * se resta del último pago, así que el adelanto se abona completo.
+ */
 export function cartItemsTotal(
   items: CartItemDTO[],
   convert: (amount: string | number, from: SupportedCurrency) => number,
@@ -221,35 +225,45 @@ export function cartItemsTotal(
   units: number;
   hasPriced: boolean;
   rawSum: number;
+  /** Ahorro del cupón, que se verá recién en el saldo de la consulta. */
   discountLabel?: string;
 } {
   let sum = 0;
   let hasPriced = false;
   let units = 0;
+  let appointmentFullSum = 0;
+
   for (const item of items) {
     units += item.quantity ?? 1;
     const line = lineAmount(item);
     if (line > 0) hasPriced = true;
     sum += convert(line, itemCurrency(item));
+
+    if (item.type === "APPOINTMENT" && item.fullPrice) {
+      appointmentFullSum += convert(
+        Number(item.fullPrice),
+        itemCurrency(item),
+      );
+    }
   }
+
   const pct =
     discountPercent && discountPercent > 0
       ? Math.min(100, Math.max(0, Math.round(discountPercent)))
       : 0;
-  const after =
-    pct > 0
-      ? Math.round(sum * (100 - pct)) / 100
-      : sum;
+  const savings =
+    pct > 0 && appointmentFullSum > 0
+      ? Math.round(appointmentFullSum * pct) / 100
+      : 0;
+
   return {
     units,
     hasPriced,
     rawSum: sum,
     discountLabel:
-      pct > 0 && hasPriced
-        ? `−${pct}% (${formatMoney(sum - after, displayCurrency)})`
+      savings > 0
+        ? `−${pct}% sobre la consulta (${formatMoney(savings, displayCurrency)}), se descuenta del saldo final`
         : undefined,
-    label: !hasPriced
-      ? "Gratis"
-      : formatMoney(after, displayCurrency),
+    label: !hasPriced ? "Gratis" : formatMoney(sum, displayCurrency),
   };
 }

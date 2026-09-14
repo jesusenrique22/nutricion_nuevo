@@ -18,11 +18,19 @@ import {
   verifyIdentifier,
 } from "@/lib/email-messages";
 import { passwordSchema } from "@/lib/validators/password";
+import { isValidE164 } from "@/lib/phone-countries";
+import { notifyNewPatientRegistered } from "@/server/services/registration-notify.service";
 
 const registerSchema = z.object({
   name: z.string().min(2, "Nombre demasiado corto"),
   email: z.string().email("Email inválido"),
   password: passwordSchema,
+  // Obligatorio desde el registro, en formato internacional (+54…, +58…).
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Ingresá tu número de teléfono")
+    .refine(isValidE164, "Número de teléfono inválido"),
 });
 
 const forgotSchema = z.object({
@@ -148,7 +156,7 @@ export async function registerPatient(
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0].message };
   }
-  const { name, password } = parsed.data;
+  const { name, password, phone } = parsed.data;
   const email = normalizeEmail(parsed.data.email);
 
   const existingResult = await withDb(() =>
@@ -169,6 +177,7 @@ export async function registerPatient(
       data: {
         name,
         email,
+        phone,
         passwordHash,
         role: "PATIENT",
         emailVerified: emailConfigured ? null : new Date(),
@@ -179,6 +188,13 @@ export async function registerPatient(
     }),
   );
   if (!createResult.ok) return createResult;
+
+  await notifyNewPatientRegistered({
+    patientId: createResult.data.id,
+    name,
+    email,
+    phone,
+  });
 
   if (!emailConfigured) {
     return {

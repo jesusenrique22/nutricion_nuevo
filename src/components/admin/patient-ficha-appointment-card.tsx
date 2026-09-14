@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DisplayPrice } from "@/components/currency/display-price";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
 import {
   appointmentStatusLabels,
   cancelledByLabels,
@@ -35,6 +36,7 @@ const paymentStyles: Record<string, string> = {
 
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString("es", {
+    timeZone: CLINIC_TIMEZONE,
     weekday: "short",
     day: "2-digit",
     month: "short",

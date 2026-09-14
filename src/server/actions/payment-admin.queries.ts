@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
 import { paymentMethodLabel, type PaymentMethodId } from "@/lib/payment-methods";
 import { parseProofUrls } from "@/lib/payment-checkout-policy";
 import { prisma } from "@/server/db/prisma";
@@ -228,6 +229,7 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
     const phases = toPaymentPhaseView(payment);
 
     const dateLabel = new Date(appt.startTime).toLocaleString("es", {
+      timeZone: CLINIC_TIMEZONE,
       day: "2-digit",
       month: "short",
       hour: "2-digit",
@@ -394,6 +396,7 @@ async function loadPaidHistoryItems(): Promise<AdminPaidPaymentItem[]> {
     const phases = toPaymentPhaseView(payment);
 
     const dateLabel = new Date(appt.startTime).toLocaleString("es", {
+      timeZone: CLINIC_TIMEZONE,
       day: "2-digit",
       month: "short",
       hour: "2-digit",

@@ -96,8 +96,23 @@ export function PatientCartPanel({
     [items, convert, displayCurrency, appliedCoupon?.percentOff],
   );
 
+  // Un cupón al 100% solo puede dejar en cero un carrito de puras consultas:
+  // recursos y productos nunca reciben descuento.
+  const onlyAppointmentsArePaid = useMemo(
+    () =>
+      items
+        .filter((i) => i.price && Number(i.price) > 0)
+        .every((i) => i.type === "APPOINTMENT"),
+    [items],
+  );
+
   const needsPaymentFields =
-    hasPaidItems && !(appliedCoupon && appliedCoupon.percentOff >= 100);
+    hasPaidItems &&
+    !(
+      appliedCoupon &&
+      appliedCoupon.percentOff >= 100 &&
+      onlyAppointmentsArePaid
+    );
 
   const appointmentTotalHint = useMemo(() => {
     const splitAppts = items.filter(
@@ -130,7 +145,7 @@ export function PatientCartPanel({
     if (pct > 0) {
       const origLabel = formatMoney(fullSum, displayCurrency);
       const savingsLabel = formatMoney(fullSum - discounted, displayCurrency);
-      return `Descuento aplicado al total: ${totalLabel} (antes ${origLabel} · ahorro de ${savingsLabel}). Aquí abonas únicamente el adelanto correspondiente con el descuento proporcional ya aplicado.`;
+      return `Total de la cita con cupón: ${totalLabel} (antes ${origLabel} · ahorro de ${savingsLabel}). El adelanto se abona completo y el descuento se resta del saldo final.`;
     }
     if (hasAdvance) {
       return `Total de la cita: ${totalLabel} · acá pagás solo la cuota de adelanto`;

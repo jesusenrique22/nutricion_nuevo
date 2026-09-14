@@ -1,5 +1,6 @@
 import { DisplayPrice } from "@/components/currency/display-price";
 import { paymentPhaseLabels } from "@/lib/appointment-labels";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
 
 export function AdminAppointmentSplitPayment({
   paidAdvanceAmount,
@@ -20,6 +21,7 @@ export function AdminAppointmentSplitPayment({
 }) {
   const appointmentLabel = appointmentStart
     ? new Date(appointmentStart).toLocaleString("es", {
+        timeZone: CLINIC_TIMEZONE,
         weekday: "long",
         day: "2-digit",
         month: "long",

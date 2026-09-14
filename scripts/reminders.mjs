@@ -15,7 +15,11 @@ function dateKeyInClinicTz(date) {
 }
 
 function fmtTime(date) {
-  return date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit });
+  return date.toLocaleTimeString("es", {
+    timeZone: CLINIC_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function daysUntil(dueAt, now) {

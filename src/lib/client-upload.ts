@@ -61,6 +61,16 @@ export async function uploadFile(
   const endpoint = options.endpoint ?? "/api/resources/upload";
 
   if (endpoint === "/api/resources/upload") {
+    // Arriba del límite de body de Vercel, ir directo a fragmentos: intentar
+    // primero el Server Action significaría subir el archivo entero dos veces.
+    if (needsChunkedUpload(uploadFile.size)) {
+      return uploadFileWithChunks(uploadFile, {
+        folder: options.folder,
+        kind,
+        endpoint,
+      });
+    }
+
     const result = await uploadAdminMediaFile(fd);
     if (result.ok) {
       return {
@@ -71,15 +81,11 @@ export async function uploadFile(
       };
     }
 
-    if (needsChunkedUpload(uploadFile.size)) {
-      return uploadFileWithChunks(uploadFile, {
-        folder: options.folder,
-        kind,
-        endpoint,
-      });
-    }
-
-    throw new Error(result.message);
+    return uploadFileWithChunks(uploadFile, {
+      folder: options.folder,
+      kind,
+      endpoint,
+    });
   }
 
   const res = await fetch(endpoint, { method: "POST", body: fd });

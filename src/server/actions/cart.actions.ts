@@ -18,6 +18,7 @@ import { createNotification } from "@/server/services/notification.service";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import { validateRemainderCartPayment } from "@/lib/appointment-remainder-checkout";
 import { formatActionError } from "@/lib/db-errors";
+import { formatClinicDateTime } from "@/lib/clinic-timezone";
 import { modalityLabels } from "@/lib/appointment-labels";
 import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { toPaymentPhaseView } from "@/lib/payment-split";
@@ -65,13 +66,7 @@ function formatAppointmentSubtitle(
   start: Date,
   modality: string | null | undefined,
 ) {
-  const when = start.toLocaleString("es", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const when = formatClinicDateTime(start);
   const mod =
     modality && modality in modalityLabels
       ? modalityLabels[modality as keyof typeof modalityLabels]
@@ -580,21 +575,17 @@ export async function submitCart(options?: {
         item.type === "APPOINTMENT_REMAINDER" && !!item.appointmentId,
     );
 
+    // El cupón solo alcanza a las consultas: recursos y productos se cobran plenos.
     const requiresPayment =
       items.some(
         (i) =>
-          (i.type === "RESOURCE" &&
-            i.resource &&
-            discountedAmount(i.resource.price.toNumber()) > 0) ||
+          (i.type === "RESOURCE" && i.resource && i.resource.price.toNumber() > 0) ||
           (i.type === "APPOINTMENT" &&
             i.consultationType &&
             discountedAmount(i.consultationType.price.toNumber()) > 0),
       ) ||
       remainderItems.length > 0 ||
-      productItems.some(
-        (item) =>
-          discountedAmount(item.product.price * (item.quantity ?? 1)) > 0,
-      );
+      productItems.some((item) => item.product.price * (item.quantity ?? 1) > 0);
 
     if (requiresPayment) {
       const policy = await getPaymentCheckoutPolicy();

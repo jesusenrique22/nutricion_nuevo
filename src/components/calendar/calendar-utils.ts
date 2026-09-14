@@ -17,6 +17,7 @@ import {
   subWeeks,
 } from "date-fns";
 import { es } from "date-fns/locale/es";
+import { CLINIC_TIMEZONE } from "@/lib/clinic-timezone";
 import type { AppointmentDTO } from "@/server/actions/booking.queries";
 
 export { isSameDay, isToday, format };
@@ -104,7 +105,12 @@ export function headerLabel(date: Date, view: CalendarView): string {
 }
 
 export function formatTime(iso: string): string {
-  return format(new Date(iso), "HH:mm", { locale: es });
+  return new Date(iso).toLocaleTimeString("es", {
+    timeZone: CLINIC_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 export function formatDuration(start: string, end: string): string {

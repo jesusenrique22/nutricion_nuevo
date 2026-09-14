@@ -17,13 +17,18 @@ import {
 import { notifyAppointmentBooked } from "@/server/services/appointment-notify.service";
 import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import {
+  notifyPurchaseSubmitted,
+  type PurchaseItemKind,
+} from "@/server/services/purchase-notify.service";
+import {
   isTimeSlotConflictError,
   TIME_SLOT_TAKEN_MESSAGE,
 } from "@/lib/scheduling-errors";
 import { applyPercentOff } from "@/lib/coupon-math";
 import { clampPercentOff } from "@/lib/coupons";
 import { applyRemainderCartPayment } from "@/lib/appointment-remainder-checkout";
-import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+
+type PurchaseNotifyItem = { title: string; kind: PurchaseItemKind };
 
 export type CartPaymentPayload = {
   patientPaymentMethod: string;
@@ -111,8 +116,10 @@ async function createCartAppointment(params: {
   patientId: string;
   item: CartAppointmentItem;
   excludeAppointmentId?: string;
-  /** Precio total ya con descuento de cupón (si aplica). */
+  /** Precio de lista de la consulta (sin descuento). */
   totalPrice?: Prisma.Decimal;
+  /** Descuento del cupón; se resta del último pago. */
+  discountAmount?: Prisma.Decimal;
 }) {
   const validation = await validateAppointmentSlot({
     consultationType: params.item.consultationType,
@@ -163,6 +170,7 @@ async function createCartAppointment(params: {
             totalPrice,
             consultationCode: params.item.consultationType.code,
             policy: paymentPolicy,
+            discountAmount: params.discountAmount,
           }),
         },
       });
@@ -194,11 +202,14 @@ export async function fulfillCartCheckout(params: {
   | { ok: false; message: string }
 > {
   const newAppointmentIds: string[] = [];
+  // El cupón aplica SOLO a las consultas: recursos y productos van a precio pleno.
   const percentOff = params.couponPercentOff
     ? clampPercentOff(params.couponPercentOff)
     : 0;
-  const withDiscount = <T extends Prisma.Decimal | number>(amount: T) =>
-    percentOff > 0 ? applyPercentOff(amount, percentOff) : amount;
+  const consultationDiscount = (price: Prisma.Decimal): Prisma.Decimal =>
+    percentOff > 0
+      ? price.sub(applyPercentOff(price, percentOff)).toDecimalPlaces(2)
+      : new Prisma.Decimal(0);
 
   for (const item of params.appointmentItems) {
     const reusable = await findReusableCartAppointment({
@@ -207,11 +218,9 @@ export async function fulfillCartCheckout(params: {
       startTime: item.appointmentStart,
     });
 
-    const discountedPrice = withDiscount(item.consultationType.price);
-    const discountedDec =
-      discountedPrice instanceof Prisma.Decimal
-        ? discountedPrice
-        : new Prisma.Decimal(discountedPrice);
+    const listPrice = new Prisma.Decimal(item.consultationType.price);
+    const discountAmount = consultationDiscount(listPrice);
+    const payableTotal = listPrice.sub(discountAmount);
 
     let appointmentId: string;
 
@@ -225,9 +234,10 @@ export async function fulfillCartCheckout(params: {
       ) {
         const paymentPolicy = await getPaymentChatPolicy();
         const data = buildPaymentCreateData({
-          totalPrice: discountedDec,
+          totalPrice: listPrice,
           consultationCode: item.consultationType.code,
           policy: paymentPolicy,
+          discountAmount,
         });
         await prisma.payment.update({
           where: { appointmentId },
@@ -243,7 +253,8 @@ export async function fulfillCartCheckout(params: {
       const created = await createCartAppointment({
         patientId: params.patientId,
         item,
-        totalPrice: discountedDec,
+        totalPrice: listPrice,
+        discountAmount,
       });
       if (!created.ok) {
         return {
@@ -257,7 +268,7 @@ export async function fulfillCartCheckout(params: {
       }
     }
 
-    if (params.paymentPayload && discountedDec.toNumber() > 0) {
+    if (params.paymentPayload && payableTotal.toNumber() > 0) {
       await applyAppointmentPayment(appointmentId, params.paymentPayload);
     }
   }
@@ -282,11 +293,7 @@ export async function fulfillCartCheckout(params: {
 
   await prisma.$transaction(async (tx) => {
     for (const item of params.resourceItems) {
-      const pricePaid = withDiscount(item.resource.price);
-      const priceDec =
-        pricePaid instanceof Prisma.Decimal
-          ? pricePaid
-          : new Prisma.Decimal(pricePaid);
+      const priceDec = new Prisma.Decimal(item.resource.price);
       const isFree = priceDec.toNumber() === 0;
       const paidPayload =
         !isFree && params.paymentPayload
@@ -331,11 +338,7 @@ export async function fulfillCartCheckout(params: {
     for (const item of params.productItems) {
       const qty = Math.max(1, item.quantity ?? 1);
       const unitPrice = item.product.price;
-      const lineTotal = withDiscount(unitPrice * qty);
-      const lineDec =
-        lineTotal instanceof Prisma.Decimal
-          ? lineTotal
-          : new Prisma.Decimal(lineTotal);
+      const lineDec = new Prisma.Decimal(unitPrice * qty);
       const isFree = lineDec.toNumber() <= 0;
       const paidPayload =
         !isFree && params.paymentPayload
@@ -386,41 +389,51 @@ export async function fulfillCartCheckout(params: {
     await tx.cartItem.deleteMany({ where: { userId: params.patientId } });
   });
 
+  const pendingPurchases: PurchaseNotifyItem[] = [];
+  const grantedPurchases: PurchaseNotifyItem[] = [];
+
   for (const item of params.resourceItems) {
-    const pricePaid = withDiscount(item.resource.price);
-    const priceNum =
-      pricePaid instanceof Prisma.Decimal
-        ? pricePaid.toNumber()
-        : Number(pricePaid);
-    if (priceNum === 0) {
+    const isFree = new Prisma.Decimal(item.resource.price).toNumber() === 0;
+    if (isFree) {
+      grantedPurchases.push({ title: item.resource.title, kind: "RESOURCE" });
       await notifyReviewRequested({
         patientId: params.patientId,
         itemTitle: item.resource.title,
         itemKind: "RESOURCE",
         entityId: item.resourceId,
       });
+    } else {
+      pendingPurchases.push({ title: item.resource.title, kind: "RESOURCE" });
     }
   }
 
   for (const item of params.productItems) {
     const qty = Math.max(1, item.quantity ?? 1);
-    const line = withDiscount(item.product.price * qty);
-    const lineNum =
-      line instanceof Prisma.Decimal ? line.toNumber() : Number(line);
-    if (lineNum <= 0) {
+    const isFree = new Prisma.Decimal(item.product.price * qty).toNumber() <= 0;
+    if (isFree) {
+      grantedPurchases.push({ title: item.product.name, kind: "PRODUCT" });
       await notifyReviewRequested({
         patientId: params.patientId,
         itemTitle: item.product.name,
         itemKind: "PRODUCT",
         entityId: item.productId,
       });
+    } else {
+      pendingPurchases.push({ title: item.product.name, kind: "PRODUCT" });
     }
   }
+
+  await notifyPurchaseSubmitted({
+    patientId: params.patientId,
+    patientName: params.patientName,
+    pendingItems: pendingPurchases,
+    grantedItems: grantedPurchases,
+  });
 
   for (const appointmentId of newAppointmentIds) {
     const appt = await prisma.appointment.findUnique({
       where: { id: appointmentId },
-      include: { consultationType: true },
+      include: { consultationType: true, payment: true },
     });
     if (!appt) continue;
     await notifyAppointmentBooked({
@@ -429,54 +442,13 @@ export async function fulfillCartCheckout(params: {
       consultationName: appt.consultationType.name,
       startTime: appt.startTime,
       appointmentId: appt.id,
+      // Reserva por carrito: la cita no está confirmada hasta que se apruebe el pago.
+      awaitingPayment: (appt.payment?.amount.toNumber() ?? 0) > 0,
     });
     const { syncAppointmentToGoogleCalendar } = await import(
       "@/server/services/google-calendar-sync.service"
     );
     await syncAppointmentToGoogleCalendar(appt.id);
-  }
-
-  if (
-    (params.resourceItems.length > 0 || params.productItems.length > 0) &&
-    isEmailDeliveryConfigured()
-  ) {
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: params.patientId },
-        select: { email: true, name: true },
-      });
-      if (user?.email) {
-        const patientName = user.name || params.patientName || "Estimado/a";
-        const itemsList = [
-          ...params.resourceItems.map((r) => r.resource.title),
-          ...params.productItems.map((p) => p.product.name),
-        ].join(", ");
-
-        await sendEmail({
-          to: user.email,
-          subject: `Anttova — Recibimos tu pedido`,
-          html: `
-            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
-              <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
-              <h1 style="font-size:20px;font-weight:600;color:#5a1728">Recibimos tu pedido</h1>
-              <p>Hola ${patientName}, registramos tu solicitud de compra para:</p>
-              <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
-                <p style="margin:4px 0"><strong>Ítems:</strong> ${itemsList}</p>
-              </div>
-              <p style="font-size:14px;color:#555">Tu comprobante de pago está siendo verificado. Te avisaremos apenas esté confirmado para que puedas acceder a tus materiales o recibir tu pedido.</p>
-              <p style="margin:24px 0">
-                <a href="${absoluteUrl("/dashboard/patient/library")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
-                  Ver mis recursos
-                </a>
-              </p>
-            </div>
-          `,
-          text: `Recibimos tu pedido\nHola ${patientName},\nÍtems: ${itemsList}\nTu pago está en revisión. Podés ver tus recursos en: ${absoluteUrl("/dashboard/patient/library")}`,
-        });
-      }
-    } catch (err) {
-      console.error("[fulfillCartCheckout:email]", err);
-    }
   }
 
   return { ok: true, newAppointmentIds };

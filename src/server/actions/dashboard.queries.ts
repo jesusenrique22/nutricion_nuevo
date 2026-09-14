@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { CLINIC_TIMEZONE, formatClinicTime } from "@/lib/clinic-timezone";
+import { getDbVisibleNotificationTypes } from "@/lib/notification-db-types";
 import { prisma } from "@/server/db/prisma";
 import { modalityLabels } from "@/lib/appointment-labels";
 
@@ -62,6 +64,7 @@ function endOfToday() {
 
 function formatTodayLabel(date: Date) {
   const formatted = date.toLocaleDateString("es", {
+    timeZone: CLINIC_TIMEZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -70,14 +73,12 @@ function formatTodayLabel(date: Date) {
 }
 
 function formatTime(date: Date) {
-  return date.toLocaleTimeString("es", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatClinicTime(date);
 }
 
 function formatDateShort(date: Date) {
   const label = date.toLocaleDateString("es", {
+    timeZone: CLINIC_TIMEZONE,
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -153,14 +154,20 @@ export async function getAdminDashboardOverview(): Promise<AdminDashboardOvervie
     const twoWeeks = new Date(now);
     twoWeeks.setDate(twoWeeks.getDate() + 14);
 
-    const visibleTypes = [
+    const wantedTypes = [
       "APPOINTMENT_CONFIRMED",
       "APPOINTMENT_REMINDER",
       "APPOINTMENT_CANCELLED",
       "RESOURCE_UNLOCKED",
       "REFUND_REQUESTED",
       "REFUND_RESOLVED",
-    ] as const;
+      "PURCHASE_STATUS",
+      "NEW_PATIENT_REGISTERED",
+    ];
+    // Filtrar por lo que el enum de Postgres acepta: un deploy sin `migrate
+    // deploy` haría fallar la query entera y dejaría el dashboard en blanco.
+    const supported = await getDbVisibleNotificationTypes();
+    const visibleTypes = supported.filter((t) => wantedTypes.includes(t));
 
     const [
       activePatients,
@@ -202,7 +209,7 @@ export async function getAdminDashboardOverview(): Promise<AdminDashboardOvervie
       prisma.notification.findMany({
         where: {
           recipientId: session.user.id,
-          type: { in: [...visibleTypes] },
+          type: { in: visibleTypes },
         },
         orderBy: { createdAt: "desc" },
         take: 5,

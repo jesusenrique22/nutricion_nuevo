@@ -32,19 +32,71 @@ export function syncOverallPaymentStatus(
   return "PENDING";
 }
 
+/**
+ * Reparte un descuento sobre un plan ya dividido en adelanto + saldo.
+ *
+ * El cupón se descuenta **íntegro del último pago**: el adelanto se cobra
+ * completo y el ahorro se ve recién en el saldo. Solo si el descuento supera
+ * al saldo, el excedente baja también el adelanto.
+ */
+export function applyDiscountToLastPhase(params: {
+  advanceAmount: Prisma.Decimal;
+  remainderAmount: Prisma.Decimal;
+  discountAmount: Prisma.Decimal | number | string | null | undefined;
+}): { advanceAmount: Prisma.Decimal; remainderAmount: Prisma.Decimal } {
+  const zero = new Prisma.Decimal(0);
+  const raw =
+    params.discountAmount == null
+      ? zero
+      : params.discountAmount instanceof Prisma.Decimal
+        ? params.discountAmount
+        : new Prisma.Decimal(params.discountAmount);
+
+  const total = params.advanceAmount.add(params.remainderAmount);
+  const discount = Prisma.Decimal.max(
+    zero,
+    Prisma.Decimal.min(raw, total),
+  ).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+
+  if (discount.lessThanOrEqualTo(0)) {
+    return {
+      advanceAmount: params.advanceAmount,
+      remainderAmount: params.remainderAmount,
+    };
+  }
+
+  const fromRemainder = Prisma.Decimal.min(discount, params.remainderAmount);
+  const leftover = discount.sub(fromRemainder);
+
+  return {
+    advanceAmount: Prisma.Decimal.max(
+      zero,
+      params.advanceAmount.sub(leftover),
+    ).toDecimalPlaces(2),
+    remainderAmount: params.remainderAmount
+      .sub(fromRemainder)
+      .toDecimalPlaces(2),
+  };
+}
+
 export function buildPaymentCreateData(params: {
+  /** Precio de lista de la consulta, SIN descuento de cupón. */
   totalPrice: Prisma.Decimal;
   consultationCode: ConsultationCode;
   policy: PaymentChatPolicy;
+  /** Descuento del cupón; se resta del último pago (ver applyDiscountToLastPhase). */
+  discountAmount?: Prisma.Decimal | number | null;
 }) {
   const split = resolvePaymentSplit(params.policy, params.consultationCode);
-  const { advanceAmount, remainderAmount } = splitPaymentAmount(
-    params.totalPrice,
-    split.advancePercent,
-  );
+  const base = splitPaymentAmount(params.totalPrice, split.advancePercent);
+  const { advanceAmount, remainderAmount } = applyDiscountToLastPhase({
+    advanceAmount: base.advanceAmount,
+    remainderAmount: base.remainderAmount,
+    discountAmount: params.discountAmount,
+  });
 
   return {
-    amount: params.totalPrice,
+    amount: advanceAmount.add(remainderAmount).toDecimalPlaces(2),
     advanceAmount,
     remainderAmount,
     advancePercent: split.advancePercent,

@@ -2,13 +2,19 @@
 
 const MB = 1024 * 1024;
 
-/** Tope por archivo en panel admin / recursos (equilibrio Vercel + PDFs habituales). */
+/**
+ * Tope por archivo en panel admin / recursos.
+ *
+ * Los archivos grandes viajan fragmentados (ver CHUNKED_UPLOAD_PART_BYTES), así
+ * que el límite de body de Vercel no los condiciona. Las imágenes se mantienen
+ * bajas a propósito: pesan en cada carga de página, no se descargan a demanda.
+ */
 export const UPLOAD_LIMITS = {
   image: 20 * MB,
-  pdf: 20 * MB,
-  video: 20 * MB,
+  pdf: 50 * MB,
+  video: 30 * MB,
   proof: 15 * MB,
-  default: 20 * MB,
+  default: 50 * MB,
 } as const;
 
 export type UploadKind = "image" | "pdf" | "video" | "proof" | "any";

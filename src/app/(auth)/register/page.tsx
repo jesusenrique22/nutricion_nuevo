@@ -13,6 +13,8 @@ import {
 import { PasswordInput } from "@/components/auth/password-input";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { PhoneField, emptyPhoneValue } from "@/components/ui/phone-field";
+import { buildE164 } from "@/lib/phone-countries";
 import { isPasswordValid } from "@/lib/validators/password";
 import { registerPatient } from "@/server/actions/auth.actions";
 
@@ -22,6 +24,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [pwdFocused, setPwdFocused] = useState(false);
+  const [phone, setPhone] = useState(emptyPhoneValue);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -33,12 +36,19 @@ export default function RegisterPage() {
       return;
     }
 
+    const phoneE164 = buildE164(phone.country, phone.number);
+    if (!phoneE164) {
+      setError("Ingresá un número de teléfono válido para el país elegido.");
+      return;
+    }
+
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const payload = {
       name: form.get("name"),
       email: form.get("email"),
       password: form.get("password"),
+      phone: phoneE164,
     };
 
     const res = await registerPatient(payload);
@@ -89,6 +99,13 @@ export default function RegisterPage() {
               className={authInputClass}
             />
           </div>
+          <PhoneField
+            value={phone}
+            onChange={setPhone}
+            disabled={loading}
+            inputClassName={authInputClass}
+            labelClassName={authLabelClass}
+          />
           <div className="relative">
             <PasswordInput
               label="Contraseña"

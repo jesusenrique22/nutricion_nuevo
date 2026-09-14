@@ -12,7 +12,9 @@ export type NotificationType =
   | "REVIEW_SUBMITTED"
   | "REVIEW_PUBLISHED"
   | "REVIEW_REQUESTED"
-  | "PAYMENT_DUE_REMINDER";
+  | "PAYMENT_DUE_REMINDER"
+  | "PURCHASE_STATUS"
+  | "NEW_PATIENT_REGISTERED";
 
 export const VISIBLE_NOTIFICATION_TYPES: NotificationType[] = [
   "APPOINTMENT_CONFIRMED",
@@ -25,6 +27,8 @@ export const VISIBLE_NOTIFICATION_TYPES: NotificationType[] = [
   "REVIEW_PUBLISHED",
   "REVIEW_REQUESTED",
   "PAYMENT_DUE_REMINDER",
+  "PURCHASE_STATUS",
+  "NEW_PATIENT_REGISTERED",
 ];
 
 export type ConsultationChatCode = "NUT_01" | "ENT_02" | "ANT_03";

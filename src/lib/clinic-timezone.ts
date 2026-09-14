@@ -60,3 +60,39 @@ export function toMinutesHhmm(hhmm: string): number {
 export function clinicTodayDateKey(): string {
   return dateKeyInClinicTz(new Date());
 }
+
+/**
+ * Fecha y hora de una cita en zona de la clínica — usar en notificaciones,
+ * correos y cualquier texto generado en el servidor (que corre en UTC).
+ */
+export function formatClinicDateTime(date: Date | string): string {
+  return new Date(date).toLocaleString("es", {
+    timeZone: CLINIC_TIMEZONE,
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Variante extendida (día y mes completos) para cuerpos de correo. */
+export function formatClinicDateTimeLong(date: Date | string): string {
+  return new Date(date).toLocaleString("es", {
+    timeZone: CLINIC_TIMEZONE,
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Solo la hora (HH:mm) en zona de la clínica. */
+export function formatClinicTime(date: Date | string): string {
+  return new Date(date).toLocaleTimeString("es", {
+    timeZone: CLINIC_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

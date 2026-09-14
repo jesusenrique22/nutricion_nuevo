@@ -20,6 +20,20 @@ function isPgEnumValueError(err: unknown): boolean {
 
 let cachedDbVisibleTypes: PrismaNotificationType[] | null = null;
 
+/** Valores agregados al enum después del release inicial, del más nuevo al más viejo. */
+const RECENT_ENUM_VALUES: string[] = [
+  "PURCHASE_STATUS",
+  "NEW_PATIENT_REGISTERED",
+  "PAYMENT_DUE_REMINDER",
+];
+
+function without(
+  types: PrismaNotificationType[],
+  excluded: string[],
+): PrismaNotificationType[] {
+  return types.filter((t) => !excluded.includes(t));
+}
+
 /**
  * Tipos visibles que Postgres acepta en el enum (puede faltar migrate deploy).
  */
@@ -28,11 +42,13 @@ export async function getDbVisibleNotificationTypes(): Promise<
 > {
   if (cachedDbVisibleTypes) return cachedDbVisibleTypes;
 
-  const withoutPending = clientVisibleTypes.filter(
-    (t) => t !== PrismaNotificationType.PAYMENT_DUE_REMINDER,
-  );
+  // Cada intento descarta un valor más de los agregados recientemente.
+  const attempts: PrismaNotificationType[][] = [clientVisibleTypes];
+  for (let i = 1; i <= RECENT_ENUM_VALUES.length; i++) {
+    attempts.push(without(clientVisibleTypes, RECENT_ENUM_VALUES.slice(0, i)));
+  }
 
-  for (const types of [clientVisibleTypes, withoutPending]) {
+  for (const types of attempts) {
     if (types.length === 0) continue;
     try {
       await prisma.notification.findFirst({
@@ -46,8 +62,9 @@ export async function getDbVisibleNotificationTypes(): Promise<
     }
   }
 
-  cachedDbVisibleTypes = withoutPending;
-  return withoutPending;
+  const safest = without(clientVisibleTypes, RECENT_ENUM_VALUES);
+  cachedDbVisibleTypes = safest;
+  return safest;
 }
 
 /** Invalida caché tras migrate deploy (dev hot reload). */

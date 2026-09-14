@@ -1,17 +1,14 @@
-import { getAdminUserIds } from "@/lib/admin-users";
+import { CLINIC_NOTIFICATION_EMAIL, getAdminUserIds } from "@/lib/admin-users";
 import { createNotification } from "@/server/services/notification.service";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
+import {
+  formatClinicDateTime,
+  formatClinicDateTimeLong,
+  formatClinicTime,
+} from "@/lib/clinic-timezone";
 import { prisma } from "@/server/db/prisma";
 
-function fmtDate(iso: Date | string) {
-  return new Date(iso).toLocaleString("es", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const fmtDate = formatClinicDateTime;
 
 async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
@@ -27,61 +24,91 @@ export async function notifyAppointmentBooked(params: {
   consultationName: string;
   startTime: Date;
   appointmentId: string;
+  /**
+   * `true` cuando la reserva queda sujeta a que se apruebe el pago. En ese caso
+   * NO se le dice al paciente que la cita está confirmada: recibe un aviso de
+   * «solicitud recibida» y la confirmación real llega con
+   * `notifyAppointmentStatusChange` al aprobarse el adelanto.
+   */
+  awaitingPayment?: boolean;
 }) {
+  const awaitingPayment = params.awaitingPayment ?? false;
+
   await safeNotify(async () => {
     const adminIds = await getAdminUserIds();
     const calendarUrl = `/dashboard/admin/calendar?appointmentId=${params.appointmentId}`;
+    const adminTitle = awaitingPayment
+      ? "Nueva cita a la espera de pago"
+      : "Nueva cita solicitada";
+    const adminBody = awaitingPayment
+      ? `${params.patientName} reservó ${params.consultationName} para el ${fmtDate(params.startTime)}. Queda pendiente de aprobar el pago.`
+      : `${params.patientName} agendó ${params.consultationName} para el ${fmtDate(params.startTime)}.`;
 
     await Promise.all(
       adminIds.map((id) =>
         createNotification({
           recipientId: id,
           type: "APPOINTMENT_REMINDER",
-          title: "Nueva cita solicitada",
-          body: `${params.patientName} agendó ${params.consultationName} para el ${fmtDate(params.startTime)}.`,
+          title: adminTitle,
+          body: adminBody,
           payload: {
-            deepLink: calendarUrl,
+            deepLink: awaitingPayment ? "/dashboard/admin/payments" : calendarUrl,
             appointmentId: params.appointmentId,
             patientId: params.patientId,
+            calendarLink: calendarUrl,
           },
         }),
       ),
     );
 
+    // Aviso en la app al paciente: refleja el estado real de la reserva.
+    await createNotification({
+      recipientId: params.patientId,
+      type: awaitingPayment ? "PURCHASE_STATUS" : "APPOINTMENT_CONFIRMED",
+      title: awaitingPayment
+        ? "Reserva recibida · pago en revisión"
+        : "Cita agendada",
+      body: awaitingPayment
+        ? `Guardamos tu horario para ${params.consultationName} el ${fmtDate(params.startTime)}. Queda confirmado apenas verifiquemos tu pago.`
+        : `${params.consultationName} · ${fmtDate(params.startTime)}`,
+      payload: {
+        deepLink: "/dashboard/patient/appointments",
+        appointmentId: params.appointmentId,
+        stage: awaitingPayment ? "IN_REVIEW" : "APPROVED",
+      },
+    });
+
     if (isEmailDeliveryConfigured()) {
-      const when = new Date(params.startTime).toLocaleString("es", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const when = formatClinicDateTimeLong(params.startTime);
 
       // 1. Notificación a la Nutricionista
       await sendEmail({
-        to: "ma.lanzahuerta@gmail.com",
-        subject: `Anttova — Nueva cita agendada: ${params.patientName}`,
+        to: CLINIC_NOTIFICATION_EMAIL,
+        subject: awaitingPayment
+          ? `Anttova — Nueva reserva pendiente de pago: ${params.patientName}`
+          : `Anttova — Nueva cita agendada: ${params.patientName}`,
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
             <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
-            <h1 style="font-size:20px;font-weight:600;color:#5a1728">Nueva cita agendada</h1>
+            <h1 style="font-size:20px;font-weight:600;color:#5a1728">${adminTitle}</h1>
             <p>Hola Licenciada, se ha registrado una nueva cita en la plataforma:</p>
             <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
               <p style="margin:4px 0"><strong>Paciente:</strong> ${params.patientName}</p>
               <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
               <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
+              ${awaitingPayment ? `<p style="margin:4px 0"><strong>Estado:</strong> pendiente de aprobar el pago</p>` : ""}
             </div>
             <p style="margin:24px 0">
-              <a href="${absoluteUrl(calendarUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
-                Ver cita en el calendario
+              <a href="${absoluteUrl(awaitingPayment ? "/dashboard/admin/payments" : calendarUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+                ${awaitingPayment ? "Revisar el pago" : "Ver cita en el calendario"}
               </a>
             </p>
           </div>
         `,
-        text: `Nueva cita agendada en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nVer: ${absoluteUrl(calendarUrl)}`,
+        text: `${adminTitle} en Anttova:\nPaciente: ${params.patientName}\nConsulta: ${params.consultationName}\nFecha: ${when}\nVer: ${absoluteUrl(awaitingPayment ? "/dashboard/admin/payments" : calendarUrl)}`,
       });
 
-      // 2. Correo de confirmación inmediata al Paciente
+      // 2. Correo al paciente — acuse de reserva, no confirmación, si falta pagar
       const patient = await prisma.user.findUnique({
         where: { id: params.patientId },
         select: { email: true, name: true },
@@ -89,20 +116,33 @@ export async function notifyAppointmentBooked(params: {
 
       if (patient?.email) {
         const patientName = patient.name || params.patientName || "Estimado/a";
+        const heading = awaitingPayment
+          ? "Recibimos tu reserva"
+          : "¡Tu cita ha sido agendada con éxito!";
+        const intro = awaitingPayment
+          ? `Hola ${patientName}, guardamos tu horario mientras verificamos el pago:`
+          : `Hola ${patientName}, registramos tu solicitud de turno en Anttova:`;
+        const note = awaitingPayment
+          ? "Tu turno quedará <strong>confirmado</strong> apenas verifiquemos tu comprobante. Te enviaremos un correo en cuanto esté listo."
+          : "Podés revisar el estado de tu turno, información previa o acceder a la plataforma desde tu panel.";
+
         await sendEmail({
           to: patient.email,
-          subject: `Anttova — Confirmación de tu turno: ${params.consultationName}`,
+          subject: awaitingPayment
+            ? `Anttova — Recibimos tu reserva: ${params.consultationName}`
+            : `Anttova — Confirmación de tu turno: ${params.consultationName}`,
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
               <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
-              <h1 style="font-size:20px;font-weight:600;color:#5a1728">¡Tu cita ha sido agendada con éxito!</h1>
-              <p>Hola ${patientName}, registramos tu solicitud de turno en Anttova:</p>
+              <h1 style="font-size:20px;font-weight:600;color:#5a1728">${heading}</h1>
+              <p>${intro}</p>
               <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
                 <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
                 <p style="margin:4px 0"><strong>Fecha y Hora:</strong> ${when}</p>
                 <p style="margin:4px 0"><strong>Profesional:</strong> Lic. Ma Antonieta Lanza</p>
+                ${awaitingPayment ? `<p style="margin:4px 0"><strong>Estado actual:</strong> pago en revisión</p>` : ""}
               </div>
-              <p style="font-size:14px;color:#555">Podés revisar el estado de tu turno, información previa o acceder a la plataforma desde tu panel.</p>
+              <p style="font-size:14px;color:#555">${note}</p>
               <p style="margin:24px 0">
                 <a href="${absoluteUrl("/dashboard/patient/appointments")}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
                   Ver mi cita en el panel
@@ -110,7 +150,7 @@ export async function notifyAppointmentBooked(params: {
               </p>
             </div>
           `,
-          text: `¡Tu cita ha sido agendada!\nHola ${patientName},\nConsulta: ${params.consultationName}\nFecha y Hora: ${when}\nProfesional: Lic. Ma Antonieta Lanza\nVer detalles: ${absoluteUrl("/dashboard/patient/appointments")}`,
+          text: `${heading}\nHola ${patientName},\nConsulta: ${params.consultationName}\nFecha y Hora: ${when}\nProfesional: Lic. Ma Antonieta Lanza${awaitingPayment ? "\nEstado actual: pago en revisión (te avisamos al confirmar)" : ""}\nVer detalles: ${absoluteUrl("/dashboard/patient/appointments")}`,
         });
       }
     }
@@ -146,13 +186,7 @@ export async function notifyAppointmentStatusChange(params: {
 
       if (patient?.email) {
         const patientName = patient.name || "Estimado/a";
-        const when = new Date(params.startTime).toLocaleString("es", {
-          weekday: "long",
-          day: "2-digit",
-          month: "long",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        const when = formatClinicDateTimeLong(params.startTime);
 
         await sendEmail({
           to: patient.email,
@@ -267,7 +301,7 @@ export async function notifyAppointmentCancelled(params: {
       // También avisar por email a la nutricionista si canceló el paciente
       if (params.cancelledBy === "PATIENT") {
         await sendEmail({
-          to: "ma.lanzahuerta@gmail.com",
+          to: CLINIC_NOTIFICATION_EMAIL,
           subject: `Anttova — Cita cancelada por paciente: ${params.patientName}`,
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
@@ -287,13 +321,78 @@ export async function notifyAppointmentCancelled(params: {
   });
 }
 
-export async function notifyPaymentRegistered(_params: {
+/**
+ * Admin registró un pago de la consulta. Avisa al paciente el estado en que
+ * queda la consulta (adelanto acreditado / saldo acreditado / pago completo).
+ *
+ * No se llama cuando el pago además confirma la cita: en ese caso el aviso lo
+ * emite `notifyAppointmentStatusChange` para no duplicar mensajes.
+ */
+export async function notifyPaymentRegistered(params: {
   patientId: string;
   amount: string;
   consultationName: string;
   appointmentId: string;
+  phase: "advance" | "remainder" | "full";
+  /** `true` cuando ya no queda nada por pagar. */
+  fullyPaid: boolean;
 }) {
-  // Pagos ya no generan notificación al paciente
+  await safeNotify(async () => {
+    const phaseLabel =
+      params.phase === "advance"
+        ? "adelanto"
+        : params.phase === "remainder"
+          ? "saldo"
+          : "pago";
+    const stateLabel = params.fullyPaid
+      ? "Pagada por completo"
+      : "Pago parcial acreditado";
+
+    await createNotification({
+      recipientId: params.patientId,
+      type: "PURCHASE_STATUS",
+      title: `Pago acreditado · ${stateLabel}`,
+      body: params.fullyPaid
+        ? `Confirmamos tu ${phaseLabel} de ${params.consultationName}. La consulta queda paga en su totalidad.`
+        : `Confirmamos tu ${phaseLabel} de ${params.consultationName}. Te avisaremos por el resto del pago.`,
+      payload: {
+        deepLink: "/dashboard/patient/appointments",
+        appointmentId: params.appointmentId,
+        stage: params.fullyPaid ? "APPROVED" : "IN_REVIEW",
+      },
+    });
+
+    if (!isEmailDeliveryConfigured()) return;
+
+    const patient = await prisma.user.findUnique({
+      where: { id: params.patientId },
+      select: { email: true, name: true },
+    });
+    if (!patient?.email) return;
+
+    const href = absoluteUrl("/dashboard/patient/appointments");
+    await sendEmail({
+      to: patient.email,
+      subject: `Anttova — Pago acreditado de ${params.consultationName}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+          <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+          <h1 style="font-size:20px;font-weight:600;color:#15803d">Pago acreditado</h1>
+          <p>Hola ${patient.name || "Estimado/a"}, registramos tu ${phaseLabel}:</p>
+          <div style="background:#f0fdf4;border-left:4px solid #15803d;padding:16px;margin:20px 0;border-radius:4px">
+            <p style="margin:4px 0"><strong>Consulta:</strong> ${params.consultationName}</p>
+            <p style="margin:4px 0"><strong>Estado actual:</strong> ${stateLabel}</p>
+          </div>
+          <p style="margin:24px 0">
+            <a href="${href}" style="background:#15803d;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+              Ver mi consulta
+            </a>
+          </p>
+        </div>
+      `,
+      text: `Pago acreditado\nConsulta: ${params.consultationName}\nEstado actual: ${stateLabel}\nVer: ${href}`,
+    });
+  });
 }
 
 export async function notifyRemainderPaymentSubmitted(params: {
@@ -462,7 +561,7 @@ export async function notifyAppointmentReminder(params: {
       recipientId: params.patientId,
       type: "APPOINTMENT_REMINDER",
       title: "Recordatorio de cita",
-      body: `Mañana tienes ${params.consultationName} a las ${new Date(params.startTime).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}.`,
+      body: `Mañana tienes ${params.consultationName} a las ${formatClinicTime(params.startTime)}.`,
       payload: {
         deepLink: "/dashboard/patient/appointments",
         appointmentId: params.appointmentId,

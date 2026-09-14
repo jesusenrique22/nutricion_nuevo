@@ -90,21 +90,22 @@ async function applyPaymentPhase(
     },
   });
 
-  const phaseLabel =
-    phase === "advance"
-      ? "Adelanto"
-      : phase === "remainder"
-        ? "Saldo final"
-        : "Pago completo";
+  const confirmsAppointment =
+    appt.status === "PENDING" && (phase === "advance" || phase === "full");
 
-  await notifyPaymentRegistered({
-    patientId: appt.patientId,
-    amount: appt.payment.amount.toString(),
-    consultationName: `${appt.consultationType.name} (${phaseLabel})`,
-    appointmentId: appt.id,
-  });
+  // Si además confirma la cita, el aviso lo da notifyAppointmentStatusChange.
+  if (!confirmsAppointment) {
+    await notifyPaymentRegistered({
+      patientId: appt.patientId,
+      amount: appt.payment.amount.toString(),
+      consultationName: appt.consultationType.name,
+      appointmentId: appt.id,
+      phase,
+      fullyPaid: status === "PAID",
+    });
+  }
 
-  if (appt.status === "PENDING" && (phase === "advance" || phase === "full")) {
+  if (confirmsAppointment) {
     await prisma.appointment.update({
       where: { id: appt.id },
       data: { status: "CONFIRMED" },
