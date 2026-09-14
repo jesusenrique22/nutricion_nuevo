@@ -12,6 +12,7 @@ import { getCartCount } from "@/server/actions/cart.actions";
 import { getNavMenu, getProducts } from "@/server/queries/landing.queries";
 import { isStoreVisible, storeNavLabel } from "@/lib/store-visibility";
 import { prisma } from "@/server/db/prisma";
+import { MissingPhoneGate } from "@/components/auth/missing-phone-gate";
 
 export default async function DashboardLayout({
   children,
@@ -23,10 +24,11 @@ export default async function DashboardLayout({
 
   // Verificar que el usuario aún existe en la BD.
   // Protege contra sesiones JWT con IDs de usuarios eliminados.
+  let dbUser: { id: string; phone: string | null } | null = null;
   try {
-    const dbUser = await prisma.user.findUnique({
+    dbUser = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { id: true },
+      select: { id: true, phone: true },
     });
     if (!dbUser) {
       // Sesión huérfana: el usuario fue eliminado de la BD.
@@ -38,6 +40,8 @@ export default async function DashboardLayout({
   }
 
   const isAdmin = session.user.role === "ADMIN";
+  const needsPhone =
+    !isAdmin && Boolean(dbUser) && !dbUser?.phone?.trim();
 
   if (!isAdmin && (await isPatientDeactivated(session.user.id))) {
     await signOut({ redirectTo: "/login?deactivated=1" });
@@ -109,6 +113,7 @@ export default async function DashboardLayout({
           <DashboardMain>{children}</DashboardMain>
         </div>
       </main>
+      {needsPhone ? <MissingPhoneGate /> : null}
     </div>
   );
 

@@ -52,19 +52,19 @@ export function PhoneField({
       <label className={labelClassName} htmlFor={inputId}>
         {label}
       </label>
-      <div className="flex gap-2">
-        <div className="relative shrink-0">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+        <div className="relative min-w-0 sm:w-[15.5rem] sm:shrink-0">
           <select
             id={selectId}
             aria-label="País"
             value={value.country}
             disabled={disabled}
             onChange={(e) => onChange({ ...value, country: e.target.value })}
-            className={`${inputClassName} w-[7.5rem] cursor-pointer appearance-none pr-7`}
+            className={`${inputClassName} w-full cursor-pointer appearance-none pr-8`}
           >
             {PHONE_COUNTRIES.map((c) => (
               <option key={c.code} value={c.code}>
-                {c.flag} +{c.dial}
+                {c.flag} {c.name} +{c.dial}
               </option>
             ))}
           </select>
@@ -87,7 +87,7 @@ export function PhoneField({
           onChange={(e) =>
             onChange({ ...value, number: digitsOnly(e.target.value) })
           }
-          className={`${inputClassName} flex-1`}
+          className={`${inputClassName} min-w-0 flex-1`}
         />
       </div>
       <p className="mt-1.5 text-xs text-foreground/55">
