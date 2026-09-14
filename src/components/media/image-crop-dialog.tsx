@@ -9,6 +9,8 @@ type ImageCropDialogProps = {
   open: boolean;
   file: File | null;
   shape?: ImageCropShape;
+  /** Ancho / alto del recorte de salida (ej. 16/10 para paquetes). Default 1. */
+  cropAspectRatio?: number;
   title?: string;
   onCancel: () => void;
   onConfirm: (cropped: File) => void;
@@ -21,6 +23,7 @@ export function ImageCropDialog({
   open,
   file,
   shape = "circle",
+  cropAspectRatio = 1,
   title = "Ajustar foto",
   onCancel,
   onConfirm,
@@ -69,8 +72,8 @@ export function ImageCropDialog({
     const img = new Image();
     img.onload = () => {
       imgRef.current = img;
-      const view = 320;
-      const fit = Math.max(view / img.naturalWidth, view / img.naturalHeight);
+      const { viewW, viewH } = viewSize();
+      const fit = Math.max(viewW / img.naturalWidth, viewH / img.naturalHeight);
       dragRef.current.scale = fit * 1.05;
       dragRef.current.offsetX = 0;
       dragRef.current.offsetY = 0;
@@ -90,70 +93,76 @@ export function ImageCropDialog({
     draw();
   });
 
+  function viewSize() {
+    const viewW = 320;
+    const viewH = Math.round(viewW / Math.max(0.5, cropAspectRatio));
+    return { viewW, viewH };
+  }
+
   function draw() {
     const canvas = canvasRef.current;
     const img = imgRef.current;
     if (!canvas || !img) return;
-    const size = 320;
-    canvas.width = size;
-    canvas.height = size;
+    const { viewW, viewH } = viewSize();
+    canvas.width = viewW;
+    canvas.height = viewH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const { offsetX, offsetY, scale } = dragRef.current;
     const w = img.naturalWidth * scale;
     const h = img.naturalHeight * scale;
-    const x = size / 2 - w / 2 + offsetX;
-    const y = size / 2 - h / 2 + offsetY;
+    const x = viewW / 2 - w / 2 + offsetX;
+    const y = viewH / 2 - h / 2 + offsetY;
 
-    ctx.clearRect(0, 0, size, size);
+    ctx.clearRect(0, 0, viewW, viewH);
     ctx.fillStyle = "#1a0a0e";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, viewW, viewH);
     ctx.drawImage(img, x, y, w, h);
 
-    // Oscurecer fuera del recorte
+    const pad = shape === "circle" ? 0 : 12;
+    const cropW = shape === "circle" ? Math.min(viewW, viewH) - 16 : viewW - pad * 2;
+    const cropH = shape === "circle" ? cropW : viewH - pad * 2;
+    const cropX = (viewW - cropW) / 2;
+    const cropY = (viewH - cropH) / 2;
+
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, viewW, viewH);
     ctx.globalCompositeOperation = "destination-out";
     if (shape === "circle") {
       ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
+      ctx.arc(viewW / 2, viewH / 2, cropW / 2, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      const pad = 16;
       ctx.beginPath();
-      ctx.roundRect(pad, pad, size - pad * 2, size - pad * 2, 12);
+      ctx.roundRect(cropX, cropY, cropW, cropH, 12);
       ctx.fill();
     }
     ctx.restore();
 
-    // Redibujar la zona visible nítida
     ctx.save();
     if (shape === "circle") {
       ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
+      ctx.arc(viewW / 2, viewH / 2, cropW / 2, 0, Math.PI * 2);
       ctx.clip();
     } else {
-      const pad = 16;
       ctx.beginPath();
-      ctx.roundRect(pad, pad, size - pad * 2, size - pad * 2, 12);
+      ctx.roundRect(cropX, cropY, cropW, cropH, 12);
       ctx.clip();
     }
     ctx.drawImage(img, x, y, w, h);
     ctx.restore();
 
-    // Borde guía
     ctx.strokeStyle = "rgba(255,255,255,0.9)";
     ctx.lineWidth = 2;
     if (shape === "circle") {
       ctx.beginPath();
-      ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2);
+      ctx.arc(viewW / 2, viewH / 2, cropW / 2, 0, Math.PI * 2);
       ctx.stroke();
     } else {
-      const pad = 16;
       ctx.beginPath();
-      ctx.roundRect(pad, pad, size - pad * 2, size - pad * 2, 12);
+      ctx.roundRect(cropX, cropY, cropW, cropH, 12);
       ctx.stroke();
     }
   }
@@ -201,24 +210,24 @@ export function ImageCropDialog({
     setBusy(true);
     setError(null);
     try {
-      const outSize = 1024;
+      const { viewW, viewH } = viewSize();
+      const outW = Math.round(1280);
+      const outH = Math.round(outW / Math.max(0.5, cropAspectRatio));
       const out = document.createElement("canvas");
-      out.width = outSize;
-      out.height = outSize;
+      out.width = outW;
+      out.height = outH;
       const ctx = out.getContext("2d");
       if (!ctx) throw new Error("No se pudo preparar el recorte.");
 
-      const view = 320;
-      const scaleFactor = outSize / view;
+      const scaleFactor = outW / viewW;
       const { offsetX, offsetY, scale } = dragRef.current;
       const w = img.naturalWidth * scale * scaleFactor;
       const h = img.naturalHeight * scale * scaleFactor;
-      const x = outSize / 2 - w / 2 + offsetX * scaleFactor;
-      const y = outSize / 2 - h / 2 + offsetY * scaleFactor;
+      const x = outW / 2 - w / 2 + offsetX * scaleFactor;
+      const y = outH / 2 - h / 2 + offsetY * scaleFactor;
 
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, outSize, outSize);
-      // Salida siempre cuadrada (JPG). El círculo/cuadro es solo la guía visual.
+      ctx.fillRect(0, 0, outW, outH);
       ctx.drawImage(img, x, y, w, h);
 
       const blob = await new Promise<Blob | null>((resolve) =>
@@ -266,7 +275,8 @@ export function ImageCropDialog({
         <div className="flex flex-col items-center gap-3 px-5">
           <canvas
             ref={canvasRef}
-            className="h-80 w-80 touch-none cursor-grab rounded-2xl active:cursor-grabbing"
+            className="max-h-[min(70vh,480px)] w-full max-w-md touch-none cursor-grab rounded-2xl active:cursor-grabbing"
+            style={{ aspectRatio: `${cropAspectRatio}` }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}

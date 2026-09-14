@@ -74,6 +74,7 @@ export function MediaUploadProvider({
   mode = "replace",
   useProgressModal = false,
   cropShape = null,
+  cropAspectRatio = 1,
   children,
 }: {
   kind: "image" | "pdf";
@@ -89,6 +90,7 @@ export function MediaUploadProvider({
   useProgressModal?: boolean;
   /** Si se define, muestra el ajuste tipo WhatsApp antes de subir. */
   cropShape?: ImageCropShape | null;
+  cropAspectRatio?: number;
   children: ReactNode;
 }) {
   const labelId = useId();
@@ -271,6 +273,7 @@ export function MediaUploadProvider({
         open={Boolean(cropFile)}
         file={cropFile}
         shape={cropShape ?? "circle"}
+        cropAspectRatio={cropAspectRatio}
         title={cropShape === "rect" ? "Ajustar imagen" : "Ajustar foto"}
         onCancel={() => setCropFile(null)}
         onConfirm={(cropped) => {

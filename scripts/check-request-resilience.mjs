@@ -122,13 +122,31 @@ async function checkPages(base) {
   return failures;
 }
 
+async function fetchApi(url) {
+  let res = await fetch(url, { redirect: "manual" });
+  // Apex → www (308) no es caída; seguir una redirección permanente.
+  if (
+    res.status === 308 ||
+    res.status === 301 ||
+    res.status === 307 ||
+    res.status === 302
+  ) {
+    const loc = res.headers.get("location");
+    if (loc) {
+      const next = loc.startsWith("http") ? loc : new URL(loc, url).href;
+      res = await fetch(next, { redirect: "manual" });
+    }
+  }
+  return res;
+}
+
 async function checkApis(base) {
   const failures = [];
 
   for (const route of API_ROUTES) {
     const url = `${base}${route.path}`;
     try {
-      const res = await fetch(url, { redirect: "manual" });
+      const res = await fetchApi(url);
       if (!route.ok(res.status)) {
         failures.push(`API ${route.path}: HTTP ${res.status}`);
         console.log(`  ✗ ${route.path} → ${res.status}`);

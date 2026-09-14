@@ -28,6 +28,7 @@ function Root({
   hint,
   useProgressModal = true,
   cropShape = "rect",
+  cropAspectRatio = 1,
   children,
 }: {
   value: string;
@@ -38,6 +39,7 @@ function Root({
   useProgressModal?: boolean;
   /** `rect` = cuadro tipo WhatsApp; `null` = subir sin ajustar. */
   cropShape?: "circle" | "rect" | null;
+  cropAspectRatio?: number;
   children: ReactNode;
 }) {
   return (
@@ -50,6 +52,7 @@ function Root({
       hint={hint}
       useProgressModal={useProgressModal}
       cropShape={cropShape}
+      cropAspectRatio={cropAspectRatio}
     >
       <div className={mediaFieldShellClass}>{children}</div>
     </MediaUploadProvider>

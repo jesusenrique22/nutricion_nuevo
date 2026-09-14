@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { PackageCarousel } from "@/components/marketing/package-carousel";
+import { PackageHeroImage } from "@/components/marketing/package-hero-image";
 import { DarkSectionSparks } from "@/components/brand/dark-section-sparks";
 import { DisplayPrice } from "@/components/currency/display-price";
 import { Reveal, RevealScale } from "@/components/motion/reveal";
-import { shouldUnoptimizeImage } from "@/lib/media-url";
+import Link from "next/link";
 import type { ConsultationTypeDTO } from "@/server/actions/booking.queries";
 import type { LandingImagesData } from "@/types/landing-images";
 
@@ -42,17 +41,11 @@ function ConsultationPackageCard({
           : "border border-white/10 bg-white/5 backdrop-blur-sm"
       }`}
     >
-      <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-muted/20">
-        <Image
-          src={imageSrc}
-          alt={pkg.name}
-          fill
-          className="object-cover object-top"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"
-          loading="lazy"
-          unoptimized={shouldUnoptimizeImage(imageSrc)}
-        />
-        {!highlight && <div className="absolute inset-0 bg-primary/25" />}
+      <div className="relative">
+        <PackageHeroImage src={imageSrc} alt={pkg.name} />
+        {!highlight && (
+          <div className="pointer-events-none absolute inset-0 bg-primary/25" />
+        )}
       </div>
       <div className="flex flex-1 flex-col p-6 sm:p-7">
         <h3 className="text-xl font-bold min-h-[3.25rem] flex items-start line-clamp-2">{pkg.name}</h3>

@@ -12,7 +12,6 @@ import {
 const statusStyles: Record<string, string> = {
   "Pago en revisión": "bg-amber-100 text-amber-800",
   "Adelanto en revisión": "bg-amber-100 text-amber-800",
-  "Procesando pago": "bg-amber-100 text-amber-800",
   "Procesando adelanto": "bg-amber-100 text-amber-800",
   "Reembolso en revisión": "bg-orange-100 text-orange-800",
   Pagado: "bg-emerald-100 text-emerald-800",

@@ -113,7 +113,11 @@ export function PackageCarousel({
         className="flex items-stretch gap-4 overflow-x-auto scroll-smooth pb-2 snap-x snap-mandatory [scrollbar-width:none] sm:gap-6 sm:px-14 [&::-webkit-scrollbar]:hidden max-sm:justify-start max-sm:px-[max(1rem,calc((100%-min(100%,20.5rem))/2))]"
       >
         {items.map((child, i) => (
-          <div key={i} data-carousel-card className={`${CARD_SIZES} flex flex-col self-stretch`}>
+          <div
+            key={i}
+            data-carousel-card
+            className={`${CARD_SIZES} flex h-full min-h-0 flex-col`}
+          >
             {child}
           </div>
         ))}

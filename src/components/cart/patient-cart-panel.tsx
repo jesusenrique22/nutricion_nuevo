@@ -98,6 +98,16 @@ export function PatientCartPanel({
 
   // Un cupón al 100% solo puede dejar en cero un carrito de puras consultas:
   // recursos y productos nunca reciben descuento.
+  const hasConsultationInCart =
+    grouped.appointments.length > 0 || grouped.remainderAppointments.length > 0;
+
+  useEffect(() => {
+    if (!hasConsultationInCart && appliedCoupon) {
+      setAppliedCoupon(null);
+      setCouponInput("");
+    }
+  }, [hasConsultationInCart, appliedCoupon]);
+
   const onlyAppointmentsArePaid = useMemo(
     () =>
       items
@@ -403,7 +413,12 @@ export function PatientCartPanel({
             <label className="block text-xs font-semibold uppercase tracking-wide text-foreground/55">
               Cupón de descuento
             </label>
-            {appliedCoupon ? (
+            {!hasConsultationInCart ? (
+              <p className="text-xs text-foreground/50">
+                Los cupones solo aplican a consultas. Agregá una cita al carrito
+                para usar uno.
+              </p>
+            ) : appliedCoupon ? (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2">
                 <p className="text-sm font-semibold text-emerald-900">
                   <span className="font-mono">{appliedCoupon.code}</span>

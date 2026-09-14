@@ -103,14 +103,14 @@ export function PackageImagesEditor({
             className="space-y-3 rounded-2xl border border-foreground/10 bg-white p-4"
           >
             <div className="flex items-start gap-3">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted">
+              <div className="relative h-16 w-[6.5rem] shrink-0 overflow-hidden rounded-xl bg-muted">
                 {value ? (
                   <Image
                     src={value}
                     alt=""
                     fill
-                    className="object-cover"
-                    sizes="64px"
+                    className="object-contain p-0.5"
+                    sizes="104px"
                     unoptimized={shouldUnoptimizeImage(value)}
                   />
                 ) : (
@@ -133,6 +133,9 @@ export function PackageImagesEditor({
                 setUrls((prev) => ({ ...prev, [type.id]: src }))
               }
               folder="packages"
+              cropShape="rect"
+              cropAspectRatio={16 / 10}
+              hint="Formato lobby 16:10. La imagen se convierte a JPG al subir."
               onUploaded={async (url) => {
                 setUrls((prev) => ({ ...prev, [type.id]: url }));
                 await persistImage(type, url);

@@ -33,7 +33,14 @@ export async function updatePatientAdminResource(
 
   const patient = await prisma.user.findFirst({
     where: { id: patientId, role: "PATIENT" },
-    select: { id: true, patientProfile: { select: { id: true } } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      patientProfile: {
+        select: { id: true, adminResourceUrl: true, adminResourceNote: true },
+      },
+    },
   });
 
   if (!patient) {
@@ -42,6 +49,8 @@ export async function updatePatientAdminResource(
 
   const url = parsed.data.url || null;
   const note = parsed.data.note?.trim() || null;
+  const previousUrl = patient.patientProfile?.adminResourceUrl?.trim() || "";
+  const isNewDriveLink = Boolean(url) && url !== previousUrl;
 
   if (patient.patientProfile) {
     await prisma.patientProfile.update({
@@ -59,6 +68,21 @@ export async function updatePatientAdminResource(
   }
 
   revalidatePath(`/dashboard/admin/patients/${patientId}`);
+  revalidatePath("/dashboard/patient");
   revalidatePath("/dashboard");
+
+  if (isNewDriveLink && url) {
+    const { notifyPatientDriveMaterialAdded } = await import(
+      "@/server/services/patient-drive-notify.service"
+    );
+    await notifyPatientDriveMaterialAdded({
+      patientId: patient.id,
+      patientEmail: patient.email,
+      patientName: patient.name,
+      driveUrl: url,
+      note,
+    });
+  }
+
   return { ok: true };
 }

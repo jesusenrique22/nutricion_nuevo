@@ -10,6 +10,24 @@ import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { addResourceToCart } from "@/server/actions/cart.actions";
 import type { ResourceDTO } from "@/server/actions/resource.queries";
 
+const PENDING_REVIEW_BADGE =
+  "Pago en revisión · pendiente de aprobación";
+
+export function ResourcePendingBadge({ compact }: { compact?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full bg-amber-100 font-semibold text-amber-900 ${
+        compact
+          ? "px-2 py-0.5 text-[10px] leading-tight"
+          : "px-2.5 py-1 text-[11px]"
+      }`}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 animate-pulse" />
+      {compact ? "En revisión" : PENDING_REVIEW_BADGE}
+    </span>
+  );
+}
+
 const typeLabels: Record<string, string> = {
   EBOOK: "E-book",
   VIDEO: "Video",
@@ -51,6 +69,11 @@ export function ResourceCatalog({
                   {typeLabels[r.type] ?? r.type}
                 </div>
               )}
+              {r.accessStatus === "PENDING" ? (
+                <div className="absolute left-2 top-2">
+                  <ResourcePendingBadge />
+                </div>
+              ) : null}
             </div>
           </Link>
           <div className="p-4">
@@ -72,9 +95,7 @@ export function ResourceCatalog({
                 />
               </span>
               {r.accessStatus === "PENDING" ? (
-                <span className="text-xs font-semibold text-amber-600">
-                  Solicitud pendiente
-                </span>
+                <ResourcePendingBadge compact />
               ) : showPurchase ? (
                 <button
                   type="button"
@@ -159,7 +180,7 @@ export function PendingResourceList({
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              En proceso
+              Pago en revisión
             </span>
           </div>
           <h3 className="mt-1.5 font-semibold text-foreground">{r.title}</h3>
@@ -168,8 +189,9 @@ export function PendingResourceList({
               {r.description}
             </p>
           )}
-          <p className="mt-3 text-xs text-amber-800/80">
-            Tu pago está siendo verificado por la administración. Se desbloqueará automáticamente aquí ni bien sea aprobado.
+          <p className="mt-3 text-xs leading-relaxed text-amber-900/85">
+            {PENDING_REVIEW_BADGE}. Te avisaremos cuando se apruebe el pago; hasta
+            entonces no podés abrir el PDF.
           </p>
         </article>
       ))}

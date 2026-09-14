@@ -43,7 +43,7 @@ function resourceStatusLabel(status: string, refundStatus: string): string {
   if (refundStatus === "REQUESTED") return "Reembolso en revisión";
   if (refundStatus === "APPROVED" || status === "REFUNDED") return "Reembolsado";
   if (refundStatus === "DENIED") return "Reembolso no aceptado";
-  if (status === "PENDING") return "Procesando pago";
+  if (status === "PENDING") return "Pago en revisión";
   if (status === "GRANTED") return "Acceso activo";
   return status;
 }
@@ -60,7 +60,7 @@ function appointmentStatusLabel(
     return "Reembolsado";
   }
   if (refundStatus === "DENIED") return "Reembolso no aceptado";
-  if (paymentStatus === "PENDING") return "Procesando pago";
+  if (paymentStatus === "PENDING") return "Pago en revisión";
   if (paymentStatus === "PARTIAL") {
     if (
       phases?.advanceStatus === "PAID" &&
@@ -77,7 +77,7 @@ function appointmentStatusLabel(
 }
 
 function productStatusLabel(status: string): string {
-  if (status === "PENDING") return "Procesando pago";
+  if (status === "PENDING") return "Pago en revisión";
   if (status === "GRANTED") return "Compra confirmada";
   if (status === "REFUNDED") return "Reembolsado";
   return status;

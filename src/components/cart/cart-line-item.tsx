@@ -175,7 +175,7 @@ export function CartLineItem({
                 ? "Saldo · cuota 2"
                 : item.type === "APPOINTMENT" && item.fullPrice
                   ? item.advancePercent != null && item.advancePercent > 0
-                    ? `A pagar ahora (${item.advancePercent}%)`
+                    ? "A pagar ahora (adelanto · cuota 1)"
                     : "A pagar ahora"
                   : "Subtotal"}
             </p>

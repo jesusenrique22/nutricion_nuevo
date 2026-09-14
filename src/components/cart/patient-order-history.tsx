@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { PatientPendingPaymentsPanel } from "@/components/progress/patient-pending-payments-panel";
 import { PatientPurchasesPanel } from "@/components/progress/patient-purchases-panel";
 import { getOrderHistoryBucket } from "@/lib/patient-progress";
+import {
+  filterDuplicateProcessingProgress,
+  uniqueProcessingCount,
+} from "@/lib/order-history-processing";
 import type { PatientPendingPaymentItem } from "@/server/actions/patient-progress.queries";
 import type { PatientProgressItem } from "@/server/actions/patient-progress.queries";
 
@@ -60,9 +64,14 @@ export function PatientOrderHistory({
     return { purchased, processing, cancelled };
   }, [purchases]);
 
+  const processingProgressOnly = useMemo(
+    () => filterDuplicateProcessingProgress(buckets.processing, pendingPayments),
+    [buckets.processing, pendingPayments],
+  );
+
   const counts = {
     purchased: buckets.purchased.length,
-    processing: buckets.processing.length + pendingPayments.length,
+    processing: uniqueProcessingCount(buckets.processing, pendingPayments),
     cancelled: buckets.cancelled.length,
   };
 
@@ -106,13 +115,13 @@ export function PatientOrderHistory({
               <PatientPendingPaymentsPanel items={pendingPayments} />
             </div>
           </section>
-          {buckets.processing.length > 0 ? (
+          {processingProgressOnly.length > 0 ? (
             <section>
               <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-foreground/50">
                 Otras órdenes en proceso
               </h2>
               <div className="mt-4">
-                <PatientPurchasesPanel items={buckets.processing} />
+                <PatientPurchasesPanel items={processingProgressOnly} />
               </div>
             </section>
           ) : null}

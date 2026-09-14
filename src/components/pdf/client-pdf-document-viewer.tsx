@@ -187,26 +187,50 @@ export function ClientPdfDocumentViewer({
 
   if (error || !doc) {
     return (
-      <p className="rounded-2xl bg-red-50 px-4 py-8 text-center text-sm text-red-700">
-        {error ?? "No se pudo cargar el PDF."}
-      </p>
+      <div className="space-y-3">
+        <p className="rounded-2xl bg-red-50 px-4 py-8 text-center text-sm text-red-700">
+          {error ?? "No se pudo cargar el PDF."}
+        </p>
+        <p className="text-center">
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold text-primary underline"
+          >
+            Abrir PDF en una pestaña nueva
+          </a>
+        </p>
+      </div>
     );
   }
 
   return (
-    <div
-      className={
-        className ??
-        "rounded-2xl bg-white shadow-[0_24px_60px_-24px_rgba(116,30,49,0.18)] ring-1 ring-primary/10 select-none"
-      }
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <div className="divide-y divide-foreground/5">
-        {Array.from({ length: doc.numPages }, (_, i) => (
-          <div key={`${pdfUrl}-${i + 1}`} className="bg-muted/10 p-2 sm:p-4">
-            <PdfPageCanvas doc={doc} pageNum={i + 1} maxWidth={maxWidth} />
-          </div>
-        ))}
+    <div className="space-y-3">
+      <p className="text-right">
+        <a
+          href={pdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-semibold text-primary/80 underline hover:text-primary"
+        >
+          Abrir en pestaña nueva (si no se ve bien en el celular)
+        </a>
+      </p>
+      <div
+        className={
+          className ??
+          "rounded-2xl bg-white shadow-[0_24px_60px_-24px_rgba(116,30,49,0.18)] ring-1 ring-primary/10 select-none"
+        }
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <div className="divide-y divide-foreground/5">
+          {Array.from({ length: doc.numPages }, (_, i) => (
+            <div key={`${pdfUrl}-${i + 1}`} className="bg-muted/10 p-2 sm:p-4">
+              <PdfPageCanvas doc={doc} pageNum={i + 1} maxWidth={maxWidth} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

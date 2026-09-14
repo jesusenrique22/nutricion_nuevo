@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BrandDashboardHeader } from "@/components/brand/brand-dashboard-shell";
 import { ResourceCoverImage } from "@/components/resources/resource-cover-image";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
+import { ResourcePendingBadge } from "@/components/resources/resource-catalog";
 import { getPublishedResources } from "@/server/actions/resource.queries";
 import { addResourceToCart } from "@/server/actions/cart.actions";
 import { redirect } from "next/navigation";
@@ -22,6 +23,8 @@ export default async function ResourcePreviewPage({
     redirect(`/dashboard/patient/library/${id}`);
   }
 
+  const isPendingReview = resource.accessStatus === "PENDING";
+
   async function addToCart() {
     "use server";
     await addResourceToCart(id);
@@ -38,22 +41,40 @@ export default async function ResourcePreviewPage({
       </Link>
       <BrandDashboardHeader
         title={resource.title}
-        eyebrow="Vista previa"
+        eyebrow={isPendingReview ? "Pago en revisión" : "Vista previa"}
         description={resource.description ?? undefined}
       />
+      {isPendingReview ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4">
+          <ResourcePendingBadge />
+          <p className="mt-3 text-sm text-amber-950/90">
+            Tu compra está pendiente de aprobación. Anttova revisará el
+            comprobante y te avisará cuando puedas abrir la guía aquí.
+          </p>
+        </div>
+      ) : null}
       {resource.coverUrl && isDisplayableCoverUrl(resource.coverUrl) && (
         <div className="relative aspect-video overflow-hidden rounded-3xl ring-1 ring-primary/10">
           <ResourceCoverImage src={resource.coverUrl} alt={resource.title} />
         </div>
       )}
-      <form action={addToCart}>
-        <button
-          type="submit"
-          className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
+      {!isPendingReview ? (
+        <form action={addToCart}>
+          <button
+            type="submit"
+            className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Agregar al carrito para solicitar acceso
+          </button>
+        </form>
+      ) : (
+        <Link
+          href="/dashboard/patient/cart/historial?tab=processing"
+          className="inline-flex rounded-full border border-amber-300 bg-white px-6 py-3 text-sm font-semibold text-amber-900"
         >
-          Agregar al carrito para solicitar acceso
-        </button>
-      </form>
+          Ver estado en historial
+        </Link>
+      )}
     </div>
   );
 }

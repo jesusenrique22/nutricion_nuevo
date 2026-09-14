@@ -1,7 +1,5 @@
 import { getAdminUserIds } from "@/lib/admin-users";
-import { prisma } from "@/server/db/prisma";
 import { createNotification } from "@/server/services/notification.service";
-import type { ReviewTopic } from "@/types/review";
 
 async function safeNotify(fn: () => Promise<void>): Promise<void> {
   try {
@@ -11,54 +9,15 @@ async function safeNotify(fn: () => Promise<void>): Promise<void> {
   }
 }
 
-const REVIEW_TOPIC_BY_KIND: Record<
-  "APPOINTMENT" | "RESOURCE" | "PRODUCT",
-  ReviewTopic
-> = {
-  APPOINTMENT: "SERVICE",
-  RESOURCE: "GENERAL",
-  PRODUCT: "PRODUCT",
-};
-
-const REVIEW_KIND_LABEL: Record<
-  "APPOINTMENT" | "RESOURCE" | "PRODUCT",
-  string
-> = {
-  APPOINTMENT: "tu consulta",
-  RESOURCE: "el recurso",
-  PRODUCT: "tu compra",
-};
-
 /** Invita al paciente a dejar reseña tras una cita completada o compra concretada. */
-export async function notifyReviewRequested(params: {
+export async function notifyReviewRequested(_params: {
   patientId: string;
   itemTitle: string;
   itemKind: "APPOINTMENT" | "RESOURCE" | "PRODUCT";
   entityId?: string;
 }) {
-  await safeNotify(async () => {
-    const pending = await prisma.review.findFirst({
-      where: { userId: params.patientId, status: "PENDING" },
-      select: { id: true },
-    });
-    if (pending) return;
-
-    const topic = REVIEW_TOPIC_BY_KIND[params.itemKind];
-    const kindLabel = REVIEW_KIND_LABEL[params.itemKind];
-
-    await createNotification({
-      recipientId: params.patientId,
-      type: "REVIEW_REQUESTED",
-      title: "¿Querés dejar una reseña?",
-      body: `¿Cómo fue ${kindLabel} «${params.itemTitle}»? Tu opinión nos ayuda a mejorar.`,
-      payload: {
-        deepLink: `/dashboard/patient/reviews?topic=${topic}`,
-        itemKind: params.itemKind,
-        entityId: params.entityId,
-        topic,
-      },
-    });
-  });
+  // Desactivado por pedido del cliente: la página de reseñas sigue disponible,
+  // pero no se empujan notificaciones automáticas.
 }
 
 export async function notifyReviewSubmitted(params: {

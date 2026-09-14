@@ -15,6 +15,7 @@ export function getOrderHistoryBucket(
     return "cancelled";
   }
   if (
+    label === "Pago en revisión" ||
     label === "Procesando pago" ||
     label === "Procesando adelanto" ||
     label === "Pago en revisión" ||

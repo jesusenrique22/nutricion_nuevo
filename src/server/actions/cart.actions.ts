@@ -699,7 +699,7 @@ export async function submitCart(options?: {
       return { ok: false, message: result.message };
     }
 
-    if (appliedCoupon) {
+    if (appliedCoupon && appointmentItems.length > 0) {
       try {
         await recordCouponRedemption({
           couponId: appliedCoupon.id,
