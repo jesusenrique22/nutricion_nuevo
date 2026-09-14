@@ -4,6 +4,7 @@ import {
   getSession,
 } from "@/server/queries/cached-dashboard";
 
+
 export async function GET() {
   const session = await getSession();
   if (!session?.user) {

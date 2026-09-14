@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getExchangeRateSnapshot } from "@/server/services/exchange-rate.service";
 
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {

@@ -5,7 +5,6 @@ import { validateUploadFile } from "@/lib/upload-policy";
 import { storePublicFile } from "@/server/services/file-storage";
 import { limitUploadByKey } from "@/lib/ratelimit";
 
-export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
