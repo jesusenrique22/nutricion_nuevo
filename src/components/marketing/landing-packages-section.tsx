@@ -35,40 +35,45 @@ function ConsultationPackageCard({
 }) {
   return (
     <div
-      className={`flex h-full flex-1 flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 ${
+      className={`flex h-full min-h-0 flex-col overflow-hidden rounded-3xl transition hover:-translate-y-1 ${
         highlight
           ? "bg-accent-soft text-foreground ring-1 ring-primary/15"
           : "border border-white/10 bg-white/5 backdrop-blur-sm"
       }`}
     >
-      <div className="relative">
+      <div className="relative shrink-0">
         <PackageHeroImage src={imageSrc} alt={pkg.name} />
         {!highlight && (
           <div className="pointer-events-none absolute inset-0 bg-primary/25" />
         )}
       </div>
-      <div className="flex flex-1 flex-col p-6 sm:p-7">
-        <h3 className="text-xl font-bold min-h-[3.25rem] flex items-start line-clamp-2">{pkg.name}</h3>
-        <p
-          className={`mt-3 flex-1 text-sm leading-relaxed ${
+      <div className="flex min-h-0 flex-1 flex-col p-6 sm:p-7">
+        <h3 className="line-clamp-2 min-h-[3.25rem] text-xl font-bold leading-snug">
+          {pkg.name}
+        </h3>
+        <div
+          tabIndex={0}
+          className={`mt-3 h-[calc(1.625em*6)] overflow-y-auto overscroll-contain pr-1.5 text-sm leading-relaxed [scrollbar-gutter:stable] [scrollbar-width:thin] ${
             highlight ? "text-foreground/80" : "text-primary-foreground/70"
           }`}
         >
-          {pkg.description ?? "Consulta personalizada Anttova."}
-        </p>
-        <div className="mt-6 text-3xl font-extrabold">
-          <DisplayPrice amount={pkg.price} currency="ARS" />
+          <p>{pkg.description ?? "Consulta personalizada Anttova."}</p>
         </div>
-        <Link
-          href="/register"
-          className={`mt-6 w-full rounded-full px-5 py-2.5 text-center text-sm font-semibold transition active:scale-95 sm:text-base ${
-            highlight
-              ? "bg-primary text-primary-foreground hover:scale-105"
-              : "bg-primary-foreground text-primary hover:scale-105"
-          }`}
-        >
-          Agendar
-        </Link>
+        <div className="mt-auto pt-6">
+          <div className="text-3xl font-extrabold">
+            <DisplayPrice amount={pkg.price} currency="ARS" />
+          </div>
+          <Link
+            href="/register"
+            className={`mt-6 block w-full rounded-full px-5 py-2.5 text-center text-sm font-semibold transition active:scale-95 sm:text-base ${
+              highlight
+                ? "bg-primary text-primary-foreground hover:scale-105"
+                : "bg-primary-foreground text-primary hover:scale-105"
+            }`}
+          >
+            Agendar
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -108,7 +113,7 @@ export function LandingPackagesSection({
           ) : (
             <PackageCarousel ariaLabel="Paquetes de consulta">
               {consultations.map((pkg, i) => (
-                <RevealScale key={pkg.id} delay={i * 0.08} className="flex h-full flex-1 flex-col">
+                <RevealScale key={pkg.id} delay={i * 0.08} className="flex h-full min-h-0 flex-col">
                   <ConsultationPackageCard
                     pkg={pkg}
                     highlight={i === 0}

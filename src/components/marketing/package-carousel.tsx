@@ -116,7 +116,7 @@ export function PackageCarousel({
           <div
             key={i}
             data-carousel-card
-            className={`${CARD_SIZES} flex h-full min-h-0 flex-col`}
+            className={`${CARD_SIZES} flex flex-col self-stretch`}
           >
             {child}
           </div>

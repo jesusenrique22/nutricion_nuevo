@@ -356,6 +356,55 @@ async function handleVideo(id: string) {
   return storedFileToResponse(file, { inline: true });
 }
 
+function contentKindFromMime(mimeType: string) {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "application/pdf") return "pdf";
+  return "unknown";
+}
+
+function closeOpenedFile(file: { stream: { destroy?: () => void } }) {
+  try {
+    file.stream.destroy?.();
+  } catch {
+    // HEAD no consume el stream; cerrarlo evita fugas en GridFS.
+  }
+}
+
+/** HEAD no puede bajar el PDF entero: el visor solo necesita tipo y permiso. */
+async function handleContentHead(id: string) {
+  const allowed = await canAccessResourceContent(id);
+  if (!allowed) {
+    const session = await auth();
+    return new Response(null, { status: session?.user ? 403 : 401 });
+  }
+
+  const resource = await prisma.resource.findUnique({
+    where: { id },
+    select: { contentUrl: true },
+  });
+  if (!resource?.contentUrl) {
+    return new Response(null, { status: 404 });
+  }
+
+  const file = await openStoredFileUrl(normalizeStoredUrl(resource.contentUrl));
+  if (!file) {
+    return new Response(null, { status: 404 });
+  }
+  closeOpenedFile(file);
+
+  const mimeType = file.mimeType || "application/octet-stream";
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "Content-Type": mimeType,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "X-Content-Kind": contentKindFromMime(mimeType),
+      "Content-Disposition": "inline",
+    },
+  });
+}
+
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const path = (await context.params).path ?? [];
@@ -373,7 +422,16 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 export async function HEAD(req: Request, context: RouteContext) {
-  return GET(req, context);
+  try {
+    const path = (await context.params).path ?? [];
+    if (path.length === 2 && path[1] === "content") {
+      return handleContentHead(path[0]);
+    }
+    return GET(req, context);
+  } catch (err) {
+    console.error("[resources/head]", err);
+    return new Response(null, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
