@@ -6,6 +6,7 @@ import {
   validateUploadFile,
 } from "@/lib/upload-policy";
 import { prepareImageForUpload } from "@/lib/client-image-upload";
+import { uploadFileWithChunks, needsChunkedUpload } from "@/lib/chunked-client-upload";
 import { parseUploadResponse } from "@/lib/upload-response";
 import { uploadAdminMediaFile } from "@/server/actions/media-upload.actions";
 
@@ -61,15 +62,24 @@ export async function uploadFile(
 
   if (endpoint === "/api/resources/upload") {
     const result = await uploadAdminMediaFile(fd);
-    if (!result.ok) {
-      throw new Error(result.message);
+    if (result.ok) {
+      return {
+        url: result.url,
+        id: result.id,
+        mimeType: result.mimeType,
+        fileName: result.fileName,
+      };
     }
-    return {
-      url: result.url,
-      id: result.id,
-      mimeType: result.mimeType,
-      fileName: result.fileName,
-    };
+
+    if (needsChunkedUpload(uploadFile.size)) {
+      return uploadFileWithChunks(uploadFile, {
+        folder: options.folder,
+        kind,
+        endpoint,
+      });
+    }
+
+    throw new Error(result.message);
   }
 
   const res = await fetch(endpoint, { method: "POST", body: fd });
@@ -79,7 +89,7 @@ export async function uploadFile(
     throw new Error(json.error ?? "Error al subir el archivo.");
   }
 
-  return { url: json.url, id: json.id };
+  return { url: json.url, id: json.id, mimeType: json.mimeType };
 }
 
 export function uploadHint(kind: UploadKind): string {

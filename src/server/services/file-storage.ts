@@ -46,6 +46,62 @@ async function prepareUpload(
   };
 }
 
+export async function storePublicBuffer(
+  buffer: Buffer,
+  folder: string,
+  options: {
+    fileName: string;
+    mimeType: string;
+    ownerId?: string;
+  },
+): Promise<StoredFile> {
+  if (hasMongoUri() && (await tryGetMongoDb())) {
+    try {
+      const uploaded = await uploadToMongo(buffer, {
+        fileName: options.fileName,
+        mimeType: options.mimeType,
+        folder,
+        ownerId: options.ownerId,
+      });
+      return {
+        url: uploaded.url,
+        mimeType: options.mimeType,
+        provider: "mongodb",
+        fileId: uploaded.fileId,
+      };
+    } catch (err) {
+      if (requiresPersistentStorage()) {
+        const message =
+          err instanceof Error ? err.message : "Error de almacenamiento";
+        throw new Error(
+          message.includes("MongoDB") || message.includes("almacenamiento")
+            ? message
+            : "No pudimos guardar el archivo en la nube. Verificá MongoDB Atlas (cluster activo y Network Access).",
+        );
+      }
+      console.warn(
+        "[storage] MongoDB no disponible, usando almacenamiento local:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  } else if (hasMongoUri() && requiresPersistentStorage()) {
+    throw new Error(
+      "No pudimos guardar el archivo. MongoDB no responde — verificá Atlas (cluster activo, IP 0.0.0.0/0).",
+    );
+  } else if (requiresPersistentStorage()) {
+    throw new Error(
+      "No pudimos guardar el archivo. Configurá MONGODB_URI en Vercel.",
+    );
+  }
+
+  return storeLocalBuffer(
+    buffer,
+    folder,
+    options.fileName,
+    options.mimeType,
+  );
+}
+
 async function storeLocalBuffer(
   buffer: Buffer,
   folder: string,
@@ -70,42 +126,9 @@ export async function storePublicFile(
   options?: { ownerId?: string },
 ): Promise<StoredFile> {
   const prepared = await prepareUpload(file, folder);
-
-  if (hasMongoUri() && (await tryGetMongoDb())) {
-    try {
-      const uploaded = await uploadToMongo(prepared.buffer, {
-        fileName: prepared.fileName,
-        mimeType: prepared.mimeType,
-        folder,
-        ownerId: options?.ownerId,
-      });
-      return {
-        url: uploaded.url,
-        mimeType: prepared.mimeType,
-        provider: "mongodb",
-        fileId: uploaded.fileId,
-      };
-    } catch (err) {
-      if (requiresPersistentStorage()) throw err;
-      console.warn(
-        "[storage] MongoDB no disponible, usando almacenamiento local:",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  } else if (hasMongoUri() && requiresPersistentStorage()) {
-    throw new Error(
-      "No pudimos guardar el archivo. Intentá de nuevo en unos minutos.",
-    );
-  } else if (requiresPersistentStorage()) {
-    throw new Error(
-      "No pudimos guardar el archivo. Intentá de nuevo más tarde.",
-    );
-  }
-
-  return storeLocalBuffer(
-    prepared.buffer,
-    folder,
-    prepared.fileName,
-    prepared.mimeType,
-  );
+  return storePublicBuffer(prepared.buffer, folder, {
+    fileName: prepared.fileName,
+    mimeType: prepared.mimeType,
+    ownerId: options?.ownerId,
+  });
 }
