@@ -4,7 +4,7 @@ import type { UploadKind } from "@/lib/upload-policy";
 import { processAdminMediaUpload } from "@/server/services/admin-media-upload.service";
 import { limitUploadByKey } from "@/lib/ratelimit";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
