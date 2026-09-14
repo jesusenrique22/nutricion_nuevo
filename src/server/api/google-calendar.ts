@@ -16,7 +16,6 @@ import {
   saveGoogleCalendarConnection,
 } from "@/server/services/google-calendar-oauth";
 
-export const maxDuration = 60;
 
 const STATE_COOKIE = "gcal_oauth_state";
 const REDIRECT_COOKIE = "gcal_oauth_redirect";

@@ -6,7 +6,6 @@ import {
   listMediaAssets,
 } from "@/server/services/media-library.service";
 
-export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 

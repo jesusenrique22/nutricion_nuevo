@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getExchangeRateSnapshot } from "@/server/services/exchange-rate.service";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 export async function GET() {
   try {

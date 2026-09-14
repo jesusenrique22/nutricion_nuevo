@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { refreshExchangeRate } from "@/server/services/exchange-rate.service";
 import { sendAppointmentReminders } from "@/server/services/reminder.service";
 
-export const maxDuration = 60;
 
 function unauthorized() {
   return NextResponse.json({ error: "No autorizado" }, { status: 401 });

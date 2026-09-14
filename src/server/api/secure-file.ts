@@ -7,7 +7,6 @@ import {
 import { canAccessStoredMediaUrl } from "@/server/services/media-access.service";
 
 /** Hobby: max 60s por función; subidas grandes usan fragmentos de 3 MB. */
-export const maxDuration = 60;
 
 function isAllowedStoredSrc(src: string): boolean {
   const normalized = normalizeStoredUrl(src);

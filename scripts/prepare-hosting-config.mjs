@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * En Vercel, genera vercel.json mínimo (solo crons).
- * Headers y build viven en next.config.ts y en el panel de Vercel.
- * Copiar deploy.json entero rompía el deploy (headers duplicados en /_next/static).
+ * En Vercel, genera vercel.json (crons + un solo bundle de funciones).
+ * Hobby admite 12 funciones: configs distintas por ruta las multiplican.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -16,11 +15,13 @@ if (!existsSync("deploy.json")) {
 }
 
 const deploy = JSON.parse(readFileSync("deploy.json", "utf8"));
-const vercelConfig = {};
+const vercelConfig = {
+  framework: "nextjs",
+};
 
 if (Array.isArray(deploy.crons) && deploy.crons.length > 0) {
   vercelConfig.crons = deploy.crons;
 }
 
 writeFileSync("vercel.json", `${JSON.stringify(vercelConfig, null, 2)}\n`);
-console.log("[hosting] vercel.json generado (crons únicamente)");
+console.log("[hosting] vercel.json generado (crons + framework)");
