@@ -4,6 +4,7 @@ import * as badgesApi from "@/server/api/dashboard-badges";
 import * as cronApi from "@/server/api/cron";
 import * as currencyApi from "@/server/api/currency-rates";
 import * as googleCalendarApi from "@/server/api/google-calendar";
+import * as internalEventIcsApi from "@/server/api/internal-event-ics";
 import * as mediaApi from "@/server/api/media";
 import * as cvApi from "@/server/api/nutricionista-cv";
 import * as proofApi from "@/server/api/payments-upload-proof";
@@ -62,6 +63,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
   }
   if (slug[0] === "secure-file") {
     return secureFileApi.GET(req);
+  }
+  if (slug[0] === "events" && slug[1] && slug[2] === "ics") {
+    return internalEventIcsApi.GET(req, {
+      params: Promise.resolve({ id: slug[1] }),
+    });
   }
 
   return notFound();

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { isMongoConfigured, tryGetMongoDb } from "@/server/db/mongo";
+import { isMongoConfigured, tryGetMongoDbWithin } from "@/server/db/mongo";
 import { optimizeImageBufferForFolder } from "@/server/services/image-optimize";
 import { uploadToMongo } from "@/server/services/mongo-storage";
 
@@ -19,10 +19,24 @@ function requiresPersistentStorage(): boolean {
   return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
 }
 
-async function prepareUpload(
+/** Deja margen dentro del maxDuration de 60 s para guardar y responder. */
+const MONGO_UPLOAD_DEADLINE_MS = 20_000;
+
+export type PreparedUpload = {
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+};
+
+/**
+ * Lee el archivo una sola vez y normaliza imágenes a un formato web seguro.
+ * Se exporta para que quien suba pueda inspeccionar los bytes (p. ej. validar
+ * la cabecera %PDF-) sin volver a leer el File.
+ */
+export async function prepareUpload(
   file: File,
   folder: string,
-): Promise<{ buffer: Buffer; mimeType: string; fileName: string }> {
+): Promise<PreparedUpload> {
   const original = Buffer.from(await file.arrayBuffer());
   const optimized = await optimizeImageBufferForFolder(
     original,
@@ -55,7 +69,9 @@ export async function storePublicBuffer(
     ownerId?: string;
   },
 ): Promise<StoredFile> {
-  if (hasMongoUri() && (await tryGetMongoDb())) {
+  // Techo de espera: más allá de esto, la función serverless se corta sola y
+  // quien sube el archivo se queda mirando "Subiendo…" sin saber por qué.
+  if (hasMongoUri() && (await tryGetMongoDbWithin(MONGO_UPLOAD_DEADLINE_MS))) {
     try {
       const uploaded = await uploadToMongo(buffer, {
         fileName: options.fileName,

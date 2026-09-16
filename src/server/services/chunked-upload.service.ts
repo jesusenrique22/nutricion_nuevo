@@ -178,6 +178,17 @@ export async function completeChunkedUpload(input: {
     throw new Error(validation.message);
   }
 
+  // Los fragmentos llegan por separado: si alguno se mezcló, el tamaño puede
+  // cuadrar pero el PDF ya no abre. La cabecera lo detecta antes de guardarlo.
+  if (
+    session.kind === "pdf" &&
+    buffer.subarray(0, 5).toString("ascii") !== "%PDF-"
+  ) {
+    throw new Error(
+      "El archivo no es un PDF válido. Probá exportarlo de nuevo.",
+    );
+  }
+
   const stored = await storePublicBuffer(buffer, session.folder, {
     fileName: session.fileName,
     mimeType: validation.mime,

@@ -10,11 +10,15 @@ export function needsChunkedUpload(fileSize: number): boolean {
   return fileSize > VERCEL_SAFE_UPLOAD_BYTES;
 }
 
+/** 0–100. Permite al panel mostrar avance real en subidas largas. */
+export type UploadProgressHandler = (percent: number) => void;
+
 async function uploadChunkedFile(
   file: File,
   options: {
     folder?: string;
     kind: UploadKind;
+    onProgress?: UploadProgressHandler;
   },
 ): Promise<{ url: string; id?: string; mimeType?: string }> {
   const folder = options.folder ?? "resources";
@@ -67,7 +71,14 @@ async function uploadChunkedFile(
             `Error al subir fragmento ${index + 1}/${totalChunks}.`,
         );
       }
+
+      // Reservar el último tramo para el ensamblado en el servidor.
+      options.onProgress?.(
+        Math.round(((index + 1) / totalChunks) * 95),
+      );
     }
+
+    options.onProgress?.(97);
 
     const completeRes = await fetch("/api/resources/upload/complete", {
       method: "POST",
@@ -80,6 +91,8 @@ async function uploadChunkedFile(
         completeJson.error ?? "No se pudo finalizar la subida del archivo.",
       );
     }
+
+    options.onProgress?.(100);
 
     return {
       url: completeJson.url,
@@ -102,6 +115,7 @@ export async function uploadFileWithChunks(
     folder?: string;
     kind?: UploadKind;
     endpoint?: "/api/resources/upload" | "/api/payments/upload-proof";
+    onProgress?: UploadProgressHandler;
   } = {},
 ): Promise<{ url: string; id?: string; mimeType?: string }> {
   const kind = options.kind ?? "any";
@@ -114,6 +128,7 @@ export async function uploadFileWithChunks(
   return uploadChunkedFile(file, {
     folder: options.folder,
     kind,
+    onProgress: options.onProgress,
   });
 }
 
@@ -123,6 +138,7 @@ async function uploadDirectFile(
     folder?: string;
     kind?: UploadKind;
     endpoint?: "/api/resources/upload" | "/api/payments/upload-proof";
+    onProgress?: UploadProgressHandler;
   },
 ): Promise<{ url: string; id?: string; mimeType?: string }> {
   const kind = options.kind ?? "any";
@@ -139,5 +155,6 @@ async function uploadDirectFile(
     throw new Error(json.error ?? "Error al subir el archivo.");
   }
 
+  options.onProgress?.(100);
   return { url: json.url, id: json.id, mimeType: json.mimeType };
 }

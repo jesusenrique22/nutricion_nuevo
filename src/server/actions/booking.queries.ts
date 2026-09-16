@@ -12,6 +12,7 @@ import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { toPaymentPhaseView } from "@/lib/payment-split";
 import { dateRangeKeys, weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
+  isPrismaInternalEventReady,
   isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
@@ -228,7 +229,7 @@ export async function getBookingAvailabilitySnapshot(params?: {
   const rangeStart = clinicDateAtMinutes(from, 0);
   const rangeEnd = clinicDateAtMinutes(to, 24 * 60);
 
-  const [blockedDates, appointments, blocks, recurringPartial] =
+  const [blockedDates, appointments, blocks, internalEvents, recurringPartial] =
     await Promise.all([
       getUnavailableBookingDates({ from, to }),
       prisma.appointment.findMany({
@@ -246,6 +247,17 @@ export async function getBookingAvailabilitySnapshot(params?: {
         },
         select: { startTime: true, endTime: true },
       }),
+      // Sin datos del evento: al paciente solo le llega que el hueco está tomado.
+      isPrismaInternalEventReady()
+        ? prisma.internalEvent.findMany({
+            where: {
+              cancelledAt: null,
+              startTime: { lt: rangeEnd },
+              endTime: { gt: rangeStart },
+            },
+            select: { startTime: true, endTime: true },
+          })
+        : Promise.resolve([]),
       getRecurringPartialBusyIntervals(from, to),
     ]);
 
@@ -261,6 +273,10 @@ export async function getBookingAvailabilitySnapshot(params?: {
       ...blocks.map((b) => ({
         start: b.startTime.toISOString(),
         end: b.endTime.toISOString(),
+      })),
+      ...internalEvents.map((e) => ({
+        start: e.startTime.toISOString(),
+        end: e.endTime.toISOString(),
       })),
       ...recurringPartial,
     ],

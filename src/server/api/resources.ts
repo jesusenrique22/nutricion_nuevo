@@ -24,11 +24,10 @@ import {
   canAccessResourceVideo,
 } from "@/server/services/media-access.service";
 import {
-  normalizeStoredUrl,
   openStoredFileUrl,
-  readStoredFileUrlToBuffer,
   storedFileToResponse,
 } from "@/lib/stored-file";
+import { isServableContentUrl } from "@/lib/stored-file-label";
 import { prisma } from "@/server/db/prisma";
 
 
@@ -233,15 +232,15 @@ async function handleComplete(req: NextRequest) {
     ownerId: session.user.id,
   });
 
-  let assetId: string | undefined;
-  if (stored.mimeType.startsWith("image/")) {
-    const asset = await registerMediaAsset(stored, {
-      folder: stored.folder,
-      fileName: stored.fileName,
-      ownerId: session.user.id,
-    });
-    assetId = asset.id;
-  }
+  // Registrar SIEMPRE, no solo imágenes: el MediaAsset es lo que permite
+  // resolver el nombre del archivo en el panel y recuperar la ruta local de
+  // subidas antiguas. Sin él, un PDF subido por fragmentos quedaba huérfano.
+  const asset = await registerMediaAsset(stored, {
+    folder: stored.folder,
+    fileName: stored.fileName,
+    ownerId: session.user.id,
+  });
+  const assetId = asset.id;
 
   if (isPublicMediaFolder("resources")) {
     revalidatePublicSiteMediaCache();
@@ -279,6 +278,14 @@ async function handleCancel(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 async function handleContent(id: string) {
   const allowed = await canAccessResourceContent(id);
   if (!allowed) {
@@ -296,22 +303,40 @@ async function handleContent(id: string) {
     return new Response("Sin contenido", { status: 404 });
   }
 
-  const contentUrl = normalizeStoredUrl(resource.contentUrl);
-  const buffer = await readStoredFileUrlToBuffer(contentUrl);
-  if (!buffer || buffer.length === 0) {
-    console.warn(
-      "[resources/content] archivo no encontrado o vacío",
-      contentUrl,
+  // Sin normalizar: un PDF alojado en otro dominio pierde el host y deja de
+  // poder abrirse. openStoredFileUrl ya normaliza para los casos internos.
+  const contentUrl = resource.contentUrl.trim();
+
+  // Una ruta local del equipo de la nutricionista no existe para nadie más.
+  if (!isServableContentUrl(contentUrl)) {
+    console.warn("[resources/content] contentUrl no servible", contentUrl);
+    return new Response(
+      "El archivo de este recurso no está subido a la plataforma. Volvé a cargarlo desde Admin → Recursos con «Subir PDF».",
+      { status: 404 },
     );
+  }
+
+  // Un solo open: leer el buffer y quedarse con el mime del mismo stream.
+  // Abrirlo dos veces dejaba un descargador de GridFS colgado por request.
+  const file = await openStoredFileUrl(contentUrl);
+  if (!file) {
+    console.warn("[resources/content] archivo no encontrado", contentUrl);
     return new Response(
       "Archivo no encontrado. Volvé a subir el PDF o archivo desde Admin → Recursos.",
       { status: 404 },
     );
   }
 
-  const file = await openStoredFileUrl(contentUrl);
-  const fallbackMime = file?.mimeType ?? "application/octet-stream";
-  const mimeType = detectBufferMimeType(buffer, fallbackMime);
+  const buffer = await streamToBuffer(file.stream);
+  if (buffer.length === 0) {
+    console.warn("[resources/content] archivo vacío", contentUrl);
+    return new Response(
+      "El archivo quedó vacío en el almacenamiento. Volvé a subirlo desde Admin → Recursos.",
+      { status: 404 },
+    );
+  }
+
+  const mimeType = detectBufferMimeType(buffer, file.mimeType);
   const kind =
     mimeType.startsWith("image/")
       ? "image"
@@ -386,7 +411,12 @@ async function handleContentHead(id: string) {
     return new Response(null, { status: 404 });
   }
 
-  const file = await openStoredFileUrl(normalizeStoredUrl(resource.contentUrl));
+  const contentUrl = resource.contentUrl.trim();
+  if (!isServableContentUrl(contentUrl)) {
+    return new Response(null, { status: 404 });
+  }
+
+  const file = await openStoredFileUrl(contentUrl);
   if (!file) {
     return new Response(null, { status: 404 });
   }

@@ -266,22 +266,57 @@ export async function tryGetMongoDb(): Promise<Db | null> {
   return null;
 }
 
+/**
+ * Igual que tryGetMongoDb pero con un techo de espera.
+ *
+ * Los reintentos completos pueden pasar del minuto (3 × serverSelectionTimeout);
+ * en una petición eso agota el límite de la función serverless y quien subía el
+ * archivo ve la subida colgada en vez de un error que explique qué pasó. El
+ * reintento sigue en segundo plano: si Atlas despierta, la conexión queda
+ * cacheada para la próxima.
+ */
+export async function tryGetMongoDbWithin(
+  deadlineMs: number,
+): Promise<Db | null> {
+  if (!isMongoConfigured()) return null;
+
+  return Promise.race([
+    tryGetMongoDb().catch(() => null),
+    sleep(deadlineMs).then(() => null),
+  ]);
+}
+
 /** Ejecuta una lectura GridFS reintentando si la topología Mongo quedó cerrada. */
+/**
+ * Techo por defecto para operaciones dentro de una petición.
+ *
+ * Sin él, dos intentos de selección de servidor suman ~40 s y la función
+ * serverless se corta antes de poder responder nada útil.
+ */
+const MONGO_OPERATION_DEADLINE_MS = 12_000;
+
 export async function withMongoDb<T>(
   fn: (db: Db) => Promise<T>,
+  options?: { deadlineMs?: number },
 ): Promise<T | null> {
   if (!isMongoConfigured()) return null;
 
-  for (let i = 1; i <= 2; i++) {
-    try {
-      const db = await getMongoDb();
-      return await fn(db);
-    } catch (err) {
-      resetMongoConnection();
-      if (!isTopologyClosedError(err) || i === 2) return null;
+  const deadlineMs = options?.deadlineMs ?? MONGO_OPERATION_DEADLINE_MS;
+
+  const run = async (): Promise<T | null> => {
+    for (let i = 1; i <= 2; i++) {
+      try {
+        const db = await getMongoDb();
+        return await fn(db);
+      } catch (err) {
+        resetMongoConnection();
+        if (!isTopologyClosedError(err) || i === 2) return null;
+      }
     }
-  }
-  return null;
+    return null;
+  };
+
+  return Promise.race([run(), sleep(deadlineMs).then(() => null)]);
 }
 
 // Colecciones tipadas (helpers de acceso)

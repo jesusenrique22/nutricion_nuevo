@@ -1,9 +1,11 @@
-import { CalendarWithPanel } from "@/components/calendar/calendar-with-panel";
+import { AdminCalendarWorkspace } from "@/components/calendar/admin-calendar-workspace";
 import { ScheduleBlocksPanel } from "@/components/calendar/schedule-blocks-panel";
 import { GoogleCalendarConnect } from "@/components/calendar/google-calendar-connect";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
 import { auth } from "@/lib/auth";
 import { getAllAppointments } from "@/server/actions/booking.queries";
+import { getInternalEvents } from "@/server/actions/internal-event.actions";
+import { getPatientsList } from "@/server/actions/patient.queries";
 import { getBlockedDays, getRecurringBlockedWeekdays, getScheduleBlocks } from "@/server/actions/schedule-block.actions";
 import {
   getCalendarAdminStatus,
@@ -28,6 +30,8 @@ export default async function CalendarPage({
     scheduleBlocks,
     blockedDays,
     recurringWeekdays,
+    internalEvents,
+    patients,
   ] = await Promise.all([
     getAllAppointments(),
     adminUserId
@@ -39,6 +43,8 @@ export default async function CalendarPage({
     getScheduleBlocks(),
     getBlockedDays(),
     getRecurringBlockedWeekdays(),
+    getInternalEvents(),
+    getPatientsList(),
   ]);
 
   return (
@@ -69,12 +75,12 @@ export default async function CalendarPage({
         blocks={scheduleBlocks}
       />
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col">
-        <CalendarWithPanel
-          appointments={appointments}
-          initialAppointmentId={initialAppointmentId ?? null}
-        />
-      </div>
+      <AdminCalendarWorkspace
+        appointments={appointments}
+        internalEvents={internalEvents}
+        patients={patients}
+        initialAppointmentId={initialAppointmentId ?? null}
+      />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { weekdayFromDateKey } from "@/lib/scheduling-dates";
 import { TimeSlotTakenError } from "@/lib/scheduling-errors";
 import {
+  isPrismaInternalEventReady,
   isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
@@ -76,6 +77,34 @@ export async function findOverlappingBlock(
 }
 
 /**
+ * Busca un evento de agenda interno (seguimiento, reunión, espacio propio) que
+ * pise el rango. Son horarios ocupados aunque no sean citas: nadie debe poder
+ * reservarlos desde la web.
+ */
+export async function findOverlappingInternalEvent(
+  db: DbLike,
+  params: {
+    startTime: Date;
+    endTime: Date;
+    excludeInternalEventId?: string;
+  },
+) {
+  if (!isPrismaInternalEventReady()) return null;
+
+  return db.internalEvent.findFirst({
+    where: {
+      ...(params.excludeInternalEventId
+        ? { id: { not: params.excludeInternalEventId } }
+        : {}),
+      cancelledAt: null,
+      startTime: { lt: params.endTime },
+      endTime: { gt: params.startTime },
+    },
+    select: { id: true, title: true },
+  });
+}
+
+/**
  * Revalida solapamiento dentro de una transacción (antes del INSERT).
  * La garantía final la da el exclusion constraint en PostgreSQL.
  */
@@ -89,6 +118,11 @@ export async function assertNoOverlapInTransaction(
 ): Promise<void> {
   const overlap = await findOverlappingAppointment(tx, params);
   if (overlap) {
+    throw new TimeSlotTakenError();
+  }
+
+  const internal = await findOverlappingInternalEvent(tx, params);
+  if (internal) {
     throw new TimeSlotTakenError();
   }
 }
@@ -235,6 +269,19 @@ export async function validateAppointmentSlot(params: {
       ok: false,
       error: "BLOCKED_TIME",
       message: "Ese horario está bloqueado en la agenda.",
+    };
+  }
+
+  const internalEvent = await findOverlappingInternalEvent(prisma, {
+    startTime,
+    endTime: rules.endTime,
+  });
+
+  if (internalEvent) {
+    return {
+      ok: false,
+      error: "BLOCKED_TIME",
+      message: "Ese horario ya está tomado por otro evento de la agenda.",
     };
   }
 

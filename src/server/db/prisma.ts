@@ -21,6 +21,7 @@ const OPTIONAL_DELEGATES = [
   "review",
   "coupon",
   "recurringBlockedWeekday",
+  "internalEvent",
 ] as const;
 
 const globalForPrisma = globalThis as unknown as {
@@ -59,6 +60,10 @@ export function isPrismaCouponReady(): boolean {
 
 export function isPrismaRecurringBlockedWeekdayReady(): boolean {
   return prismaHasDelegate("recurringBlockedWeekday");
+}
+
+export function isPrismaInternalEventReady(): boolean {
+  return prismaHasDelegate("internalEvent");
 }
 
 /** Franja horaria opcional en bloqueos recurrentes (startTime/endTime). */

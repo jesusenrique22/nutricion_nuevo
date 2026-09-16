@@ -127,23 +127,27 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  patientProfile PatientProfile?
-  appointments   Appointment[]      @relation("PatientAppointments")
-  purchases ResourcePurchase[]
-  productPurchases ProductPurchase[]
-  cartItems   CartItem[]
-  weeklyPlans    PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
-  notifications  Notification[]
-  reviews        Review[]
-  couponsCreated Coupon[]            @relation("CouponsCreated")
+  patientProfile    PatientProfile?
+  appointments      Appointment[]       @relation("PatientAppointments")
+  purchases         ResourcePurchase[]
+  productPurchases  ProductPurchase[]
+  cartItems         CartItem[]
+  weeklyPlans       PatientWeeklyPlan[] @relation("PatientWeeklyPlans")
+  notifications     Notification[]
+  reviews           Review[]
+  couponsCreated    Coupon[]            @relation("CouponsCreated")
   couponRedemptions CouponRedemption[]
 
-  accounts Account[]
-  sessions Session[]
-  googleCalendarConnection GoogleCalendarConnection?
-  /** Admin que recibe nuevas citas en su Google Calendar (solo uno activo). */
-  isDefaultCalendarAdmin Boolean @default(false)
-  calendarAdminAppointments Appointment[] @relation("CalendarAdminAppointments")
+  accounts                    Account[]
+  sessions                    Session[]
+  googleCalendarConnection    GoogleCalendarConnection?
+  /**
+   * Admin que recibe nuevas citas en su Google Calendar (solo uno activo).
+   */
+  isDefaultCalendarAdmin      Boolean                   @default(false)
+  calendarAdminAppointments   Appointment[]             @relation("CalendarAdminAppointments")
+  internalEvents              InternalEvent[]           @relation("InternalEventPatient")
+  calendarAdminInternalEvents InternalEvent[]           @relation("InternalEventCalendarAdmin")
 
   @@index([role])
 }
@@ -160,10 +164,12 @@ model PatientProfile {
   emergencyPhone String?
 
   // Flag clave para decidir Intake vs Follow-up (Módulo 1)
-  hasCompletedIntake Boolean @default(false)
+  hasCompletedIntake  Boolean @default(false)
   hiddenFromAdminList Boolean @default(false)
 
-  /** Enlace externo (Drive, etc.) que la doctora asigna al paciente. */
+  /**
+   * Enlace externo (Drive, etc.) que la doctora asigna al paciente.
+   */
   adminResourceUrl  String?
   adminResourceNote String?
 
@@ -205,30 +211,32 @@ model ConsultationType {
 // ──────────────────────────────────────────────
 
 model Appointment {
-  id                 String               @id @default(cuid())
-  patientId          String
-  patient            User                 @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
-  consultationTypeId String
-  consultationType   ConsultationType     @relation(fields: [consultationTypeId], references: [id])
-  startTime          DateTime
-  endTime            DateTime
-  modality           ConsultationModality
-  status             AppointmentStatus    @default(PENDING)
-  flow               AppointmentFlow
-  notes              String?
-  reminderSentAt     DateTime?
-  remainderReminder7dSentAt DateTime?
-  remainderReminder3dSentAt DateTime?
-  remainderReminder1dSentAt DateTime?
+  id                         String                  @id @default(cuid())
+  patientId                  String
+  patient                    User                    @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
+  consultationTypeId         String
+  consultationType           ConsultationType        @relation(fields: [consultationTypeId], references: [id])
+  startTime                  DateTime
+  endTime                    DateTime
+  modality                   ConsultationModality
+  status                     AppointmentStatus       @default(PENDING)
+  flow                       AppointmentFlow
+  notes                      String?
+  reminderSentAt             DateTime?
+  remainderReminder7dSentAt  DateTime?
+  remainderReminder3dSentAt  DateTime?
+  remainderReminder1dSentAt  DateTime?
   remainderAdminDueDaySentAt DateTime?
-  cancelledBy        AppointmentCancelledBy?
-  cancelledAt        DateTime?
-  googleEventId      String?
-  /** Admin cuyo Google Calendar recibe este evento. */
-  calendarAdminId    String?
-  calendarAdmin      User?   @relation("CalendarAdminAppointments", fields: [calendarAdminId], references: [id], onDelete: SetNull)
+  cancelledBy                AppointmentCancelledBy?
+  cancelledAt                DateTime?
+  googleEventId              String?
+  /**
+   * Admin cuyo Google Calendar recibe este evento.
+   */
+  calendarAdminId            String?
+  calendarAdmin              User?                   @relation("CalendarAdminAppointments", fields: [calendarAdminId], references: [id], onDelete: SetNull)
 
-  payment Payment?
+  payment   Payment?
   cartItems CartItem[]
 
   followUpSubmission          FollowUpSubmission?
@@ -247,7 +255,62 @@ model Appointment {
   @@index([calendarAdminId])
 }
 
-/** Bloqueos de agenda del admin (vacaciones, compromisos, etc.). */
+/**
+ * Evento de agenda creado por la nutricionista: seguimiento incluido en un pack,
+ * consulta extra, reunión con otro profesional o espacio propio.
+ * No es una Appointment a propósito: no genera Payment ni deuda, no se ofrece
+ * para reservar desde la web, y el participante puede ser alguien sin cuenta
+ * (solo su correo). Ocupa el horario igual que un bloqueo.
+ */
+model InternalEvent {
+  id          String               @id @default(cuid())
+  title       String
+  description String?              @db.Text
+  /**
+   * FOLLOW_UP | EXTRA_CONSULT | MEETING | PERSONAL
+   */
+  kind        String               @default("MEETING")
+  startTime   DateTime
+  endTime     DateTime
+  modality    ConsultationModality @default(ONLINE)
+  location    String?
+
+  /**
+   * Participante registrado en la plataforma.
+   */
+  patientId  String?
+  patient    User?   @relation("InternalEventPatient", fields: [patientId], references: [id], onDelete: SetNull)
+  /**
+   * Participante sin cuenta: se lo invita solo por correo.
+   */
+  guestName  String?
+  guestEmail String?
+
+  /**
+   * Cobro opcional: informativo, fuera del circuito de Payment y carrito.
+   */
+  chargeAmount   Decimal? @db.Decimal(10, 2)
+  chargeCurrency String   @default("ARS")
+  chargePaid     Boolean  @default(false)
+
+  googleEventId   String?
+  calendarAdminId String?
+  calendarAdmin   User?   @relation("InternalEventCalendarAdmin", fields: [calendarAdminId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  notifiedAt  DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startTime, endTime])
+  @@index([patientId])
+}
+
+/**
+ * Bloqueos de agenda del admin (vacaciones, compromisos, etc.).
+ */
 model ScheduleBlock {
   id        String   @id @default(cuid())
   startTime DateTime
@@ -259,7 +322,9 @@ model ScheduleBlock {
   @@index([startTime, endTime])
 }
 
-/** Días enteros sin atención (no se pueden agendar citas). */
+/**
+ * Días enteros sin atención (no se pueden agendar citas).
+ */
 model BlockedDay {
   id        String   @id @default(cuid())
   date      String   @unique // YYYY-MM-DD (hora local de la clínica)
@@ -279,9 +344,13 @@ model RecurringBlockedWeekday {
   id        String   @id @default(cuid())
   weekday   Int      @unique // 0–6
   reason    String?
-  /** HH:mm — inicio de franja bloqueada; null = día completo. */
+  /**
+   * HH:mm — inicio de franja bloqueada; null = día completo.
+   */
   startTime String?
-  /** HH:mm — fin de franja bloqueada; null = día completo. */
+  /**
+   * HH:mm — fin de franja bloqueada; null = día completo.
+   */
   endTime   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -352,11 +421,11 @@ model AnthropometryFormSubmission {
 
   consentAccepted Boolean @default(false)
 
-  fullName             String?
-  consultationReason   String?
-  phone                String?
-  gender               String?
-  birthDate            DateTime?
+  fullName           String?
+  consultationReason String?
+  phone              String?
+  gender             String?
+  birthDate          DateTime?
 
   previousAnthropometry Boolean?
   dominantHand          String?
@@ -368,7 +437,7 @@ model AnthropometryFormSubmission {
   reportAnalysisTypes Json // string[]
   mainObjective       String?
   evaluationFrequency String?
-  reservedSlotNote      String?
+  reservedSlotNote    String?
 
   procedureQuestions String?
 
@@ -384,19 +453,19 @@ model NutritionFormSubmission {
   appointmentId String      @unique
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
-  fullName   String?
-  phone      String?
-  gender     String?
-  birthDate  DateTime?
+  fullName  String?
+  phone     String?
+  gender    String?
+  birthDate DateTime?
 
-  consultationReason    String?
-  dietDescription       String?
-  dietaryRestrictions   String?
-  activityLevel         String?
-  activityFrequency     String?
-  sportsPracticed       String?
+  consultationReason  String?
+  dietDescription     String?
+  dietaryRestrictions String?
+  activityLevel       String?
+  activityFrequency   String?
+  sportsPracticed     String?
 
-  reservedSlotNote      String?
+  reservedSlotNote       String?
   continuationPreference String?
 
   extendedPayload Json?
@@ -444,44 +513,44 @@ model TrainingFormSubmission {
 // ──────────────────────────────────────────────
 
 model Payment {
-  id              String        @id @default(cuid())
-  appointmentId   String        @unique
-  appointment     Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  amount          Decimal       @db.Decimal(10, 2)
-  advanceAmount   Decimal       @default(0) @db.Decimal(10, 2)
-  remainderAmount Decimal       @default(0) @db.Decimal(10, 2)
-  advancePercent  Int           @default(50)
-  currency        String        @default("ARS")
-  status          PaymentStatus @default(PENDING)
-  advanceStatus   PaymentStatus @default(PENDING)
-  remainderStatus PaymentStatus @default(PENDING)
-  provider        String?       @default("manual")
-  providerRef     String?
-  adminNote       String?
-  advanceNote     String?
-  remainderNote   String?
-  patientPaymentMethod    String?
-  patientPaymentReference String?
-  patientPaymentNote      String?
-  patientPaymentProofUrls Json?
+  id                               String        @id @default(cuid())
+  appointmentId                    String        @unique
+  appointment                      Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  amount                           Decimal       @db.Decimal(10, 2)
+  advanceAmount                    Decimal       @default(0) @db.Decimal(10, 2)
+  remainderAmount                  Decimal       @default(0) @db.Decimal(10, 2)
+  advancePercent                   Int           @default(50)
+  currency                         String        @default("ARS")
+  status                           PaymentStatus @default(PENDING)
+  advanceStatus                    PaymentStatus @default(PENDING)
+  remainderStatus                  PaymentStatus @default(PENDING)
+  provider                         String?       @default("manual")
+  providerRef                      String?
+  adminNote                        String?
+  advanceNote                      String?
+  remainderNote                    String?
+  patientPaymentMethod             String?
+  patientPaymentReference          String?
+  patientPaymentNote               String?
+  patientPaymentProofUrls          Json?
   remainderPatientPaymentMethod    String?
   remainderPatientPaymentReference String?
   remainderPatientPaymentNote      String?
   remainderPatientPaymentProofUrls Json?
-  remainderSubmittedAt    DateTime?
-  paidAt          DateTime?
-  advancePaidAt   DateTime?
-  remainderPaidAt DateTime?
-  refundStatus        RefundStatus @default(NONE)
-  refundRequestedAt   DateTime?
-  refundPatientNote   String?
-  refundAdminNote     String?
-  refundResolvedAt    DateTime?
-  advanceInboxTrashedAt    DateTime?
-  remainderInboxTrashedAt  DateTime?
-  advanceInboxDismissedAt  DateTime?
-  remainderInboxDismissedAt DateTime?
-  createdAt       DateTime      @default(now())
+  remainderSubmittedAt             DateTime?
+  paidAt                           DateTime?
+  advancePaidAt                    DateTime?
+  remainderPaidAt                  DateTime?
+  refundStatus                     RefundStatus  @default(NONE)
+  refundRequestedAt                DateTime?
+  refundPatientNote                String?
+  refundAdminNote                  String?
+  refundResolvedAt                 DateTime?
+  advanceInboxTrashedAt            DateTime?
+  remainderInboxTrashedAt          DateTime?
+  advanceInboxDismissedAt          DateTime?
+  remainderInboxDismissedAt        DateTime?
+  createdAt                        DateTime      @default(now())
 }
 
 // ──────────────────────────────────────────────
@@ -489,25 +558,25 @@ model Payment {
 // ──────────────────────────────────────────────
 
 model Resource {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   title       String
-  description String?  @db.Text
+  description String? @db.Text
   type        String // EBOOK | VIDEO | LINK | PACKAGE
   coverUrl    String?
   contentUrl  String? // PDF, archivo descargable
   videoUrl    String?
   linkUrl     String?
-  body        String?  @db.Text
-  price       Decimal  @db.Decimal(10, 2)
-  currency    String   @default("ARS")
-  isPublished Boolean  @default(false)
+  body        String? @db.Text
+  price       Decimal @db.Decimal(10, 2)
+  currency    String  @default("ARS")
+  isPublished Boolean @default(false)
   category    String?
-  sortOrder   Int      @default(0)
+  sortOrder   Int     @default(0)
 
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   purchases ResourcePurchase[]
-  cartItems   CartItem[]
+  cartItems CartItem[]
 }
 
 // ──────────────────────────────────────────────
@@ -564,27 +633,27 @@ model PatientWeeklyPlan {
 }
 
 model ResourcePurchase {
-  id         String               @id @default(cuid())
-  userId     String
-  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resourceId String
-  resource   Resource             @relation(fields: [resourceId], references: [id])
-  pricePaid  Decimal              @db.Decimal(10, 2)
-  status     ResourceAccessStatus @default(PENDING)
-  adminNote  String?
+  id                      String               @id @default(cuid())
+  userId                  String
+  user                    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId              String
+  resource                Resource             @relation(fields: [resourceId], references: [id])
+  pricePaid               Decimal              @db.Decimal(10, 2)
+  status                  ResourceAccessStatus @default(PENDING)
+  adminNote               String?
   patientPaymentMethod    String?
   patientPaymentReference String?
   patientPaymentNote      String?
   patientPaymentProofUrls Json?
-  grantedAt  DateTime?
-  refundStatus        RefundStatus @default(NONE)
-  refundRequestedAt   DateTime?
-  refundPatientNote   String?
-  refundAdminNote     String?
-  refundResolvedAt    DateTime?
-  inboxTrashedAt      DateTime?
-  inboxDismissedAt    DateTime?
-  createdAt  DateTime             @default(now())
+  grantedAt               DateTime?
+  refundStatus            RefundStatus         @default(NONE)
+  refundRequestedAt       DateTime?
+  refundPatientNote       String?
+  refundAdminNote         String?
+  refundResolvedAt        DateTime?
+  inboxTrashedAt          DateTime?
+  inboxDismissedAt        DateTime?
+  createdAt               DateTime             @default(now())
 
   @@unique([userId, resourceId])
   @@index([status])
@@ -642,32 +711,32 @@ model CartItem {
 // ──────────────────────────────────────────────
 
 model Coupon {
-  id              String         @id @default(cuid())
-  code            String         @unique
-  percentOff      Int
-  duration        CouponDuration
+  id             String             @id @default(cuid())
+  code           String             @unique
+  percentOff     Int
+  duration       CouponDuration
   /// Límite total de canjes (null = ilimitado). Cada paciente sigue pudiendo usarlo una vez.
-  maxRedemptions  Int?
-  startsAt        DateTime       @default(now())
-  expiresAt       DateTime?
-  active          Boolean        @default(true)
-  createdById String?
-  createdBy   User?          @relation("CouponsCreated", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  redemptions CouponRedemption[]
+  maxRedemptions Int?
+  startsAt       DateTime           @default(now())
+  expiresAt      DateTime?
+  active         Boolean            @default(true)
+  createdById    String?
+  createdBy      User?              @relation("CouponsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  redemptions    CouponRedemption[]
 
   @@index([active, expiresAt])
 }
 
 model CouponRedemption {
-  id               String   @id @default(cuid())
-  couponId         String
-  coupon           Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  percentOff       Int
-  createdAt        DateTime @default(now())
+  id         String   @id @default(cuid())
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  percentOff Int
+  createdAt  DateTime @default(now())
 
   @@unique([couponId, userId])
   @@index([userId])
@@ -704,13 +773,13 @@ model Session {
 }
 
 model GoogleCalendarConnection {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refreshToken   String   @db.Text
-  accessToken    String?  @db.Text
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken   String    @db.Text
+  accessToken    String?   @db.Text
   tokenExpiry    DateTime?
-  calendarId     String   @default("primary")
+  calendarId     String    @default("primary")
   connectedEmail String?
 
   createdAt DateTime @default(now())
@@ -749,16 +818,18 @@ model Notification {
 // ──────────────────────────────────────────────
 
 model Review {
-  id         String       @id @default(cuid())
-  userId     String
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /** Nombre denormalizado del autor para mostrar en el lobby. */
-  authorName String
-  rating     Int // 1–5 estrellas (validado en zod)
-  topic      ReviewTopic  @default(GENERAL)
-  body       String       @db.Text
-  status     ReviewStatus @default(PENDING)
-  adminNote  String?
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /**
+   * Nombre denormalizado del autor para mostrar en el lobby.
+   */
+  authorName  String
+  rating      Int // 1–5 estrellas (validado en zod)
+  topic       ReviewTopic  @default(GENERAL)
+  body        String       @db.Text
+  status      ReviewStatus @default(PENDING)
+  adminNote   String?
   publishedAt DateTime?
 
   createdAt DateTime @default(now())

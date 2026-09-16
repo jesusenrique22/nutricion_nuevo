@@ -33,8 +33,15 @@ export async function register() {
   if (process.env.MONGODB_URI?.trim()) {
     try {
       const { tryGetMongoDb } = await import("@/server/db/mongo");
-      await tryGetMongoDb();
-      console.log("[mongo] ✓ Conexión Atlas activa (GridFS / chat)");
+      // tryGetMongoDb devuelve null en vez de lanzar: sin este chequeo el
+      // arranque anunciaba "conexión activa" aunque Atlas estuviera caído.
+      const db = await tryGetMongoDb();
+      if (db) {
+        console.log("[mongo] ✓ Conexión Atlas activa (GridFS / chat)");
+      } else {
+        console.error("[mongo] ✗ Atlas no responde — subidas y PDFs fallarán.");
+        console.error("[mongo] Revisá Network Access (0.0.0.0/0) y que el cluster no esté pausado: pnpm db:check:mongo");
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message.split("\n")[0] : String(err);
       console.error(`[mongo] ✗ No se pudo conectar a Atlas: ${msg}`);

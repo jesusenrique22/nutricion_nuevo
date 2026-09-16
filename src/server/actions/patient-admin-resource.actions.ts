@@ -81,8 +81,71 @@ export async function updatePatientAdminResource(
       patientName: patient.name,
       driveUrl: url,
       note,
+      reason: "added",
     });
   }
 
+  return { ok: true };
+}
+
+/**
+ * Reenvía el aviso del material de Drive sin tocar el enlace.
+ *
+ * Drive no le avisa a la web cuando Anttova agrega archivos a una carpeta ya
+ * enlazada, así que el aviso automático (que depende de que cambie la URL) no
+ * se dispara en las consultas siguientes. Este botón lo manda a pedido.
+ */
+export async function resendPatientDriveNotification(
+  patientId: string,
+): Promise<PatientAdminResourceResult> {
+  if (!(await requireAdmin())) {
+    return { ok: false, message: "No autorizado." };
+  }
+
+  const patient = await prisma.user.findFirst({
+    where: { id: patientId, role: "PATIENT" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      patientProfile: {
+        select: { adminResourceUrl: true, adminResourceNote: true },
+      },
+    },
+  });
+
+  if (!patient) {
+    return { ok: false, message: "Paciente no encontrado." };
+  }
+
+  const url = patient.patientProfile?.adminResourceUrl?.trim();
+  if (!url) {
+    return {
+      ok: false,
+      message: "Primero guardá el enlace de Drive del paciente.",
+    };
+  }
+
+  try {
+    const { notifyPatientDriveMaterialAdded } = await import(
+      "@/server/services/patient-drive-notify.service"
+    );
+    await notifyPatientDriveMaterialAdded({
+      patientId: patient.id,
+      patientEmail: patient.email,
+      patientName: patient.name,
+      driveUrl: url,
+      note: patient.patientProfile?.adminResourceNote ?? null,
+      reason: "updated",
+    });
+  } catch (err) {
+    console.error("[resendPatientDriveNotification]", err);
+    return {
+      ok: false,
+      message: "No se pudo enviar el aviso. Intentá de nuevo.",
+    };
+  }
+
+  revalidatePath("/dashboard/notifications");
   return { ok: true };
 }

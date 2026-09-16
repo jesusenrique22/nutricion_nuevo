@@ -7,6 +7,7 @@ import {
 import { clinicDateAtMinutes, clinicDateTimeToUtc } from "@/lib/clinic-timezone";
 import { weekdayFromDateKey } from "@/lib/scheduling-dates";
 import {
+  isPrismaInternalEventReady,
   isPrismaRecurringBlockedWeekdayPartialReady,
   isPrismaRecurringBlockedWeekdayReady,
   prisma,
@@ -82,6 +83,19 @@ export async function getAvailableSlots(
     select: { startTime: true, endTime: true },
   });
 
+  // Los eventos de agenda de la nutricionista (seguimientos, reuniones) ocupan
+  // el horario igual que una cita, pero nunca se ofrecen para reservar.
+  const internalEvents = isPrismaInternalEventReady()
+    ? await prisma.internalEvent.findMany({
+        where: {
+          cancelledAt: null,
+          startTime: { lt: dayEnd },
+          endTime: { gt: dayStart },
+        },
+        select: { startTime: true, endTime: true },
+      })
+    : [];
+
   return computeSlotsForDay({
     dateStr,
     type: consultationType,
@@ -93,6 +107,10 @@ export async function getAvailableSlots(
       ...blocks.map((b) => ({
         start: b.startTime.toISOString(),
         end: b.endTime.toISOString(),
+      })),
+      ...internalEvents.map((e) => ({
+        start: e.startTime.toISOString(),
+        end: e.endTime.toISOString(),
       })),
       ...recurringBusy,
     ],

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePatientAdminResource } from "@/server/actions/patient-admin-resource.actions";
+import {
+  resendPatientDriveNotification,
+  updatePatientAdminResource,
+} from "@/server/actions/patient-admin-resource.actions";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-foreground/15 px-3 py-2 text-sm outline-none focus:border-primary";
@@ -18,22 +21,26 @@ export function PatientAdminResourceEditor({
 }) {
   const [url, setUrl] = useState(initialUrl ?? "");
   const [note, setNote] = useState(initialNote ?? "");
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<
+    { tone: "ok" | "error"; text: string } | null
+  >(null);
   const [isPending, startTransition] = useTransition();
 
   const dirty =
     url !== (initialUrl ?? "") || note !== (initialNote ?? "");
+  // Reenviar usa el enlace ya guardado, no el del input.
+  const canNotify = Boolean(initialUrl?.trim()) && !dirty;
 
   function save() {
-    setMessage(null);
+    setFeedback(null);
     startTransition(async () => {
       const res = await updatePatientAdminResource(patientId, { url, note });
       if (!res.ok) {
-        setMessage(res.message);
+        setFeedback({ tone: "error", text: res.message });
         return;
       }
-      setMessage("Material guardado.");
-      setTimeout(() => setMessage(null), 3000);
+      setFeedback({ tone: "ok", text: "Material guardado." });
+      setTimeout(() => setFeedback(null), 3000);
     });
   }
 
@@ -45,7 +52,27 @@ export function PatientAdminResourceEditor({
         url: "",
         note: "",
       });
-      setMessage(res.ok ? "Material eliminado." : res.message);
+      setFeedback(
+        res.ok
+          ? { tone: "ok", text: "Material eliminado." }
+          : { tone: "error", text: res.message },
+      );
+    });
+  }
+
+  function notifyUpdate() {
+    setFeedback(null);
+    startTransition(async () => {
+      const res = await resendPatientDriveNotification(patientId);
+      if (!res.ok) {
+        setFeedback({ tone: "error", text: res.message });
+        return;
+      }
+      setFeedback({
+        tone: "ok",
+        text: "Aviso enviado al paciente con el enlace de su material.",
+      });
+      setTimeout(() => setFeedback(null), 4000);
     });
   }
 
@@ -106,6 +133,21 @@ export function PatientAdminResourceEditor({
         >
           {isPending ? "Guardando…" : "Guardar material"}
         </button>
+        {Boolean(initialUrl?.trim()) && (
+          <button
+            type="button"
+            disabled={isPending || !canNotify}
+            onClick={notifyUpdate}
+            title={
+              canNotify
+                ? "Reenvía al paciente el correo con el enlace a su carpeta de Drive"
+                : "Guardá los cambios antes de avisar al paciente"
+            }
+            className="rounded-full border border-primary/25 bg-primary/5 px-5 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+          >
+            {isPending ? "Enviando…" : "Notificar actualización"}
+          </button>
+        )}
         {(initialUrl || url.trim()) && (
           <button
             type="button"
@@ -116,18 +158,24 @@ export function PatientAdminResourceEditor({
             Quitar
           </button>
         )}
-        {message && (
+        {feedback && (
           <span
             className={`text-sm font-medium ${
-              message.includes("guardado") || message.includes("eliminado")
-                ? "text-green-700"
-                : "text-red-600"
+              feedback.tone === "ok" ? "text-green-700" : "text-red-600"
             }`}
           >
-            {message}
+            {feedback.text}
           </span>
         )}
       </div>
+
+      {Boolean(initialUrl?.trim()) && (
+        <p className="mt-3 text-xs text-foreground/50">
+          Drive no le avisa a la web cuando agregás archivos a una carpeta que ya
+          está enlazada. Usá <strong>Notificar actualización</strong> para
+          reenviarle al paciente el mismo correo con el enlace.
+        </p>
+      )}
     </section>
   );
 }

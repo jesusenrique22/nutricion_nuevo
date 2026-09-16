@@ -29,9 +29,16 @@ export const STATUS_UI: Record<
     card: "border-accent/30 bg-accent/10 opacity-75 hover:opacity-100",
     badge: "bg-accent/80 text-primary-foreground",
   },
+  // Evento propio de la agenda: no es una cita de paciente, se distingue a ojo.
+  INTERNAL: {
+    dot: "bg-foreground/35",
+    card: "border-dashed border-foreground/25 bg-foreground/[0.04] hover:border-primary/35",
+    badge: "bg-foreground/60 text-white",
+  },
 };
 
 export function statusLabel(status: string): string {
+  if (status === "INTERNAL") return "Agenda propia";
   return appointmentStatusLabels[status] ?? status;
 }
 

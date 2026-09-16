@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { coverUrlValidationMessage } from "@/lib/resource-cover";
+import {
+  CONTENT_URL_VALIDATION_MESSAGE,
+  isServableContentUrl,
+} from "@/lib/stored-file-label";
 
 export const resourceTypeSchema = z.enum([
   "EBOOK",
@@ -20,7 +24,13 @@ export const upsertResourceSchema = z.object({
       (v) => coverUrlValidationMessage(v ?? "") === null,
       "La portada debe ser una imagen (.jpg, .png, .webp) o subir un archivo; no uses enlaces a artículos.",
     ),
-  contentUrl: z.string().optional(),
+  contentUrl: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || v.trim() === "" || isServableContentUrl(v),
+      CONTENT_URL_VALIDATION_MESSAGE,
+    ),
   videoUrl: z.string().optional(),
   linkUrl: z
     .string()

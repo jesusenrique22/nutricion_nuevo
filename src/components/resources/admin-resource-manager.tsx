@@ -14,7 +14,10 @@ import type { ResourceDTO } from "@/server/actions/resource.queries";
 import { DeleteResourceDialog } from "@/components/resources/delete-resource-dialog";
 import { isDisplayableCoverUrl } from "@/lib/resource-cover";
 import { uploadFile as uploadPublicFile } from "@/lib/client-upload";
-import { isInternalStoredMediaUrl } from "@/lib/stored-file-label";
+import {
+  isInternalStoredMediaUrl,
+  isServableContentUrl,
+} from "@/lib/stored-file-label";
 import { secureStoredFileUrl } from "@/lib/secure-media-url";
 import { uploadLimitLabel } from "@/lib/upload-policy";
 import { StoredFileName } from "@/components/media/stored-file-name";
@@ -58,6 +61,7 @@ export function AdminResourceManager({
   const [message, setMessage] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ResourceDTO | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -100,6 +104,7 @@ export function AdminResourceManager({
 
   async function uploadFile(file: File, target: "coverUrl" | "contentUrl") {
     setUploading(true);
+    setUploadPercent(0);
     setMessage(null);
     try {
       const kind =
@@ -114,6 +119,7 @@ export function AdminResourceManager({
       const uploaded = await uploadPublicFile(file, {
         folder: "resources",
         kind,
+        onProgress: setUploadPercent,
       });
 
       const nextForm =
@@ -150,6 +156,7 @@ export function AdminResourceManager({
       setMessage(err instanceof Error ? err.message : "Error al subir");
     } finally {
       setUploading(false);
+      setUploadPercent(0);
     }
   }
 
@@ -351,7 +358,7 @@ export function AdminResourceManager({
                   }}
                 >
                   {uploading && uploadTarget === "coverUrl"
-                    ? "Subiendo…"
+                    ? `Subiendo… ${uploadPercent}%`
                     : "Subir imagen"}
                 </button>
                 {form.coverUrl && (
@@ -446,12 +453,40 @@ export function AdminResourceManager({
                   }}
                 >
                   {uploading && uploadTarget === "contentUrl"
-                    ? "Subiendo…"
+                    ? `Subiendo… ${uploadPercent}%`
                     : form.contentUrl && isInternalStoredMediaUrl(form.contentUrl)
                       ? "Reemplazar PDF"
                       : "Subir PDF"}
                 </button>
               </div>
+
+              {uploading && uploadTarget === "contentUrl" && (
+                <div className="mt-2">
+                  <div
+                    role="progressbar"
+                    aria-valuenow={uploadPercent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className="h-1.5 overflow-hidden rounded-full bg-foreground/10"
+                  >
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${Math.max(3, uploadPercent)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-foreground/50">
+                    No cierres esta pantalla hasta que termine.
+                  </p>
+                </div>
+              )}
+
+              {form.contentUrl && !isServableContentUrl(form.contentUrl) && (
+                <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  Ese archivo apunta a una carpeta de tu computadora, así que
+                  ningún paciente puede abrirlo. Usá <strong>Subir PDF</strong>{" "}
+                  para guardarlo en la plataforma.
+                </p>
+              )}
               {showPdfPreview &&
                 form.contentUrl &&
                 isInternalStoredMediaUrl(form.contentUrl) && (
@@ -531,7 +566,11 @@ export function AdminResourceManager({
         {resources.length === 0 && (
           <p className="text-sm text-foreground/50">Sin recursos aún.</p>
         )}
-        {resources.map((r) => (
+        {resources.map((r) => {
+          const needsFile =
+            (r.type === "EBOOK" || r.type === "PACKAGE") &&
+            !(r.contentUrl && isServableContentUrl(r.contentUrl));
+          return (
           <div
             key={r.id}
             className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-foreground/10 bg-white p-4"
@@ -561,6 +600,11 @@ export function AdminResourceManager({
                 />
                 {r.isPublished ? " · Publicado" : " · Borrador"}
               </div>
+              {needsFile && (
+                <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                  Falta subir el PDF
+                </p>
+              )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -597,7 +641,8 @@ export function AdminResourceManager({
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <DeleteResourceDialog

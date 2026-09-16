@@ -1,12 +1,21 @@
 import { GridFSBucket, ObjectId, type Db } from "mongodb";
 import { Readable } from "node:stream";
 import {
-  tryGetMongoDb,
+  tryGetMongoDbWithin,
   tryGetMongoDbFast,
   withMongoDb,
 } from "@/server/db/mongo";
 
 const BUCKET = "media";
+
+/**
+ * Techos de espera al resolver la conexión.
+ *
+ * Los reintentos sin límite superan el maxDuration de la función: la petición
+ * se cortaba sola y el panel mostraba una subida colgada en vez de un error.
+ */
+const MONGO_RESOLVE_DEADLINE_MS = 12_000;
+const MONGO_UPLOAD_DEADLINE_MS = 20_000;
 
 export function mediaUrl(fileId: string): string {
   return `/api/media/${fileId}`;
@@ -21,9 +30,11 @@ export async function uploadToMongo(
     ownerId?: string;
   },
 ): Promise<{ fileId: string; url: string }> {
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_UPLOAD_DEADLINE_MS);
   if (!db) {
-    throw new Error("No pudimos guardar el archivo. Intentá de nuevo más tarde.");
+    throw new Error(
+      "No pudimos guardar el archivo: el almacenamiento (MongoDB Atlas) no responde. Revisá que el cluster esté activo y volvé a intentar.",
+    );
   }
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
 
@@ -47,7 +58,7 @@ export async function uploadToMongo(
 async function resolveMongoDb() {
   const fast = await tryGetMongoDbFast();
   if (fast) return fast;
-  return tryGetMongoDb();
+  return tryGetMongoDbWithin(MONGO_RESOLVE_DEADLINE_MS);
 }
 
 export async function getMongoFileMeta(fileId: string) {
@@ -89,7 +100,7 @@ async function openGridFsDownloadStreamOnDb(db: Db, fileId: string) {
 
 export async function deleteFromMongo(fileId: string): Promise<boolean> {
   if (!ObjectId.isValid(fileId)) return false;
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_RESOLVE_DEADLINE_MS);
   if (!db) return false;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const files = await bucket
@@ -114,7 +125,7 @@ export async function replaceMongoFileInPlace(
   },
 ): Promise<boolean> {
   if (!ObjectId.isValid(fileId)) return false;
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_UPLOAD_DEADLINE_MS);
   if (!db) return false;
   const bucket = new GridFSBucket(db, { bucketName: BUCKET });
   const oid = new ObjectId(fileId);

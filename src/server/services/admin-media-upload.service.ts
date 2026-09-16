@@ -5,8 +5,8 @@ import {
   type UploadKind,
   validateUploadFile,
 } from "@/lib/upload-policy";
-import { readStoredFileUrlToBuffer } from "@/lib/stored-file";
-import { storePublicFile } from "@/server/services/file-storage";
+import { statStoredFileUrl } from "@/lib/stored-file";
+import { prepareUpload, storePublicBuffer } from "@/server/services/file-storage";
 import { registerMediaAsset } from "@/server/services/media-library.service";
 
 export type AdminMediaUploadResult =
@@ -18,6 +18,10 @@ export type AdminMediaUploadResult =
       id?: string;
     }
   | { ok: false; message: string };
+
+function looksLikePdf(buffer: Buffer): boolean {
+  return buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+}
 
 export async function processAdminMediaUpload(
   file: File,
@@ -42,26 +46,43 @@ export async function processAdminMediaUpload(
     return { ok: false, message: validation.message };
   }
 
-  const stored = await storePublicFile(file, safeFolder, {
-    ownerId: options.ownerId,
-  });
+  // Leer una sola vez: los mismos bytes se inspeccionan y se guardan.
+  const prepared = await prepareUpload(file, safeFolder);
 
-  const storedBytes = await readStoredFileUrlToBuffer(stored.url);
-  if (!storedBytes || storedBytes.length === 0) {
-    return {
-      ok: false,
-      message:
-        "No se pudo verificar el archivo subido. Intentá de nuevo en unos segundos.",
-    };
+  if (prepared.buffer.length === 0) {
+    return { ok: false, message: "El archivo llegó vacío. Probá de nuevo." };
   }
 
-  if (
-    kind === "pdf" &&
-    storedBytes.subarray(0, 5).toString("ascii") !== "%PDF-"
-  ) {
+  // Revisar la cabecera ANTES de guardar: si no es un PDF, no tiene sentido
+  // ocupar GridFS ni hacer esperar a quien sube.
+  if (kind === "pdf" && !looksLikePdf(prepared.buffer)) {
     return {
       ok: false,
       message: "El archivo no es un PDF válido. Probá exportarlo de nuevo.",
+    };
+  }
+
+  const stored = await storePublicBuffer(prepared.buffer, safeFolder, {
+    fileName: prepared.fileName,
+    mimeType: prepared.mimeType,
+    ownerId: options.ownerId,
+  });
+
+  // Verificación por metadatos, no releyendo el binario: confirma que quedó
+  // guardado y completo sin gastar el tiempo de la función en una descarga.
+  const info = await statStoredFileUrl(stored.url);
+  if (!info) {
+    return {
+      ok: false,
+      message:
+        "No se pudo confirmar el archivo en el almacenamiento. Intentá de nuevo en unos segundos.",
+    };
+  }
+  if (info.size !== prepared.buffer.length) {
+    return {
+      ok: false,
+      message:
+        "El archivo se guardó incompleto. Intentá subirlo de nuevo con mejor conexión.",
     };
   }
 

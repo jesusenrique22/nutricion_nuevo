@@ -6,11 +6,35 @@ import {
   validateUploadFile,
 } from "@/lib/upload-policy";
 import { prepareImageForUpload } from "@/lib/client-image-upload";
-import { uploadFileWithChunks, needsChunkedUpload } from "@/lib/chunked-client-upload";
+import {
+  uploadFileWithChunks,
+  needsChunkedUpload,
+  type UploadProgressHandler,
+} from "@/lib/chunked-client-upload";
 import { parseUploadResponse } from "@/lib/upload-response";
 import { uploadAdminMediaFile } from "@/server/actions/media-upload.actions";
 
 export type UploadEndpoint = "/api/resources/upload" | "/api/payments/upload-proof";
+
+/**
+ * Mensajes del servidor que describen el archivo en sí: reintentar por
+ * fragmentos vuelve a subirlo entero para fallar igual, así que se muestran
+ * tal cual en vez de duplicar la espera.
+ */
+function isFinalUploadRejection(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("no autorizado") ||
+    m.includes("demasiadas subidas") ||
+    m.includes("archivo requerido") ||
+    m.includes("no es un pdf") ||
+    m.includes("tipo no permitido") ||
+    m.includes("demasiado grande") ||
+    m.includes("está vacío") ||
+    m.includes("se esperaba") ||
+    m.includes("solo se permiten")
+  );
+}
 
 /**
  * Sube un archivo. Toda imagen (recursos, paquetes, sobre mí, comprobantes, etc.)
@@ -22,6 +46,7 @@ export async function uploadFile(
     folder?: string;
     kind?: UploadKind;
     endpoint?: UploadEndpoint;
+    onProgress?: UploadProgressHandler;
   } = {},
 ): Promise<{ url: string; id?: string; mimeType?: string; fileName?: string }> {
   const kind = options.kind ?? "any";
@@ -68,23 +93,39 @@ export async function uploadFile(
         folder: options.folder,
         kind,
         endpoint,
+        onProgress: options.onProgress,
       });
     }
 
-    const result = await uploadAdminMediaFile(fd);
-    if (result.ok) {
-      return {
-        url: result.url,
-        id: result.id,
-        mimeType: result.mimeType,
-        fileName: result.fileName,
-      };
+    try {
+      const result = await uploadAdminMediaFile(fd);
+      if (result.ok) {
+        options.onProgress?.(100);
+        return {
+          url: result.url,
+          id: result.id,
+          mimeType: result.mimeType,
+          fileName: result.fileName,
+        };
+      }
+
+      // El archivo es el problema: reintentar solo duplica la espera.
+      if (isFinalUploadRejection(result.message)) {
+        throw new Error(result.message);
+      }
+    } catch (err) {
+      // Un throw del Server Action (body cortado, red caída) sí justifica
+      // reintentar por fragmentos; un rechazo del archivo, no.
+      if (err instanceof Error && isFinalUploadRejection(err.message)) {
+        throw err;
+      }
     }
 
     return uploadFileWithChunks(uploadFile, {
       folder: options.folder,
       kind,
       endpoint,
+      onProgress: options.onProgress,
     });
   }
 
@@ -95,6 +136,7 @@ export async function uploadFile(
     throw new Error(json.error ?? "Error al subir el archivo.");
   }
 
+  options.onProgress?.(100);
   return { url: json.url, id: json.id, mimeType: json.mimeType };
 }
 

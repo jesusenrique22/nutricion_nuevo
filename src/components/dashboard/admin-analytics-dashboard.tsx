@@ -1,4 +1,10 @@
 import { appointmentStatusLabels } from "@/lib/appointment-labels";
+import {
+  AnalyticsDetailCard,
+  CancelledAppointmentRow,
+  PendingPaymentRow,
+  UpcomingAppointmentRow,
+} from "@/components/dashboard/analytics-detail-card";
 import type { AnalyticsSummary } from "@/server/actions/analytics.queries";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -241,18 +247,28 @@ export function AdminAnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
           hint="Historial completo registrado"
           accent="primary"
         />
-        <KpiCard
+        <AnalyticsDetailCard
           label="Próximas"
           value={data.upcomingAppointments}
           hint="Pendientes o confirmadas por venir"
           accent="accent"
-        />
-        <KpiCard
+          emptyLabel="No hay citas agendadas por delante."
+        >
+          {data.upcomingList.map((row) => (
+            <UpcomingAppointmentRow key={row.id} row={row} />
+          ))}
+        </AnalyticsDetailCard>
+        <AnalyticsDetailCard
           label="Pagos pendientes"
           value={data.pendingPayments}
           hint="Cobros aún sin completar"
           accent="warning"
-        />
+          emptyLabel="No hay cobros pendientes."
+        >
+          {data.pendingPaymentsList.map((row) => (
+            <PendingPaymentRow key={row.id} row={row} />
+          ))}
+        </AnalyticsDetailCard>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -286,12 +302,17 @@ export function AdminAnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-          <KpiCard
+          <AnalyticsDetailCard
             label="Canceladas"
             value={data.cancelledAppointments}
             hint="Citas anuladas por paciente o consulta"
             accent="danger"
-          />
+            emptyLabel="Ninguna cita cancelada."
+          >
+            {data.cancelledList.map((row) => (
+              <CancelledAppointmentRow key={row.id} row={row} />
+            ))}
+          </AnalyticsDetailCard>
           <KpiCard
             label="No asistió"
             value={data.noShowCount}

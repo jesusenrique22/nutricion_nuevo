@@ -7,6 +7,9 @@ import {
 } from "@/lib/secure-media-url";
 import { ResourcePdfViewer } from "@/components/resources/resource-pdf-viewer";
 
+type ContentKind = "pdf" | "image" | "video" | "unknown";
+type ProbeState = "idle" | "loading" | "ok" | "forbidden" | "missing" | "error";
+
 export function ProtectedContentViewer({
   resourceId,
   title,
@@ -16,24 +19,47 @@ export function ProtectedContentViewer({
 }: {
   resourceId: string;
   title: string;
-  contentKind: "pdf" | "image" | "video" | "unknown";
+  contentKind: ContentKind;
   hasVideo: boolean;
   hasContent: boolean;
 }) {
   const contentUrl = hasContent ? resourceContentStreamUrl(resourceId) : null;
   const videoUrl = hasVideo ? resourceVideoStreamUrl(resourceId) : null;
-  const [effectiveKind, setEffectiveKind] = useState<"pdf" | "image" | "video" | "unknown">(contentKind);
+  const [effectiveKind, setEffectiveKind] = useState<ContentKind>(contentKind);
+  const [probe, setProbe] = useState<ProbeState>(
+    hasContent ? "loading" : "idle",
+  );
 
   useEffect(() => {
     setEffectiveKind(contentKind);
   }, [contentKind]);
 
   useEffect(() => {
-    if (!hasContent || !contentUrl) return;
+    if (!hasContent || !contentUrl) {
+      setProbe("idle");
+      return;
+    }
+
     let cancelled = false;
+    setProbe("loading");
+
     fetch(contentUrl, { method: "HEAD", credentials: "include" })
       .then((res) => {
         if (cancelled) return;
+
+        if (res.status === 401 || res.status === 403) {
+          setProbe("forbidden");
+          return;
+        }
+        if (res.status === 404) {
+          setProbe("missing");
+          return;
+        }
+        if (!res.ok) {
+          setProbe("error");
+          return;
+        }
+
         const kindHeader = res.headers.get("x-content-kind");
         const ct = res.headers.get("content-type") || "";
         if (kindHeader === "image" || ct.startsWith("image/")) {
@@ -41,21 +67,29 @@ export function ProtectedContentViewer({
         } else if (kindHeader === "pdf" || ct === "application/pdf") {
           setEffectiveKind("pdf");
         }
+        setProbe("ok");
       })
-      .catch(() => {});
+      .catch(() => {
+        // Sin respuesta al HEAD no sabemos el tipo, pero el archivo puede estar
+        // perfecto: dejamos que el visor lo intente en vez de mostrar nada.
+        if (!cancelled) setProbe("ok");
+      });
+
     return () => {
       cancelled = true;
     };
   }, [contentUrl, hasContent]);
 
-  const showPdf =
-    hasContent &&
-    contentUrl &&
-    effectiveKind === "pdf";
+  // Un recurso sin extensión en la URL (p. ej. /api/media/<id>) daba "unknown"
+  // y antes no se renderizaba nada: en la duda se intenta como documento, que
+  // es lo que Anttova sube en la práctica.
+  const resolvedKind: ContentKind =
+    effectiveKind === "unknown" && hasContent ? "pdf" : effectiveKind;
+
+  const readable = probe === "ok" || probe === "loading";
+  const showPdf = hasContent && contentUrl && resolvedKind === "pdf" && readable;
   const showImage =
-    hasContent &&
-    contentUrl &&
-    effectiveKind === "image";
+    hasContent && contentUrl && resolvedKind === "image" && readable;
 
   useEffect(() => {
     function blockSave(e: KeyboardEvent) {
@@ -99,19 +133,38 @@ export function ProtectedContentViewer({
         </div>
       )}
 
-      {showPdf && (
-        <ResourcePdfViewer resourceId={resourceId} title={title} />
+      {showPdf && <ResourcePdfViewer resourceId={resourceId} title={title} />}
+
+      {probe === "missing" && (
+        <ContentNotice>
+          El archivo de este recurso todavía no está cargado. Escribile a
+          Anttova para que lo suba y vas a poder abrirlo desde acá — tu compra
+          sigue registrada.
+        </ContentNotice>
+      )}
+
+      {probe === "forbidden" && (
+        <ContentNotice>
+          Tu sesión no tiene permiso para abrir este archivo. Cerrá sesión,
+          volvé a entrar y reintentá; si sigue igual, avisale a Anttova.
+        </ContentNotice>
+      )}
+
+      {probe === "error" && (
+        <ContentNotice>
+          No pudimos cargar el documento en este momento. Actualizá la página en
+          unos minutos.
+        </ContentNotice>
       )}
 
       {!hasVideo && !hasContent && (
         <p className="text-sm text-foreground/50">
-          Este recurso no tiene archivo adjunto. Subí un PDF en{" "}
-          <strong>Archivo principal</strong> al editarlo en el panel de
-          recursos.
+          Este recurso todavía no tiene archivo adjunto. Anttova tiene que
+          subirlo desde el panel de recursos.
         </p>
       )}
 
-      {hasContent && !showPdf && contentKind === "video" && !hasVideo && (
+      {hasContent && resolvedKind === "video" && !hasVideo && (
         <p className="text-sm text-foreground/50">
           Configurá la URL de video o subí un archivo compatible.
         </p>
@@ -122,5 +175,16 @@ export function ProtectedContentViewer({
         está disponible para descarga directa.
       </p>
     </div>
+  );
+}
+
+function ContentNotice({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      role="status"
+      className="rounded-2xl bg-amber-50 px-4 py-5 text-sm text-amber-900 ring-1 ring-amber-200/70"
+    >
+      {children}
+    </p>
   );
 }

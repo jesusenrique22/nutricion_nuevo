@@ -15,7 +15,7 @@ import {
   getMongoFileMeta,
   openMongoFileStream,
 } from "@/server/services/mongo-storage";
-import { tryGetMongoDb } from "@/server/db/mongo";
+import { tryGetMongoDbWithin } from "@/server/db/mongo";
 import {
   gridFileMimeType as gridMime,
   openGridFsDownloadStream,
@@ -104,12 +104,16 @@ export async function guessContentKindFromStoredUrl(
   return "unknown";
 }
 
+/** Margen para que el visor reciba un error claro en vez de quedarse girando. */
+const MONGO_READ_DEADLINE_MS = 15_000;
+
 async function openGridFsWithRetry(fileId: string) {
   const fast = await openMongoFileStream(fileId);
   if (fast) return fast;
 
-  // Second pass with the slow/retry Mongo path (Atlas cold start).
-  const db = await tryGetMongoDb();
+  // Segunda pasada por el camino lento de Mongo (Atlas recién despierto),
+  // pero acotada: sin techo, una caída de Atlas cuelga la petición entera.
+  const db = await tryGetMongoDbWithin(MONGO_READ_DEADLINE_MS);
   if (!db) return null;
   return openGridFsDownloadStream(fileId);
 }
@@ -158,7 +162,8 @@ async function openLocalUploadsPath(
 export async function openStoredFileUrl(
   url: string,
 ): Promise<StoredFileOpenResult | null> {
-  const normalized = normalizeStoredUrl(url);
+  const raw = url.trim();
+  const normalized = normalizeStoredUrl(raw);
   const mediaId = parseMediaIdFromUrl(normalized);
   if (mediaId) {
     const result = await openGridFsWithRetry(mediaId);
@@ -175,15 +180,93 @@ export async function openStoredFileUrl(
     return resolveUploadsFallbackFromMediaAsset(mediaId);
   }
 
+  const isAbsolute = /^https?:\/\/\S+$/i.test(raw);
+
+  if (!isAbsolute && isUploadsPath(normalized)) {
+    return openLocalUploadsPath(normalized);
+  }
+
+  // Contra la URL cruda: normalizeStoredUrl deja solo el path, con lo que un
+  // PDF alojado en otro dominio dejaba de parecer remoto y no se abría nunca.
+  if (isRemoteHttpsUrl(raw)) {
+    return openRemoteHttpsUrl(raw);
+  }
+
   if (isUploadsPath(normalized)) {
     return openLocalUploadsPath(normalized);
   }
 
-  if (isRemoteHttpsUrl(normalized)) {
-    return openRemoteHttpsUrl(normalized);
+  return null;
+}
+
+/**
+ * Comprueba que el archivo quedó guardado y con qué tamaño, sin descargarlo.
+ *
+ * Verificar una subida releyendo el archivo entero desde GridFS puede tardar
+ * más que el propio límite de la función serverless (Atlas frío + PDF grande):
+ * la subida terminaba bien pero el panel la daba por fallida. Con los metadatos
+ * alcanza para saber que el binario está completo.
+ */
+export async function statStoredFileUrl(
+  url: string,
+): Promise<{ size: number; mimeType: string } | null> {
+  const normalized = normalizeStoredUrl(url);
+  const mediaId = parseMediaIdFromUrl(normalized);
+
+  if (mediaId) {
+    const meta = await getMongoFileMeta(mediaId);
+    if (meta) {
+      return {
+        size: meta.length ?? 0,
+        mimeType: gridFileMimeType(
+          meta.metadata as Record<string, unknown> | undefined,
+          meta.filename,
+        ),
+      };
+    }
+    // Legacy: el id apunta a un archivo solo local.
+    const fallback = await resolveUploadsFallbackFromMediaAsset(mediaId);
+    if (!fallback) return null;
+    fallback.stream.destroy?.();
+    return statLocalUploadsPath(fallback.fileName ?? "", mediaId);
+  }
+
+  if (isUploadsPath(normalized)) {
+    const rel = normalized.replace(/^\//, "").split("?")[0] ?? "";
+    const abs = path.join(process.cwd(), "public", rel);
+    try {
+      const info = await stat(abs);
+      return { size: info.size, mimeType: mimeFromPath(abs) };
+    } catch {
+      return null;
+    }
   }
 
   return null;
+}
+
+async function statLocalUploadsPath(
+  fileName: string,
+  fileId: string,
+): Promise<{ size: number; mimeType: string } | null> {
+  const { prisma } = await import("@/server/db/prisma");
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { OR: [{ fileId }, { url: { contains: fileId } }] },
+    select: { url: true },
+  });
+  if (!asset?.url.startsWith("/uploads/")) return null;
+
+  const abs = path.join(
+    process.cwd(),
+    "public",
+    asset.url.replace(/^\//, ""),
+  );
+  try {
+    const info = await stat(abs);
+    return { size: info.size, mimeType: mimeFromPath(fileName || abs) };
+  } catch {
+    return null;
+  }
 }
 
 export async function readStoredFileUrlToBuffer(
