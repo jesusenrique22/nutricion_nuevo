@@ -193,6 +193,16 @@ async function handleChunk(req: NextRequest) {
     return NextResponse.json({ error: "Índice inválido." }, { status: 400 });
   }
 
+  // Antes de leer el cuerpo: el tope de 50 MB se comprueba sobre el tamaño
+  // declarado y sobre el archivo ya ensamblado, pero sin esto cada fragmento
+  // podía traer lo que quisiera y meter mucho más en memoria entremedio.
+  if (chunk.size > CHUNKED_UPLOAD_PART_BYTES) {
+    return NextResponse.json(
+      { error: "Fragmento demasiado grande." },
+      { status: 413 },
+    );
+  }
+
   const buffer = Buffer.from(await chunk.arrayBuffer());
   if (buffer.length === 0) {
     return NextResponse.json({ error: "Fragmento vacío." }, { status: 400 });

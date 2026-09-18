@@ -1,7 +1,10 @@
 import { Binary, ObjectId } from "mongodb";
 import { tryGetMongoDbWithin } from "@/server/db/mongo";
 import type { UploadKind } from "@/lib/upload-policy";
-import { validateUploadBuffer } from "@/lib/upload-policy";
+import {
+  CHUNKED_UPLOAD_PART_BYTES,
+  validateUploadBuffer,
+} from "@/lib/upload-policy";
 import {
   storePublicBuffer,
   type StoredFile,
@@ -134,6 +137,17 @@ export async function storeChunkedUploadPart(input: {
 
   if (input.chunkIndex < 0 || input.chunkIndex >= session.totalChunks) {
     throw new Error("Índice de fragmento inválido.");
+  }
+
+  // Los fragmentos son rebanadas de tamaño fijo, así que se sabe dónde termina
+  // cada uno. Que la suma no pase del tamaño declarado mantiene el tope de
+  // 50 MB también durante la subida, no solo al principio y al final.
+  const declaredEnd =
+    input.chunkIndex * CHUNKED_UPLOAD_PART_BYTES + input.data.length;
+  if (declaredEnd > session.totalSize) {
+    throw new Error(
+      "El archivo supera el tamaño declarado al iniciar la subida.",
+    );
   }
 
   const chunks = chunkCollection(db);
