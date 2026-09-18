@@ -438,11 +438,13 @@ async function handleContentHead(id: string) {
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const path = (await context.params).path ?? [];
+    // `await` y no `return promesa`: sin esperar acá, un rechazo escapa del
+    // try/catch y la respuesta sale vacía en vez de con el motivo del fallo.
     if (path.length === 2 && path[1] === "content") {
-      return handleContent(path[0]);
+      return await handleContent(path[0]);
     }
     if (path.length === 2 && path[1] === "video") {
-      return handleVideo(path[0]);
+      return await handleVideo(path[0]);
     }
     return new Response("No encontrado", { status: 404 });
   } catch (err) {
@@ -455,9 +457,9 @@ export async function HEAD(req: Request, context: RouteContext) {
   try {
     const path = (await context.params).path ?? [];
     if (path.length === 2 && path[1] === "content") {
-      return handleContentHead(path[0]);
+      return await handleContentHead(path[0]);
     }
-    return GET(req, context);
+    return await GET(req, context);
   } catch (err) {
     console.error("[resources/head]", err);
     return new Response(null, { status: 500 });
@@ -470,11 +472,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (path[0] !== "upload") {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
-    if (path.length === 1) return handleDirectUpload(req);
-    if (path[1] === "init") return handleInit(req);
-    if (path[1] === "chunk") return handleChunk(req);
-    if (path[1] === "complete") return handleComplete(req);
-    if (path[1] === "cancel") return handleCancel(req);
+    // `await` obligatorio: sin él el rechazo no llega al catch de abajo y el
+    // panel recibía un 500 sin cuerpo — la subida parecía fallar en silencio.
+    if (path.length === 1) return await handleDirectUpload(req);
+    if (path[1] === "init") return await handleInit(req);
+    if (path[1] === "chunk") return await handleChunk(req);
+    if (path[1] === "complete") return await handleComplete(req);
+    if (path[1] === "cancel") return await handleCancel(req);
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   } catch (err) {
     console.error("[resources/upload]", err);

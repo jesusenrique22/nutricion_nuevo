@@ -35,13 +35,14 @@ async function uploadChunkedFile(
       totalSize: file.size,
     }),
   });
-  const initJson = (await initRes.json()) as {
-    sessionId?: string;
-    totalChunks?: number;
-    error?: string;
-  };
+  // parseUploadResponse y no res.json(): cuando la función se corta por tiempo
+  // el 500 viene sin cuerpo, y json() reventaba con "Unexpected end of JSON
+  // input" en vez de decir qué pasó.
+  const initJson = await parseUploadResponse(initRes);
   if (!initRes.ok || !initJson.sessionId) {
-    throw new Error(initJson.error ?? "No se pudo iniciar la subida del archivo.");
+    throw new Error(
+      initJson.error ?? "No se pudo iniciar la subida del archivo.",
+    );
   }
   const sessionId = initJson.sessionId;
   const totalChunks =

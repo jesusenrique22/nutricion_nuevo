@@ -490,7 +490,7 @@ export function AdminResourceManager({
               {showPdfPreview &&
                 form.contentUrl &&
                 isInternalStoredMediaUrl(form.contentUrl) && (
-                  <div className="mt-4 max-h-[min(70vh,720px)] overflow-y-auto rounded-2xl ring-1 ring-foreground/10">
+                  <div className="mt-4">
                     <ClientPdfDocumentViewer
                       pdfUrl={secureStoredFileUrl(form.contentUrl)}
                       maxWidth={900}

@@ -22,7 +22,31 @@ const dbName = process.env.MONGODB_DB ?? "nutricion_chat";
 const globalForMongo = globalThis as unknown as {
   _mongoClient: MongoClient | undefined;
   _mongoClientPromise: Promise<MongoClient> | undefined;
+  _mongoDownUntil: number | undefined;
 };
+
+/**
+ * Ventana de corte tras un fallo de conexión.
+ *
+ * Con Atlas caído, cada petición volvía a esperar el tiempo completo antes de
+ * rendirse: subir un archivo se iba a decenas de segundos y parecía colgado.
+ * Durante esta ventana se responde "no disponible" al instante; es corta para
+ * que el servicio se recupere solo apenas Atlas vuelva.
+ */
+const MONGO_DOWN_WINDOW_MS = 15_000;
+
+function isMongoInDownWindow(): boolean {
+  const until = globalForMongo._mongoDownUntil;
+  return typeof until === "number" && Date.now() < until;
+}
+
+function markMongoDown(): void {
+  globalForMongo._mongoDownUntil = Date.now() + MONGO_DOWN_WINDOW_MS;
+}
+
+function markMongoUp(): void {
+  globalForMongo._mongoDownUntil = undefined;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -224,10 +248,13 @@ export async function tryGetMongoDbFast(): Promise<Db | null> {
 
   if (globalForMongo._mongoClient) {
     if (await pingClient(globalForMongo._mongoClient, 2_500)) {
+      markMongoUp();
       return globalForMongo._mongoClient.db(dbName);
     }
     resetMongoConnection();
   }
+
+  if (isMongoInDownWindow()) return null;
 
   const client = new MongoClient(getMongoUri(), {
     ...getClientOptions(),
@@ -240,9 +267,11 @@ export async function tryGetMongoDbFast(): Promise<Db | null> {
     await client.connect();
     globalForMongo._mongoClient = client;
     globalForMongo._mongoClientPromise = Promise.resolve(client);
+    markMongoUp();
     return client.db(dbName);
   } catch {
     await client.close().catch(() => {});
+    markMongoDown();
     return null;
   }
 }
@@ -257,12 +286,15 @@ export async function tryGetMongoDb(): Promise<Db | null> {
   const attempts = 3;
   for (let i = 1; i <= attempts; i++) {
     try {
-      return await getMongoDb();
+      const db = await getMongoDb();
+      markMongoUp();
+      return db;
     } catch (err) {
       resetMongoConnection();
       if (i < attempts) await sleep(isTopologyClosedError(err) ? 500 : 2_000);
     }
   }
+  markMongoDown();
   return null;
 }
 
@@ -279,6 +311,14 @@ export async function tryGetMongoDbWithin(
   deadlineMs: number,
 ): Promise<Db | null> {
   if (!isMongoConfigured()) return null;
+
+  // Reutilizar un cliente sano no cuesta nada; solo se corta si hay que
+  // reconectar y acabamos de fallar.
+  if (globalForMongo._mongoClient && (await pingClient(globalForMongo._mongoClient, 2_500))) {
+    markMongoUp();
+    return globalForMongo._mongoClient.db(dbName);
+  }
+  if (isMongoInDownWindow()) return null;
 
   return Promise.race([
     tryGetMongoDb().catch(() => null),

@@ -1,6 +1,9 @@
 "use client";
 
-import { ClientPdfDocumentViewer } from "@/components/pdf/client-pdf-document-viewer";
+import {
+  ClientPdfDocumentViewer,
+  PdfPrintNotice,
+} from "@/components/pdf/client-pdf-document-viewer";
 
 export function ResourcePdfViewer({
   resourceId,
@@ -15,8 +18,8 @@ export function ResourcePdfViewer({
       <ClientPdfDocumentViewer
         pdfUrl={`/api/resources/${resourceId}/content`}
         maxWidth={1100}
-        className="overflow-hidden rounded-2xl bg-muted/20 ring-1 ring-foreground/10 select-none"
       />
+      <PdfPrintNotice />
     </div>
   );
 }

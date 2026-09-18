@@ -487,3 +487,31 @@ html[data-anttova-splash="skip"] .anttova-splash {
   }
 }
 
+
+/* ── Visor de PDF ───────────────────────────────────────────────────────────
+   El contenido se pinta en canvas dentro de la app, nunca en el visor nativo
+   del navegador (que trae descargar e imprimir). Al imprimir la página, el
+   documento se reemplaza por un aviso en vez de salir por la impresora. */
+@media print {
+  .pdf-guard {
+    display: none !important;
+  }
+
+  .pdf-guard-print-notice {
+    display: block !important;
+    padding: 24px;
+    text-align: center;
+    font-size: 14px;
+  }
+}
+
+.pdf-guard-print-notice {
+  display: none;
+}
+
+.pdf-guard canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}

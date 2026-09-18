@@ -1,5 +1,5 @@
-import { ObjectId } from "mongodb";
-import { tryGetMongoDb } from "@/server/db/mongo";
+import { Binary, ObjectId } from "mongodb";
+import { tryGetMongoDbWithin } from "@/server/db/mongo";
 import type { UploadKind } from "@/lib/upload-policy";
 import { validateUploadBuffer } from "@/lib/upload-policy";
 import {
@@ -10,6 +10,18 @@ import {
 const SESSIONS = "upload_sessions";
 const CHUNKS = "upload_chunks";
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Techo de espera por petición.
+ *
+ * Los reintentos completos de tryGetMongoDb suman ~64 s, más que el maxDuration
+ * de 60 s de la ruta: la función se cortaba sola y devolvía un 500 sin cuerpo,
+ * así que el panel no podía ni decir qué había fallado.
+ */
+const MONGO_DEADLINE_MS = 12_000;
+
+const STORAGE_DOWN_MESSAGE =
+  "No pudimos conectar con el almacenamiento de archivos (MongoDB Atlas). Revisá que el cluster esté activo y que la IP del servidor esté permitida en Network Access.";
 
 export type UploadSessionInfo = {
   sessionId: string;
@@ -31,14 +43,33 @@ type SessionDoc = {
   expiresAt: Date;
 };
 
-function chunkCollection(db: Awaited<ReturnType<typeof tryGetMongoDb>>) {
-  if (!db) throw new Error("MongoDB no disponible para subidas grandes.");
-  return db.collection<{ sessionId: ObjectId; chunkIndex: number; data: Buffer }>(
-    CHUNKS,
+/**
+ * El fragmento se guarda como Buffer, pero al releerlo el driver lo devuelve
+ * como `Binary` de BSON, no como Buffer. Tipar el campo como Buffer escondía
+ * esa diferencia y `Buffer.concat` reventaba al ensamblar el archivo.
+ */
+type ChunkDoc = {
+  sessionId: ObjectId;
+  chunkIndex: number;
+  data: Buffer | Binary;
+};
+
+/** Normaliza lo que devuelva el driver (Binary, Uint8Array o Buffer) a Buffer. */
+function chunkToBuffer(data: unknown, chunkIndex: number): Buffer {
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof Binary) return Buffer.from(data.buffer);
+  if (data instanceof Uint8Array) return Buffer.from(data);
+  throw new Error(
+    `El fragmento ${chunkIndex + 1} llegó en un formato inesperado. Volvé a subir el archivo.`,
   );
 }
 
-function sessionCollection(db: Awaited<ReturnType<typeof tryGetMongoDb>>) {
+function chunkCollection(db: Awaited<ReturnType<typeof tryGetMongoDbWithin>>) {
+  if (!db) throw new Error("MongoDB no disponible para subidas grandes.");
+  return db.collection<ChunkDoc>(CHUNKS);
+}
+
+function sessionCollection(db: Awaited<ReturnType<typeof tryGetMongoDbWithin>>) {
   if (!db) throw new Error("MongoDB no disponible para subidas grandes.");
   return db.collection<SessionDoc>(SESSIONS);
 }
@@ -52,11 +83,9 @@ export async function initChunkedUpload(input: {
   totalSize: number;
   totalChunks: number;
 }): Promise<UploadSessionInfo> {
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_DEADLINE_MS);
   if (!db) {
-    throw new Error(
-      "No pudimos iniciar la subida. Verificá que MongoDB Atlas esté activo y accesible (Network Access → 0.0.0.0/0 para Vercel).",
-    );
+    throw new Error(STORAGE_DOWN_MESSAGE);
   }
 
   const now = new Date();
@@ -92,9 +121,9 @@ export async function storeChunkedUploadPart(input: {
     throw new Error("Sesión de subida inválida.");
   }
 
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_DEADLINE_MS);
   if (!db) {
-    throw new Error("MongoDB no disponible. Intentá de nuevo en unos minutos.");
+    throw new Error(STORAGE_DOWN_MESSAGE);
   }
 
   const sessions = sessionCollection(db);
@@ -134,9 +163,9 @@ export async function completeChunkedUpload(input: {
     throw new Error("Sesión de subida inválida.");
   }
 
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_DEADLINE_MS);
   if (!db) {
-    throw new Error("MongoDB no disponible. Intentá de nuevo en unos minutos.");
+    throw new Error(STORAGE_DOWN_MESSAGE);
   }
 
   const sessions = sessionCollection(db);
@@ -161,7 +190,9 @@ export async function completeChunkedUpload(input: {
     throw new Error("No se encontraron todos los fragmentos del archivo.");
   }
 
-  const buffer = Buffer.concat(parts.map((part) => part.data));
+  const buffer = Buffer.concat(
+    parts.map((part) => chunkToBuffer(part.data, part.chunkIndex)),
+  );
   if (buffer.length !== session.totalSize) {
     throw new Error(
       `Tamaño incorrecto (${buffer.length} bytes, esperado ${session.totalSize}).`,
@@ -200,7 +231,7 @@ export async function completeChunkedUpload(input: {
 }
 
 async function cleanupChunkedUpload(sessionId: ObjectId): Promise<void> {
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_DEADLINE_MS);
   if (!db) return;
   await chunkCollection(db).deleteMany({ sessionId });
   await sessionCollection(db).deleteOne({ _id: sessionId });
@@ -211,7 +242,7 @@ export async function cancelChunkedUpload(input: {
   ownerId: string;
 }): Promise<void> {
   if (!ObjectId.isValid(input.sessionId)) return;
-  const db = await tryGetMongoDb();
+  const db = await tryGetMongoDbWithin(MONGO_DEADLINE_MS);
   if (!db) return;
 
   const session = await sessionCollection(db).findOne({

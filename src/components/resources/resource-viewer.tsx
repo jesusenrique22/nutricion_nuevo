@@ -1,5 +1,4 @@
 import type { ResourceDTO } from "@/server/actions/resource.queries";
-import { guessContentKindFromUrl } from "@/lib/content-kind";
 import { ProtectedContentViewer } from "@/components/resources/protected-content-viewer";
 
 export function ResourceViewer({
@@ -7,13 +6,10 @@ export function ResourceViewer({
 }: {
   resource: ResourceDTO;
 }) {
-  // Solo heurística por URL/tipo — no abrir Mongo aquí (evita meter mongodb
-  // en el bundle SSR de /dashboard/patient/library/[id]).
-  const contentKind = guessContentKindFromUrl(
-    resource.contentUrl,
-    resource.type,
-  );
-  const hasContent = Boolean(resource.contentUrl);
+  // El tipo ya viene resuelto del servidor: la ruta del archivo no se manda al
+  // navegador para que el PDF solo sea accesible a través del visor.
+  const contentKind = resource.contentKind;
+  const hasContent = resource.hasContent;
 
   return (
     <div className="space-y-6">
@@ -38,7 +34,7 @@ export function ResourceViewer({
         resourceId={resource.id}
         title={resource.title}
         contentKind={contentKind}
-        hasVideo={Boolean(resource.type === "VIDEO" && resource.videoUrl)}
+        hasVideo={resource.type === "VIDEO" && resource.hasVideo}
         hasContent={hasContent}
       />
 

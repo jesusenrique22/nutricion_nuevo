@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { guessContentKindFromUrl } from "@/lib/content-kind";
 import { prisma } from "@/server/db/prisma";
 
 export interface ResourceDTO {
@@ -9,8 +10,17 @@ export interface ResourceDTO {
   description: string | null;
   type: string;
   coverUrl: string | null;
+  /**
+   * Solo para ADMIN. Al paciente se le manda `null`: la ruta del archivo viaja
+   * en el HTML de la página, y con ella podría abrir el PDF en el visor nativo
+   * del navegador —con descargar e imprimir— saltándose el visor de Anttova.
+   */
   contentUrl: string | null;
   videoUrl: string | null;
+  /** Lo que el visor necesita saber sin conocer la ruta del archivo. */
+  hasContent: boolean;
+  hasVideo: boolean;
+  contentKind: "pdf" | "image" | "video" | "unknown";
   linkUrl: string | null;
   body: string | null;
   price: string;
@@ -39,16 +49,25 @@ function mapResource(
     isPublished: boolean;
     sortOrder: number;
   },
-  opts: { owned?: boolean; accessStatus?: "PENDING" | "GRANTED" | "REFUNDED" | null } = {},
+  opts: {
+    owned?: boolean;
+    accessStatus?: "PENDING" | "GRANTED" | "REFUNDED" | null;
+    /** Solo el panel de administración recibe las rutas reales. */
+    exposeFiles?: boolean;
+  } = {},
 ): ResourceDTO {
+  const exposeFiles = opts.exposeFiles ?? false;
   return {
     id: r.id,
     title: r.title,
     description: r.description,
     type: r.type,
     coverUrl: r.coverUrl,
-    contentUrl: r.contentUrl,
-    videoUrl: r.videoUrl,
+    contentUrl: exposeFiles ? r.contentUrl : null,
+    videoUrl: exposeFiles ? r.videoUrl : null,
+    hasContent: Boolean(r.contentUrl),
+    hasVideo: Boolean(r.videoUrl),
+    contentKind: guessContentKindFromUrl(r.contentUrl, r.type),
     linkUrl: r.linkUrl,
     body: r.body,
     price: r.price.toString(),
@@ -110,7 +129,7 @@ export async function getAllResourcesAdmin(): Promise<ResourceDTO[]> {
   const resources = await prisma.resource.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   });
-  return resources.map((r) => mapResource(r));
+  return resources.map((r) => mapResource(r, { exposeFiles: true }));
 }
 
 export async function getMyLibraryResources(): Promise<ResourceDTO[]> {
@@ -195,7 +214,7 @@ export async function getResourceById(
   const owned = isAdmin || accessStatus === "GRANTED";
   if (!owned && !isAdmin) return null;
 
-  return mapResource(resource, { owned, accessStatus });
+  return mapResource(resource, { owned, accessStatus, exposeFiles: isAdmin });
 }
 
 export interface PendingResourceRequestDTO {
@@ -256,6 +275,9 @@ export async function getPublishedResourcesForPatientAdmin(
   );
 
   return catalog.map((r) =>
-    mapResource(r, { accessStatus: statusByResource.get(r.id) ?? null }),
+    mapResource(r, {
+      accessStatus: statusByResource.get(r.id) ?? null,
+      exposeFiles: true,
+    }),
   );
 }
