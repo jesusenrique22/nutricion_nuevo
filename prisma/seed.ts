@@ -131,10 +131,38 @@ async function seedAdminUser() {
   return adminEmail;
 }
 
+/** Segundo admin solo para pruebas locales; no es el calendario por defecto. */
+async function seedTestAdminUser() {
+  const email = "admin.prueba@anttova.local";
+  const passwordHash = await bcrypt.hash("AdminPrueba123!", 10);
+
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      name: "Admin Prueba",
+      emailVerified: new Date(),
+      passwordHash,
+      role: "ADMIN",
+      isDefaultCalendarAdmin: false,
+    },
+    create: {
+      email,
+      name: "Admin Prueba",
+      role: "ADMIN",
+      passwordHash,
+      emailVerified: new Date(),
+      isDefaultCalendarAdmin: false,
+    },
+  });
+
+  return email;
+}
+
 async function main() {
   await seedConsultationTypes();
 
   const adminEmail = await seedAdminUser();
+  const testAdminEmail = await seedTestAdminUser();
 
   for (const [slug, content] of Object.entries(SITE_CONTENT_DEFAULTS)) {
     await prisma.siteContent.upsert({
@@ -183,6 +211,7 @@ async function main() {
 
   console.log("Seed completado: consultas, admin, CMS, recurso demo.");
   console.log(`Admin -> ${adminEmail} / Admin123!`);
+  console.log(`Admin prueba -> ${testAdminEmail} / AdminPrueba123!`);
   console.log(
     "Para restaurar «Guía de porciones proteicas»: pnpm run db:restore-guia",
   );

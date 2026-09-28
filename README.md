@@ -17,10 +17,10 @@ Abre [http://localhost:3000](http://localhost:3000).
 Para el chat en tiempo real (requiere MongoDB en marcha):
 
 ```bash
-pnpm run socket   # puerto 3001 — en otra terminal junto a dev
+pnpm run socket   # puerto 5001 — en otra terminal junto a dev
 ```
 
-Variables: `MONGODB_URI`, `MONGODB_DB`, `NEXT_PUBLIC_SOCKET_URL` (ej. `http://localhost:3001`).
+Variables: `MONGODB_URI`, `MONGODB_DB`, `NEXT_PUBLIC_SOCKET_URL` (ej. `http://localhost:5001`).
 
 ### Recordatorios de citas (sin servicios pagos)
 

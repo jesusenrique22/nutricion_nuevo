@@ -243,7 +243,12 @@ export async function getMyPendingPayments(): Promise<PatientPendingPaymentItem[
     prisma.appointment.findMany({
       where: {
         patientId,
+        // Una cita cancelada no debe seguir pidiendo pago. El filtro cubre
+        // también los cobros que quedaron PENDING antes de que cancelar
+        // anulara la solicitud.
+        status: { not: "CANCELLED" },
         payment: {
+          status: { notIn: ["CANCELLED", "REFUNDED"] },
           OR: [
             {
               advanceStatus: "PENDING",

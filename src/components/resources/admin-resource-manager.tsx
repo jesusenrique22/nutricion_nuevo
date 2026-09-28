@@ -43,6 +43,7 @@ const emptyForm = {
   currency: "ARS",
   category: "",
   isPublished: false,
+  allowDownload: false,
   sortOrder: "0",
 };
 
@@ -64,6 +65,17 @@ export function AdminResourceManager({
   const [uploadPercent, setUploadPercent] = useState(0);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Word/Excel/PowerPoint no tienen visor en la app: si no se habilita la
+  // descarga, el paciente se queda sin forma de abrirlos.
+  // Se mira el nombre además de la URL: una subida a GridFS queda como
+  // /api/media/<id>, sin extensión que delate el tipo.
+  const needsDownloadToOpen = Boolean(
+    form.contentUrl &&
+      /\.(docx?|xlsx?|pptx?)(\?|$)/i.test(
+        `${form.contentFileName} ${form.contentUrl}`,
+      ),
+  );
 
   function buildPayload(nextForm: typeof form, id?: string) {
     const { contentFileName: _label, ...rest } = nextForm;
@@ -97,6 +109,7 @@ export function AdminResourceManager({
       currency: r.currency,
       category: r.category ?? "",
       isPublished: r.isPublished,
+      allowDownload: r.allowDownload,
       sortOrder: String(r.sortOrder),
     });
     setMessage(null);
@@ -386,7 +399,8 @@ export function AdminResourceManager({
               <span className="font-semibold">Archivo principal (PDF)</span>
               <span className="mt-0.5 block text-xs font-normal text-foreground/55">
                 Documento que el paciente lee al desbloquear el recurso. Subí
-                el PDF aquí; es obligatorio para e-books. Máx.{" "}
+                el PDF aquí; es obligatorio para e-books. También admite Word,
+                Excel y PowerPoint, que solo se entregan por descarga. Máx.{" "}
                 {uploadLimitLabel("pdf")}. Archivos grandes se suben por
                 fragmentos automáticamente si hace falta.
               </span>
@@ -522,13 +536,38 @@ export function AdminResourceManager({
               />
               Publicado en tienda
             </label>
+
+            <label className="block text-sm sm:col-span-2">
+              <span className="flex items-center gap-2 font-semibold">
+                <input
+                  type="checkbox"
+                  checked={form.allowDownload}
+                  onChange={(e) =>
+                    setForm({ ...form, allowDownload: e.target.checked })
+                  }
+                />
+                Permitir descargar el archivo
+              </span>
+              <span className="mt-1 block text-xs font-normal text-foreground/55">
+                {form.allowDownload
+                  ? "El paciente verá un botón para bajar el archivo a su dispositivo. Una vez descargado podrá compartirlo libremente."
+                  : "Sin marcar, el paciente solo lo lee dentro de Anttova y no puede descargarlo ni imprimirlo."}
+              </span>
+              {needsDownloadToOpen && !form.allowDownload && (
+                <span className="mt-2 block rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  Este tipo de archivo (Word, Excel o PowerPoint) no se puede
+                  leer dentro de Anttova. Si no habilitás la descarga, el
+                  paciente no va a poder abrirlo.
+                </span>
+              )}
+            </label>
           </div>
 
           <input
             ref={fileRef}
             type="file"
             className="hidden"
-            accept="image/*,application/pdf,video/mp4,video/webm"
+            accept="image/*,application/pdf,video/mp4,video/webm,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file || !uploadTarget) return;

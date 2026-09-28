@@ -18,6 +18,10 @@ import {
 import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import { formatActionError } from "@/lib/db-errors";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
+import {
+  cancelAppointmentPaymentRequest,
+  removeCartItemsForAppointment,
+} from "@/server/services/appointment-cancel-payment.service";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { appointmentRescheduledEmail } from "@/lib/email-messages";
 
@@ -48,9 +52,36 @@ async function revalidateAppointmentPaths(patientId: string) {
   revalidatePath("/dashboard/admin/patients");
   revalidatePath(`/dashboard/admin/patients/${patientId}`);
   revalidatePath("/dashboard/patient/appointments");
+  revalidatePath("/dashboard/patient/cart");
+  revalidatePath("/dashboard/patient/cart/historial");
+  revalidatePath("/dashboard/admin/payments");
   revalidatePath("/dashboard/notifications");
   revalidatePath("/dashboard");
   await syncPatientAndAdmins(patientId, "appointments");
+}
+
+/**
+ * Cancelar la cita y dejar el cobro vivo es la mitad del trabajo: anula lo que
+ * quede por cobrar y limpia el carrito antes de avisarle a nadie.
+ */
+async function voidPaymentForCancelledAppointment(appt: {
+  id: string;
+  patientId: string;
+  consultationTypeId: string;
+  startTime: Date;
+}) {
+  try {
+    await cancelAppointmentPaymentRequest(appt.id);
+    await removeCartItemsForAppointment({
+      appointmentId: appt.id,
+      patientId: appt.patientId,
+      consultationTypeId: appt.consultationTypeId,
+      startTime: appt.startTime,
+    });
+  } catch (err) {
+    // La cita ya quedó cancelada; no revertirla por esto, pero sí registrarlo.
+    console.error("[appointment-cancel/payment]", appt.id, err);
+  }
 }
 
 async function loadAppointment(appointmentId: string) {
@@ -113,6 +144,7 @@ export async function updateAppointmentStatus(
     }
 
     if (parsed.data.status === "CANCELLED") {
+      await voidPaymentForCancelledAppointment(appt);
       await notifyAppointmentCancelled({
         appointmentId: appt.id,
         patientId: appt.patientId,
@@ -194,6 +226,8 @@ export async function cancelAppointment(
         cancelledAt: new Date(),
       },
     });
+
+    await voidPaymentForCancelledAppointment(appt);
 
     await notifyAppointmentCancelled({
       appointmentId: appt.id,

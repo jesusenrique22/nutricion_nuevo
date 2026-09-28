@@ -67,6 +67,7 @@ export async function upsertResource(
     category: data.category ?? null,
     isPublished: data.isPublished ?? false,
     sortOrder: data.sortOrder ?? 0,
+    allowDownload: data.allowDownload ?? false,
   };
 
   if (data.id) {

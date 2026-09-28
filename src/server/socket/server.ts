@@ -7,7 +7,7 @@ import { Server } from "socket.io";
  * - Chat en vivo (salas por conversación)
  * - Actualizaciones del dashboard (salas por usuario y rol)
  */
-const PORT = Number(process.env.SOCKET_PORT ?? 3001);
+const PORT = Number(process.env.SOCKET_PORT ?? 5001);
 const SOCKET_SECRET = process.env.SOCKET_INTERNAL_SECRET;
 if (!SOCKET_SECRET) {
   console.error(

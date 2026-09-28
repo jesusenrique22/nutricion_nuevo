@@ -44,6 +44,7 @@ export const upsertResourceSchema = z.object({
   currency: z.string().default("ARS"),
   category: z.string().optional(),
   isPublished: z.boolean().optional(),
+  allowDownload: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
 

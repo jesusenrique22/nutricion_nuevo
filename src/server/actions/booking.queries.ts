@@ -176,20 +176,25 @@ async function getRecurringPartialBusyIntervals(
     });
     if (partials.length === 0) return [];
 
-    const byWeekday = new Map(
-      partials.map((r) => [
-        r.weekday,
-        { start: r.startTime!.trim(), end: r.endTime!.trim() },
-      ]),
-    );
+    // Una lista por día, no una sola franja: con un Map de 1 a 1 se perdían
+    // todas las franjas menos la última de cada día.
+    const byWeekday = new Map<number, { start: string; end: string }[]>();
+    for (const r of partials) {
+      const list = byWeekday.get(r.weekday) ?? [];
+      list.push({ start: r.startTime!.trim(), end: r.endTime!.trim() });
+      byWeekday.set(r.weekday, list);
+    }
+
     const out: { start: string; end: string }[] = [];
     for (const key of dateRangeKeys(from, to)) {
-      const window = byWeekday.get(weekdayFromDateKey(key));
-      if (!window) continue;
-      out.push({
-        start: clinicDateTimeToUtc(key, window.start).toISOString(),
-        end: clinicDateTimeToUtc(key, window.end).toISOString(),
-      });
+      const windows = byWeekday.get(weekdayFromDateKey(key));
+      if (!windows) continue;
+      for (const window of windows) {
+        out.push({
+          start: clinicDateTimeToUtc(key, window.start).toISOString(),
+          end: clinicDateTimeToUtc(key, window.end).toISOString(),
+        });
+      }
     }
     return out;
   } catch {

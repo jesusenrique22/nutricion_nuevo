@@ -28,6 +28,8 @@ export interface ResourceDTO {
   category: string | null;
   isPublished: boolean;
   sortOrder: number;
+  /** La nutricionista habilitó bajar el archivo además de leerlo en la app. */
+  allowDownload: boolean;
   owned?: boolean;
   accessStatus?: "PENDING" | "GRANTED" | "REFUNDED" | null;
 }
@@ -48,6 +50,7 @@ function mapResource(
     category: string | null;
     isPublished: boolean;
     sortOrder: number;
+    allowDownload?: boolean;
   },
   opts: {
     owned?: boolean;
@@ -75,6 +78,7 @@ function mapResource(
     category: r.category,
     isPublished: r.isPublished,
     sortOrder: r.sortOrder,
+    allowDownload: r.allowDownload ?? false,
     owned: opts.owned,
     accessStatus: opts.accessStatus ?? null,
   };

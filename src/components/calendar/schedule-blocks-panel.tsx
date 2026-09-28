@@ -18,6 +18,8 @@ import {
   deleteBlockedDay,
   deleteRecurringBlockedWeekday,
   deleteScheduleBlock,
+  updateRecurringBlockedWeekday,
+  updateScheduleBlock,
 } from "@/server/actions/schedule-block.actions";
 
 function todayStr() {
@@ -82,6 +84,12 @@ export function ScheduleBlocksPanel({
   const [endTime, setEndTime] = useState("13:00");
   const [reason, setReason] = useState("");
 
+  // Ids en edición: el formulario se reutiliza para crear y para corregir.
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(
+    null,
+  );
+
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -136,6 +144,26 @@ export function ScheduleBlocksPanel({
       return;
     }
     startTransition(async () => {
+      if (editingRecurringId) {
+        const res = await updateRecurringBlockedWeekday({
+          id: editingRecurringId,
+          weekday: selectedWeekdays[0]!,
+          reason: weekdayReason.trim() || undefined,
+          startTime: weekdayScope === "partial" ? weekdayStart : "",
+          endTime: weekdayScope === "partial" ? weekdayEnd : "",
+        });
+        if (!res.ok) {
+          setMessage(res.message);
+          return;
+        }
+        setEditingRecurringId(null);
+        setSelectedWeekdays([]);
+        setWeekdayReason("");
+        setMessage("Bloqueo actualizado.");
+        router.refresh();
+        return;
+      }
+
       const res = await createRecurringBlockedWeekdays({
         weekdays: selectedWeekdays,
         reason: weekdayReason.trim() || undefined,
@@ -162,22 +190,81 @@ export function ScheduleBlocksPanel({
     });
   }
 
+  /** Carga un bloqueo puntual en el formulario para corregirlo. */
+  function startEditBlock(block: ScheduleBlockDTO) {
+    const start = new Date(block.start);
+    const end = new Date(block.end);
+    const opts = { timeZone: "America/Argentina/Buenos_Aires" } as const;
+    setMode("hours");
+    setExpanded(true);
+    setMessage(null);
+    setEditingRecurringId(null);
+    setEditingBlockId(block.id);
+    setDate(start.toLocaleDateString("en-CA", opts));
+    setStartTime(
+      start.toLocaleTimeString("en-GB", { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).slice(0, 5),
+    );
+    setEndTime(
+      end.toLocaleTimeString("en-GB", { ...opts, hour: "2-digit", minute: "2-digit", hour12: false }).slice(0, 5),
+    );
+    setReason(block.reason ?? "");
+  }
+
+  function cancelEditBlock() {
+    setEditingBlockId(null);
+    setReason("");
+    setMessage(null);
+  }
+
+  /** Carga una franja fija en el formulario para corregirla. */
+  function startEditRecurring(row: RecurringBlockedWeekdayDTO) {
+    setMode("weekdays");
+    setExpanded(true);
+    setMessage(null);
+    setEditingBlockId(null);
+    setEditingRecurringId(row.id);
+    setSelectedWeekdays([row.weekday]);
+    setWeekdayReason(row.reason ?? "");
+    const partial = Boolean(row.startTime && row.endTime);
+    setWeekdayScope(partial ? "partial" : "full");
+    if (partial) {
+      setWeekdayStart(row.startTime!);
+      setWeekdayEnd(row.endTime!);
+    }
+  }
+
+  function cancelEditRecurring() {
+    setEditingRecurringId(null);
+    setSelectedWeekdays([]);
+    setWeekdayReason("");
+    setMessage(null);
+  }
+
   function handleCreatePartial(e: FormEvent) {
     e.preventDefault();
     setMessage(null);
     startTransition(async () => {
-      const res = await createScheduleBlock({
-        dateStr: date,
-        startTime,
-        endTime,
-        reason: reason.trim() || undefined,
-      });
+      const res = editingBlockId
+        ? await updateScheduleBlock({
+            id: editingBlockId,
+            dateStr: date,
+            startTime,
+            endTime,
+            reason: reason.trim() || undefined,
+          })
+        : await createScheduleBlock({
+            dateStr: date,
+            startTime,
+            endTime,
+            reason: reason.trim() || undefined,
+          });
       if (!res.ok) {
         setMessage(res.message);
         return;
       }
+      setMessage(editingBlockId ? "Bloqueo actualizado." : "Horario bloqueado.");
+      setEditingBlockId(null);
       setReason("");
-      setMessage("Horario bloqueado.");
       router.refresh();
     });
   }
@@ -325,9 +412,9 @@ export function ScheduleBlocksPanel({
           {mode === "weekdays" && (
             <form onSubmit={handleBlockWeekdays} className="space-y-3">
               <p className="text-sm text-foreground/60">
-                Se aplica a <strong>todos</strong> esos días de la semana hasta
-                que los habilites. Podés cerrar el día entero o solo una franja
-                (ej. jueves mañana cerrado, tarde libre).
+                {editingRecurringId
+                  ? "Estás editando una franja fija. El día no se cambia acá: ajustá el horario o el motivo y guardá."
+                  : "Se aplica a todos esos días de la semana hasta que los habilites. Podés cerrar el día entero o solo una franja (ej. jueves mañana cerrado, tarde libre), y agregar varias franjas al mismo día: queda libre lo que haya en el medio."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -353,7 +440,9 @@ export function ScheduleBlocksPanel({
                   Solo franja horaria
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div
+                className={`flex flex-wrap gap-2 ${editingRecurringId ? "pointer-events-none opacity-60" : ""}`}
+              >
                 {WEEKDAY_OPTIONS.map((day) => {
                   const active = selectedWeekdays.includes(day.value);
                   const already = recurringWeekdays.some(
@@ -406,7 +495,8 @@ export function ScheduleBlocksPanel({
                     />
                   </div>
                   <p className="sm:col-span-2 text-[11px] text-foreground/45">
-                    Ejemplo: 08:00–13:00 deja libres las citas de la tarde.
+                    Ejemplo: bloqueá 08:00–13:00 y después 17:00–18:00 el mismo
+                    día: se puede agendar de 13:00 a 17:00.
                   </p>
                 </div>
               )}
@@ -428,16 +518,31 @@ export function ScheduleBlocksPanel({
                 disabled={isPending || selectedWeekdays.length === 0}
                 className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
-                {isPending ? "Guardando…" : "Bloquear días elegidos"}
+                {isPending
+                  ? "Guardando…"
+                  : editingRecurringId
+                    ? "Guardar cambios"
+                    : "Bloquear días elegidos"}
               </button>
+              {editingRecurringId && (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={cancelEditRecurring}
+                  className="ml-2 rounded-full border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground/70 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              )}
             </form>
           )}
 
           {mode === "hours" && (
             <form onSubmit={handleCreatePartial} className="space-y-3">
               <p className="text-sm text-foreground/60">
-                Bloqueá solo algunas horas de una fecha concreta (reunión,
-                turno médico, etc.). El resto del día sigue disponible.
+                {editingBlockId
+                  ? "Estás editando un bloqueo existente. Cambiá fecha, horario o motivo y guardá."
+                  : "Bloqueá solo algunas horas de una fecha concreta (reunión, turno médico, etc.). El resto del día sigue disponible, y podés agregar varios bloqueos en la misma fecha, todas las veces que quieras, sin tocar los demás días."}
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
@@ -496,8 +601,22 @@ export function ScheduleBlocksPanel({
                 disabled={isPending}
                 className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
               >
-                {isPending ? "Guardando…" : "Bloquear horario"}
+                {isPending
+                  ? "Guardando…"
+                  : editingBlockId
+                    ? "Guardar cambios"
+                    : "Bloquear horario"}
               </button>
+              {editingBlockId && (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={cancelEditBlock}
+                  className="ml-2 rounded-full border border-foreground/15 px-4 py-2 text-sm font-semibold text-foreground/70 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              )}
             </form>
           )}
 
@@ -531,6 +650,15 @@ export function ScheduleBlocksPanel({
                         </span>
                       )}
                     </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => startEditRecurring(r)}
+                      className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                    >
+                      Editar
+                    </button>
                     <button
                       type="button"
                       disabled={isPending}
@@ -539,6 +667,7 @@ export function ScheduleBlocksPanel({
                     >
                       Habilitar
                     </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -606,14 +735,24 @@ export function ScheduleBlocksPanel({
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => handleDeleteBlock(b.id)}
-                      className="shrink-0 text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => startEditBlock(b)}
+                        className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => handleDeleteBlock(b.id)}
+                        className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

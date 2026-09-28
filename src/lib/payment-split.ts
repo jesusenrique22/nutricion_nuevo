@@ -21,14 +21,21 @@ export function splitPaymentAmount(
 export function syncOverallPaymentStatus(
   advanceStatus: string,
   remainderStatus: string,
-): "PENDING" | "PARTIAL" | "PAID" | "REFUNDED" {
+): "PENDING" | "PARTIAL" | "PAID" | "REFUNDED" | "CANCELLED" {
   if (advanceStatus === "REFUNDED" || remainderStatus === "REFUNDED") {
     return "REFUNDED";
   }
+
   const advancePaid = advanceStatus === "PAID";
   const remainderPaid = remainderStatus === "PAID";
+
+  // Lo ya cobrado manda: si se pagó algo, el cobro no es "cancelado" aunque la
+  // parte restante se haya anulado — eso se resuelve por reembolso.
   if (advancePaid && remainderPaid) return "PAID";
   if (advancePaid || remainderPaid) return "PARTIAL";
+  if (advanceStatus === "CANCELLED" || remainderStatus === "CANCELLED") {
+    return "CANCELLED";
+  }
   return "PENDING";
 }
 

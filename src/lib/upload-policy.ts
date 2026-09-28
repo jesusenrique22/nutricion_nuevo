@@ -28,6 +28,31 @@ const WEB_SAFE_IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
 const PDF_EXT = new Set(["pdf"]);
 const VIDEO_EXT = new Set(["mp4", "webm", "mov", "m4v"]);
 
+/**
+ * Documentos que solo se entregan por descarga: no hay visor en la app para
+ * ellos, así que el recurso tiene que tener la descarga habilitada.
+ */
+const DOC_EXT = new Set(["doc", "docx", "xls", "xlsx", "ppt", "pptx"]);
+
+const DOC_MIME = new Set([
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+/** ¿El archivo solo sirve para descargar (sin vista previa en la app)? */
+export function isDownloadOnlyFile(file: {
+  type?: string;
+  name: string;
+}): boolean {
+  const mime = (file.type ?? "").trim().toLowerCase();
+  if (DOC_MIME.has(mime)) return true;
+  return DOC_EXT.has(fileExtension(file.name));
+}
+
 const MIME_BY_EXT: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -42,6 +67,12 @@ const MIME_BY_EXT: Record<string, string> = {
   webm: "video/webm",
   mov: "video/quicktime",
   m4v: "video/x-m4v",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 /** Mime que se pueden guardar en disco/Mongo (después de normalizar en el cliente). */
@@ -75,6 +106,7 @@ const ALLOWED_MIME: Record<UploadKind, Set<string>> = {
     "video/mp4",
     "video/webm",
     "video/quicktime",
+    ...DOC_MIME,
   ]),
 };
 
@@ -126,7 +158,10 @@ function extMatchesKind(ext: string, kind: UploadKind): boolean {
   if (kind === "proof") return WEB_SAFE_IMAGE_EXT.has(ext);
   if (kind === "any") {
     return (
-      WEB_SAFE_IMAGE_EXT.has(ext) || PDF_EXT.has(ext) || VIDEO_EXT.has(ext)
+      WEB_SAFE_IMAGE_EXT.has(ext) ||
+      PDF_EXT.has(ext) ||
+      VIDEO_EXT.has(ext) ||
+      DOC_EXT.has(ext)
     );
   }
   return false;
@@ -190,7 +225,7 @@ export function validateUploadFile(
       pdf: "archivos PDF",
       video: "videos MP4 o WebM",
       proof: "capturas JPG, PNG o WebP",
-      any: "imágenes web (JPG/PNG/WebP), PDF o video",
+      any: "imágenes web (JPG/PNG/WebP), PDF, Word, Excel, PowerPoint o video",
     };
     return {
       ok: false,
@@ -256,7 +291,7 @@ export function validateUploadMetadata(
       pdf: "archivos PDF",
       video: "videos MP4 o WebM",
       proof: "capturas JPG, PNG o WebP",
-      any: "imágenes web (JPG/PNG/WebP), PDF o video",
+      any: "imágenes web (JPG/PNG/WebP), PDF, Word, Excel, PowerPoint o video",
     };
     return {
       ok: false,

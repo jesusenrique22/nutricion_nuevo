@@ -151,7 +151,7 @@ Todos los formularios de cita usan plantillas editables en **Personalizar → Fo
 ### 3.7 Chat y notificaciones
 
 - MongoDB: conversaciones, mensajes, notificaciones.
-- Socket.io (`pnpm run socket`, puerto 3001).
+- Socket.io (`pnpm run socket`, puerto 5001).
 - Upload adjuntos chat → `public/uploads/chat/`.
 - UI en `/dashboard/chat` y `/dashboard/notifications`.
 
@@ -286,7 +286,7 @@ FormTemplate (code + fields JSON) — formularios editables
 # Desarrollo (3 terminales si usás chat + reminders)
 pnpm install
 pnpm run dev              # http://localhost:3000
-pnpm run socket           # Socket.io :3001
+pnpm run socket           # Socket.io :5001
 
 # Base de datos
 pnpm run db:push          # Sincronizar schema (dev)
@@ -313,9 +313,10 @@ Tras `pnpm run db:seed`:
 
 | Rol | Email | Contraseña |
 |-----|-------|------------|
-| Admin | `admin@gmail.com` | `Admin123!` |
+| Admin (lic) | `admin@gmail.com` | `Admin123!` |
+| Admin (pruebas) | `admin.prueba@anttova.local` | `AdminPrueba123!` |
 
-Pacientes: registro en `/register`.
+El admin de pruebas tiene el mismo panel y agenda (horarios compartidos de la clínica). No aparece en la lista de pacientes (`role: ADMIN`). No es el admin de calendario por defecto.
 
 **PostgreSQL local (ejemplo):** `NutricionSQL` en `localhost:5432`.
 

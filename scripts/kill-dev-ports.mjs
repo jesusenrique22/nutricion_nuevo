@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/** Libera los puertos 3000 (Next) y 3001 (socket) antes de `pnpm run dev`. */
+/** Libera los puertos 3000 (Next) y 5001 (socket) antes de `pnpm run dev`. */
 import { execSync } from "node:child_process";
 
-const PORTS = [3000, 3001];
+const PORTS = [3000, 5001];
 const killed = new Set();
 
 for (const port of PORTS) {
@@ -29,7 +29,7 @@ for (const port of PORTS) {
 }
 
 if (killed.size === 0) {
-  console.log("Nada que liberar en 3000/3001.");
+  console.log("Nada que liberar en 3000/5001.");
 } else {
   console.log("\nListo. Ahora: pnpm run dev");
 }

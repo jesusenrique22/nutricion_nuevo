@@ -34,6 +34,14 @@ export const deleteScheduleBlockSchema = z.object({
   id: z.string().min(1),
 });
 
+export const updateScheduleBlockSchema = z.object({
+  id: z.string().min(1),
+  dateStr: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+  reason: z.string().max(200).optional(),
+});
+
 export const createBlockedDaysSchema = z.object({
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -83,6 +91,23 @@ export const createRecurringBlockedWeekdaysSchema = z
 
 export const deleteRecurringBlockedWeekdaySchema = z.object({
   id: z.string().min(1),
+});
+
+export const updateRecurringBlockedWeekdaySchema = z.object({
+  id: z.string().min(1),
+  weekday: z.number().int().min(0).max(6),
+  reason: z.string().max(200).optional(),
+  /** Ambos vacíos = día completo. */
+  startTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Hora inválida")
+    .optional()
+    .or(z.literal("")),
+  endTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Hora inválida")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const markPaymentSchema = z.object({

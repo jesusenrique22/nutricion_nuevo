@@ -36,6 +36,7 @@ export function ResourceViewer({
         contentKind={contentKind}
         hasVideo={resource.type === "VIDEO" && resource.hasVideo}
         hasContent={hasContent}
+        allowDownload={resource.allowDownload}
       />
 
       {resource.type === "LINK" && resource.linkUrl && (

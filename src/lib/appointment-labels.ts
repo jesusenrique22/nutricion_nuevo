@@ -12,12 +12,14 @@ export const paymentStatusLabels: Record<string, string> = {
   PAID: "Pagado",
   REFUNDED: "Reembolsado",
   FAILED: "Fallido",
+  CANCELLED: "Cancelado",
 };
 
 export const paymentPhaseLabels: Record<string, string> = {
   PENDING: "Procesando",
   PAID: "Pagado",
   REFUNDED: "Reembolsado",
+  CANCELLED: "Cancelado",
 };
 
 export const modalityLabels: Record<string, string> = {

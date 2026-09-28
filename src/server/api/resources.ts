@@ -347,12 +347,7 @@ async function handleContent(id: string) {
   }
 
   const mimeType = detectBufferMimeType(buffer, file.mimeType);
-  const kind =
-    mimeType.startsWith("image/")
-      ? "image"
-      : mimeType === "application/pdf"
-        ? "pdf"
-        : "unknown";
+  const kind = contentKindFromMime(mimeType);
 
   return new Response(new Uint8Array(buffer), {
     headers: {
@@ -391,9 +386,83 @@ async function handleVideo(id: string) {
   return storedFileToResponse(file, { inline: true });
 }
 
+/** Nombre de archivo legible: el del recurso, no el aleatorio del almacenamiento. */
+function downloadFileName(title: string, storedName?: string): string {
+  const ext = storedName?.includes(".")
+    ? storedName.slice(storedName.lastIndexOf("."))
+    : "";
+  const base = title.trim().replace(/[^\w\s.\-()]+/g, "").trim() || "recurso";
+  return ext && !base.toLowerCase().endsWith(ext.toLowerCase())
+    ? `${base}${ext}`
+    : base;
+}
+
+/**
+ * Descarga del archivo, solo si la nutricionista la habilitó en el recurso.
+ *
+ * Va por streaming y no por buffer: el archivo no pasa entero por la memoria
+ * de la función y el navegador empieza a recibirlo de inmediato.
+ */
+async function handleDownload(id: string) {
+  const allowed = await canAccessResourceContent(id);
+  if (!allowed) {
+    const session = await auth();
+    return new Response(session?.user ? "No autorizado" : "Inicia sesión", {
+      status: session?.user ? 403 : 401,
+    });
+  }
+
+  const resource = await prisma.resource.findUnique({
+    where: { id },
+    select: { contentUrl: true, title: true, allowDownload: true },
+  });
+  if (!resource?.contentUrl) {
+    return new Response("Sin contenido", { status: 404 });
+  }
+
+  // La admin siempre puede bajar su propio material; el paciente solo si está
+  // habilitado. Sin este control alcanzaría con adivinar la URL.
+  if (!resource.allowDownload) {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") {
+      return new Response(
+        "La descarga de este recurso no está habilitada.",
+        { status: 403 },
+      );
+    }
+  }
+
+  const contentUrl = resource.contentUrl.trim();
+  if (!isServableContentUrl(contentUrl)) {
+    return new Response("El archivo no está subido a la plataforma.", {
+      status: 404,
+    });
+  }
+
+  const file = await openStoredFileUrl(contentUrl);
+  if (!file) {
+    return new Response("Archivo no encontrado.", { status: 404 });
+  }
+
+  return storedFileToResponse(
+    { ...file, fileName: downloadFileName(resource.title, file.fileName) },
+    { inline: false },
+  );
+}
+
 function contentKindFromMime(mimeType: string) {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType === "application/pdf") return "pdf";
+  // Word/Excel/PowerPoint: se sabe qué son, pero no hay visor. Distinguirlos de
+  // "unknown" evita que el visor intente abrirlos como PDF y muestre un error.
+  if (
+    mimeType.startsWith("application/vnd.openxmlformats-officedocument") ||
+    mimeType === "application/msword" ||
+    mimeType === "application/vnd.ms-excel" ||
+    mimeType === "application/vnd.ms-powerpoint"
+  ) {
+    return "document";
+  }
   return "unknown";
 }
 
@@ -455,6 +524,9 @@ export async function GET(_req: Request, context: RouteContext) {
     }
     if (path.length === 2 && path[1] === "video") {
       return await handleVideo(path[0]);
+    }
+    if (path.length === 2 && path[1] === "download") {
+      return await handleDownload(path[0]);
     }
     return new Response("No encontrado", { status: 404 });
   } catch (err) {

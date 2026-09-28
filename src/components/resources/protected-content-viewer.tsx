@@ -7,7 +7,7 @@ import {
 } from "@/lib/secure-media-url";
 import { ResourcePdfViewer } from "@/components/resources/resource-pdf-viewer";
 
-type ContentKind = "pdf" | "image" | "video" | "unknown";
+type ContentKind = "pdf" | "image" | "video" | "document" | "unknown";
 type ProbeState = "idle" | "loading" | "ok" | "forbidden" | "missing" | "error";
 
 export function ProtectedContentViewer({
@@ -16,13 +16,16 @@ export function ProtectedContentViewer({
   contentKind,
   hasVideo,
   hasContent,
+  allowDownload = false,
 }: {
   resourceId: string;
   title: string;
   contentKind: ContentKind;
   hasVideo: boolean;
   hasContent: boolean;
+  allowDownload?: boolean;
 }) {
+  const canDownload = allowDownload && hasContent;
   const contentUrl = hasContent ? resourceContentStreamUrl(resourceId) : null;
   const videoUrl = hasVideo ? resourceVideoStreamUrl(resourceId) : null;
   const [effectiveKind, setEffectiveKind] = useState<ContentKind>(contentKind);
@@ -66,6 +69,9 @@ export function ProtectedContentViewer({
           setEffectiveKind("image");
         } else if (kindHeader === "pdf" || ct === "application/pdf") {
           setEffectiveKind("pdf");
+        } else if (kindHeader === "document") {
+          // Word/Excel/PowerPoint: sin visor, solo descarga.
+          setEffectiveKind("document");
         }
         setProbe("ok");
       })
@@ -81,8 +87,9 @@ export function ProtectedContentViewer({
   }, [contentUrl, hasContent]);
 
   // Un recurso sin extensión en la URL (p. ej. /api/media/<id>) daba "unknown"
-  // y antes no se renderizaba nada: en la duda se intenta como documento, que
-  // es lo que Anttova sube en la práctica.
+  // y antes no se renderizaba nada: en la duda se intenta como PDF, que es lo
+  // que Anttova sube en la práctica. Un ofimático nunca entra acá: el servidor
+  // lo identifica como "document" y se entrega solo por descarga.
   const resolvedKind: ContentKind =
     effectiveKind === "unknown" && hasContent ? "pdf" : effectiveKind;
 
@@ -106,6 +113,19 @@ export function ProtectedContentViewer({
       className="space-y-6 rounded-3xl border border-foreground/10 bg-white p-6"
       onContextMenu={(e) => e.preventDefault()}
     >
+      {canDownload && (
+        <a
+          href={`/api/resources/${resourceId}/download`}
+          // Enlace directo, sin JS: el navegador descarga en streaming y no hay
+          // estado intermedio que pueda quedarse colgado.
+          download
+          className="flex items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+        >
+          <DownloadIcon />
+          Descargar archivo
+        </a>
+      )}
+
       {hasVideo && videoUrl && (
         <div className="overflow-hidden rounded-2xl bg-black">
           <video
@@ -134,6 +154,14 @@ export function ProtectedContentViewer({
       )}
 
       {showPdf && <ResourcePdfViewer resourceId={resourceId} title={title} />}
+
+      {!showPdf && !showImage && !hasVideo && probe === "ok" && (
+        <p className="text-sm text-foreground/55">
+          {canDownload
+            ? "Este archivo no se puede previsualizar acá. Usá el botón de arriba para descargarlo."
+            : "Este archivo no se puede abrir dentro de Anttova. Pedile a Anttova que habilite la descarga."}
+        </p>
+      )}
 
       {probe === "missing" && (
         <ContentNotice>
@@ -171,10 +199,29 @@ export function ProtectedContentViewer({
       )}
 
       <p className="text-xs text-foreground/45">
-        Contenido exclusivo para tu cuenta. Visualización dentro de Anttova; no
-        está disponible para descarga directa.
+        {canDownload
+          ? "Contenido exclusivo para tu cuenta. Podés descargarlo para uso personal."
+          : "Contenido exclusivo para tu cuenta. Visualización dentro de Anttova; no está disponible para descarga directa."}
       </p>
     </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 3v10m0 0 4-4m-4 4-4-4" />
+      <path d="M3 15v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" />
+    </svg>
   );
 }
 

@@ -211,18 +211,20 @@ export async function validateAppointmentSlot(params: {
     const select = isPrismaRecurringBlockedWeekdayPartialReady()
       ? ({ id: true, startTime: true, endTime: true } as const)
       : ({ id: true } as const);
-    const recurring = await prisma.recurringBlockedWeekday.findUnique({
+    // Varias franjas por día: hay que revisarlas todas, no solo la primera.
+    const recurring = await prisma.recurringBlockedWeekday.findMany({
       where: { weekday },
       select,
     });
-    if (recurring) {
+
+    for (const row of recurring) {
       const windowStart =
-        "startTime" in recurring
-          ? (recurring.startTime as string | null)?.trim() || null
+        "startTime" in row
+          ? (row.startTime as string | null)?.trim() || null
           : null;
       const windowEnd =
-        "endTime" in recurring
-          ? (recurring.endTime as string | null)?.trim() || null
+        "endTime" in row
+          ? (row.endTime as string | null)?.trim() || null
           : null;
 
       if (!windowStart || !windowEnd) {

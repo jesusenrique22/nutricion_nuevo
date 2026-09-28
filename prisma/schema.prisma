@@ -62,6 +62,10 @@ enum PaymentStatus {
   PAID
   REFUNDED
   FAILED
+  /**
+   * La cita se anuló: ya no hay nada que cobrar ni que el paciente deba.
+   */
+  CANCELLED
 }
 
 enum RefundStatus {
@@ -342,7 +346,11 @@ model BlockedDay {
  */
 model RecurringBlockedWeekday {
   id        String   @id @default(cuid())
-  weekday   Int      @unique // 0–6
+  /**
+   * 0–6. Sin @unique a propósito: un mismo día puede tener varias franjas
+   * bloqueadas (p. ej. 08:00–13:00 y 17:00–18:00) y trabajar en el resto.
+   */
+  weekday   Int
   reason    String?
   /**
    * HH:mm — inicio de franja bloqueada; null = día completo.
@@ -354,6 +362,8 @@ model RecurringBlockedWeekday {
   endTime   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([weekday])
 }
 
 // ──────────────────────────────────────────────
@@ -558,20 +568,24 @@ model Payment {
 // ──────────────────────────────────────────────
 
 model Resource {
-  id          String  @id @default(cuid())
-  title       String
-  description String? @db.Text
-  type        String // EBOOK | VIDEO | LINK | PACKAGE
-  coverUrl    String?
-  contentUrl  String? // PDF, archivo descargable
-  videoUrl    String?
-  linkUrl     String?
-  body        String? @db.Text
-  price       Decimal @db.Decimal(10, 2)
-  currency    String  @default("ARS")
-  isPublished Boolean @default(false)
-  category    String?
-  sortOrder   Int     @default(0)
+  id            String  @id @default(cuid())
+  title         String
+  description   String? @db.Text
+  type          String // EBOOK | VIDEO | LINK | PACKAGE
+  coverUrl      String?
+  contentUrl    String? // PDF, archivo descargable
+  videoUrl      String?
+  linkUrl       String?
+  body          String? @db.Text
+  price         Decimal @db.Decimal(10, 2)
+  currency      String  @default("ARS")
+  isPublished   Boolean @default(false)
+  category      String?
+  sortOrder     Int     @default(0)
+  /**
+   * Habilita el botón de descarga del archivo para quien compró el recurso.
+   */
+  allowDownload Boolean @default(false)
 
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

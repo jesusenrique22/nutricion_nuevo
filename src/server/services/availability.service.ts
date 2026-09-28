@@ -36,22 +36,26 @@ export async function getAvailableSlots(
   if (isPrismaRecurringBlockedWeekdayReady()) {
     const weekday = weekdayFromDateKey(dateStr);
     const partial = isPrismaRecurringBlockedWeekdayPartialReady();
-    const recurring = await prisma.recurringBlockedWeekday.findUnique({
+    // findMany, no findUnique: un mismo día puede tener varias franjas
+    // bloqueadas y quedar libre en el resto.
+    const recurring = await prisma.recurringBlockedWeekday.findMany({
       where: { weekday },
       select: partial
         ? { id: true, startTime: true, endTime: true }
         : { id: true },
     });
-    if (recurring) {
+
+    for (const row of recurring) {
       const windowStart =
-        partial && "startTime" in recurring
-          ? (recurring.startTime as string | null)?.trim() || null
+        partial && "startTime" in row
+          ? (row.startTime as string | null)?.trim() || null
           : null;
       const windowEnd =
-        partial && "endTime" in recurring
-          ? (recurring.endTime as string | null)?.trim() || null
+        partial && "endTime" in row
+          ? (row.endTime as string | null)?.trim() || null
           : null;
 
+      // Sin franja = día completo sin atención: no hay nada que ofrecer.
       if (!windowStart || !windowEnd) {
         return [];
       }

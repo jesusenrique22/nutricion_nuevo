@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Dev server en puerto fijo 3000.
- * NextAuth (NEXTAUTH_URL) y el socket (3001) dependen de que la app NO cambie de puerto.
+ * NextAuth (NEXTAUTH_URL) y el socket (5001) dependen de que la app NO cambie de puerto.
  */
 import { statSync, existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
@@ -93,7 +93,7 @@ const blocked = portListeners(APP_PORT);
 if (blocked.length > 0) {
   console.error(`
 ✗ El puerto ${APP_PORT} está ocupado (PID: ${blocked.join(", ")}).
-  Eso hace que Next salte a 3001 y rompe login/sesión.
+  Eso hace que Next salte a otro puerto y rompe login/sesión.
 
   Liberá el puerto y volvé a iniciar:
     pnpm run dev:kill

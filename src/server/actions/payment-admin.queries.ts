@@ -152,8 +152,11 @@ async function loadRawInboxItems(): Promise<AdminPendingPaymentItem[]> {
     }),
     prisma.appointment.findMany({
       where: {
+        // Cancelada la cita no hay nada que cobrar; sin esto la solicitud
+        // seguía apareciendo en la bandeja de cobros pendientes.
+        status: { not: "CANCELLED" },
         payment: {
-          status: { not: "REFUNDED" },
+          status: { notIn: ["REFUNDED", "CANCELLED"] },
           OR: [
             {
               advanceStatus: "PENDING",
