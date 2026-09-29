@@ -15,12 +15,14 @@ type ConnectionInfo = {
 
 const statusMessages: Record<string, string> = {
   connected:
-    "Google Calendar conectado. Solo se sincronizan citas desde hoy en adelante; las nuevas se agregan solas al crearlas.",
+    "Google Calendar conectado. Solo se sincronizan citas desde hoy en adelante; las nuevas se agregan solas al confirmarlas.",
   denied:
     "No se pudo autorizar Google Calendar. Revisá que tu cuenta tenga permiso e intentá de nuevo.",
   invalid_state: "La autorización expiró. Intentá de nuevo.",
   no_refresh:
     "No se pudo completar la conexión con Google. Desconectá la app desde tu cuenta de Google y volvé a conectar.",
+  missing_scope:
+    "Google no dio permiso para el calendario. Volvé a conectar y, en la pantalla de Google, marcá la casilla para ver y editar los eventos de tu calendario.",
   error:
     "No se pudo conectar Google Calendar. Intentá de nuevo en unos minutos.",
   missing_config:
@@ -50,7 +52,7 @@ function GoogleCalendarConnectInner({
     const shouldSync = params.get("sync") === "1";
 
     if (gcal && statusMessages[gcal]) {
-      setMessageTone(gcal === "connected" ? "success" : gcal === "error" ? "error" : "info");
+      setMessageTone(gcal === "connected" ? "success" : gcal === "error" || gcal === "missing_scope" ? "error" : "info");
       setMessage(statusMessages[gcal]);
       router.replace("/dashboard/admin/calendar", { scroll: false });
 

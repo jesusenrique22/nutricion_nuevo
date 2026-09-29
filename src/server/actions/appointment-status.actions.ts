@@ -317,6 +317,9 @@ export async function rescheduleAppointment(
       },
     });
 
+    // Primero Google Calendar: que un correo lento o fallido no lo bloquee.
+    await refreshGoogleCalendar(appt.id);
+
     await notifyAppointmentRescheduled({
       patientId: appt.patientId,
       patientName: appt.patient.name,
@@ -338,15 +341,18 @@ export async function rescheduleAppointment(
         newStartTime: startTime,
         appointmentsUrl: absoluteUrl("/dashboard/patient/appointments"),
       });
-      await sendEmail({
-        to: appt.patient.email,
-        subject: msg.subject,
-        html: msg.html,
-        text: msg.text,
-      });
+      try {
+        await sendEmail({
+          to: appt.patient.email,
+          subject: msg.subject,
+          html: msg.html,
+          text: msg.text,
+        });
+      } catch (err) {
+        console.error("[rescheduleAppointment] email", err);
+      }
     }
 
-    await refreshGoogleCalendar(appt.id);
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };
   } catch (err) {

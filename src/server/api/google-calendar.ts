@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { ensureDefaultCalendarAdmin } from "@/lib/calendar-admin-resolve";
-import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
+import {
+  CALENDAR_EVENTS_SCOPE,
+  isGoogleCalendarConfigured,
+} from "@/lib/google-calendar/config";
 import {
   appOriginFromRequest,
   oauthRedirectUriFromRequest,
@@ -88,6 +91,14 @@ async function handleCallback(request: Request) {
     const tokens = await exchangeCodeForTokens(code, redirectUri);
     if (!tokens.refresh_token) {
       return NextResponse.redirect(`${calendarUrl}?gcal=no_refresh`);
+    }
+
+    // Google permite destildar el permiso del calendario en la pantalla de
+    // consentimiento: sin él la conexión "funciona" pero todo evento da 403.
+    const grantedScopes = (tokens.scope ?? "").split(/\s+/);
+    if (!grantedScopes.includes(CALENDAR_EVENTS_SCOPE)) {
+      console.warn("[google-calendar/callback] falta scope de calendario:", tokens.scope);
+      return NextResponse.redirect(`${calendarUrl}?gcal=missing_scope`);
     }
 
     let connectedEmail: string | null = null;
