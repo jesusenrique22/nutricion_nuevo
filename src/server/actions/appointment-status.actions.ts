@@ -6,6 +6,7 @@ import { getPaymentQuerySelect } from "@/lib/payment-query-select";
 import { prisma } from "@/server/db/prisma";
 import {
   cancelAppointmentSchema,
+  changeAppointmentServiceSchema,
   rescheduleAppointmentSchema,
   updateAppointmentStatusSchema,
 } from "@/lib/validators/appointment-status";
@@ -17,13 +18,15 @@ import {
 } from "@/server/services/appointment-notify.service";
 import { notifyReviewRequested } from "@/server/services/review-notify.service";
 import { formatActionError } from "@/lib/db-errors";
+import { Prisma } from "@prisma/client";
+import type { ConsultationCode } from "@/lib/consultation-codes";
+import { getPaymentChatPolicy } from "@/lib/payment-chat-policy";
+import { buildPaymentCreateData } from "@/lib/payment-split";
 import { validateAppointmentSlot } from "@/server/services/scheduling.service";
 import {
   cancelAppointmentPaymentRequest,
   removeCartItemsForAppointment,
 } from "@/server/services/appointment-cancel-payment.service";
-import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
-import { appointmentRescheduledEmail } from "@/lib/email-messages";
 
 async function refreshGoogleCalendar(appointmentId: string) {
   const { refreshAppointmentGoogleCalendar } = await import(
@@ -330,29 +333,6 @@ export async function rescheduleAppointment(
       rescheduledBy,
     });
 
-    if (
-      appt.patient.email &&
-      isEmailDeliveryConfigured() &&
-      rescheduledBy === "ADMIN"
-    ) {
-      const msg = appointmentRescheduledEmail({
-        name: appt.patient.name,
-        consultationName: appt.consultationType.name,
-        newStartTime: startTime,
-        appointmentsUrl: absoluteUrl("/dashboard/patient/appointments"),
-      });
-      try {
-        await sendEmail({
-          to: appt.patient.email,
-          subject: msg.subject,
-          html: msg.html,
-          text: msg.text,
-        });
-      } catch (err) {
-        console.error("[rescheduleAppointment] email", err);
-      }
-    }
-
     await revalidateAppointmentPaths(appt.patientId);
     return { ok: true };
   } catch (err) {
@@ -360,6 +340,128 @@ export async function rescheduleAppointment(
     return {
       ok: false,
       message: formatActionError(err, "No se pudo reagendar la cita."),
+    };
+  }
+}
+
+/**
+ * Corrige el servicio de una cita (ej. se agendó un pack en vez de una
+ * consulta) sin cancelarla: cancelar y volver a agendar dejaba dos cobros y
+ * le llegaban al paciente avisos de más. Lo ya cobrado se respeta.
+ */
+export async function changeAppointmentService(
+  formData: unknown,
+): Promise<StatusActionResult> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") {
+      return { ok: false, message: "No autorizado." };
+    }
+
+    const parsed = changeAppointmentServiceSchema.safeParse(formData);
+    if (!parsed.success) return { ok: false, message: "Datos inválidos." };
+
+    const appt = await loadAppointment(parsed.data.appointmentId);
+    if (!appt) return { ok: false, message: "Cita no encontrada." };
+
+    if (!["PENDING", "CONFIRMED"].includes(appt.status)) {
+      return { ok: false, message: "A esta cita ya no se le puede cambiar el servicio." };
+    }
+    if (appt.consultationTypeId === parsed.data.consultationTypeId) {
+      return { ok: false, message: "La cita ya tiene ese servicio." };
+    }
+
+    const newType = await prisma.consultationType.findUnique({
+      where: { id: parsed.data.consultationTypeId },
+    });
+    if (!newType) return { ok: false, message: "Servicio no encontrado." };
+
+    const validation = await validateAppointmentSlot({
+      consultationType: newType,
+      startTime: appt.startTime,
+      modality: appt.modality,
+      excludeAppointmentId: appt.id,
+    });
+    if (!validation.ok) {
+      return {
+        ok: false,
+        message: `${validation.message} Reagendá primero a un horario libre para este servicio.`,
+      };
+    }
+
+    const payment = appt.payment;
+    const advancePaid = payment?.advanceStatus === "PAID";
+    const remainderPaid = payment?.remainderStatus === "PAID";
+    if (payment && (payment.status === "PAID" || remainderPaid)) {
+      return {
+        ok: false,
+        message: "La cita ya está pagada completa: no se puede cambiar el servicio.",
+      };
+    }
+
+    // Se conserva el descuento de cupón que tuviera el cobro original.
+    const discountAmount = payment
+      ? Prisma.Decimal.max(0, appt.consultationType.price.sub(payment.amount))
+      : new Prisma.Decimal(0);
+    const policy = await getPaymentChatPolicy();
+    const fresh = buildPaymentCreateData({
+      totalPrice: newType.price,
+      consultationCode: newType.code as ConsultationCode,
+      policy,
+      discountAmount,
+    });
+
+    let paymentData: Prisma.PaymentUncheckedUpdateInput | null = null;
+    if (payment && advancePaid) {
+      // Adelanto ya cobrado: se mantiene y se ajusta solo el saldo.
+      const remainder = fresh.amount.sub(payment.advanceAmount);
+      if (remainder.lt(0)) {
+        return {
+          ok: false,
+          message:
+            "El adelanto ya pagado supera el precio del nuevo servicio. Registrá la diferencia como reembolso.",
+        };
+      }
+      const settled = remainder.eq(0);
+      paymentData = {
+        amount: fresh.amount,
+        remainderAmount: remainder,
+        remainderStatus: settled ? "PAID" : "PENDING",
+        status: settled ? "PAID" : payment.status,
+        ...(settled ? { paidAt: new Date(), remainderPaidAt: new Date() } : {}),
+      };
+    } else if (payment) {
+      paymentData = {
+        amount: fresh.amount,
+        advanceAmount: fresh.advanceAmount,
+        remainderAmount: fresh.remainderAmount,
+        advancePercent: fresh.advancePercent,
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.appointment.update({
+        where: { id: appt.id },
+        data: {
+          consultationTypeId: newType.id,
+          endTime: validation.endTime,
+        },
+      });
+      if (paymentData && payment) {
+        await tx.payment.update({ where: { id: payment.id }, data: paymentData });
+      } else if (!payment) {
+        await tx.payment.create({ data: { appointmentId: appt.id, ...fresh } });
+      }
+    });
+
+    await refreshGoogleCalendar(appt.id);
+    await revalidateAppointmentPaths(appt.patientId);
+    return { ok: true };
+  } catch (err) {
+    console.error("[changeAppointmentService]", err);
+    return {
+      ok: false,
+      message: formatActionError(err, "No se pudo cambiar el servicio."),
     };
   }
 }

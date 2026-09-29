@@ -63,6 +63,8 @@ export async function updateGoogleCalendarEvent(
     eventId,
     sendUpdates: "all",
     requestBody: {
+      // Si el evento se borró a mano en Google queda "cancelled": lo restaura.
+      status: "confirmed",
       summary: input.summary,
       description: input.description,
       start: { dateTime: input.startTime.toISOString(), timeZone },

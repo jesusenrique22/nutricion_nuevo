@@ -23,6 +23,11 @@ export const rescheduleAppointmentSchema = z.object({
   startTime: z.string().datetime(),
 });
 
+export const changeAppointmentServiceSchema = z.object({
+  appointmentId: z.string().min(1),
+  consultationTypeId: z.string().min(1),
+});
+
 export const createScheduleBlockSchema = z.object({
   dateStr: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
