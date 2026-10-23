@@ -76,7 +76,14 @@ function buildEventPayload(event: EventRow): CalendarEventInput {
   const attendeeName = event.patient?.name ?? event.guestName ?? null;
   const attendeeEmail = event.patient?.email ?? event.guestEmail ?? null;
 
-  const attendees: Array<{ email: string; displayName?: string }> = [];
+  // La nutricionista va primero como invitada, igual que en las citas: sin
+  // esto Google no le mandaba la invitación y el evento le pasaba inadvertido.
+  const attendees: Array<{ email: string; displayName?: string }> = [
+    {
+      email: CLINIC_NOTIFICATION_EMAIL,
+      displayName: "Lic. Ma Antonieta Lanza",
+    },
+  ];
   if (
     attendeeEmail &&
     attendeeEmail.toLowerCase() !== CLINIC_NOTIFICATION_EMAIL.toLowerCase()
@@ -110,24 +117,48 @@ function buildEventPayload(event: EventRow): CalendarEventInput {
   };
 }
 
+/**
+ * Resultado de la sincronización.
+ *
+ * Antes devolvía un boolean que nadie miraba: si el evento no llegaba a Google
+ * Calendar, la nutricionista no se enteraba de nada.
+ */
+export type InternalEventSyncResult =
+  | { ok: true }
+  | { ok: false; reason: string };
+
 /** Crea o actualiza el evento en el calendario de la nutricionista. */
 export async function syncInternalEventToGoogleCalendar(
   eventId: string,
-): Promise<boolean> {
+): Promise<InternalEventSyncResult> {
   try {
     const event = await prisma.internalEvent.findUnique({
       where: { id: eventId },
       include: { patient: { select: { name: true, email: true } } },
     });
-    if (!event || event.cancelledAt) return false;
+    if (!event || event.cancelledAt) {
+      return { ok: false, reason: "El evento ya no está activo." };
+    }
 
-    if (!isAppointmentEligibleForGoogleSync(event.startTime)) return false;
+    if (!isAppointmentEligibleForGoogleSync(event.startTime)) {
+      return {
+        ok: false,
+        reason:
+          "La fecha ya pasó, así que no se agregó a Google Calendar. El evento igual quedó en tu agenda de Anttova.",
+      };
+    }
 
     const adminUserId = await resolveAdminForEvent(
       eventId,
       event.calendarAdminId,
     );
-    if (!adminUserId) return false;
+    if (!adminUserId) {
+      return {
+        ok: false,
+        reason:
+          "No hay ningún calendario de Google conectado. Conectalo desde el calendario para que los eventos te aparezcan ahí.",
+      };
+    }
 
     const api = await calendarApi();
     const payload = buildEventPayload(event);
@@ -138,23 +169,32 @@ export async function syncInternalEventToGoogleCalendar(
         event.googleEventId,
         payload,
       );
-      return true;
+      return { ok: true };
     }
 
     const googleEventId = await api.createGoogleCalendarEvent(
       adminUserId,
       payload,
     );
-    if (!googleEventId) return false;
+    if (!googleEventId) {
+      return {
+        ok: false,
+        reason: "Google no confirmó la creación del evento. Reintentá.",
+      };
+    }
 
     await prisma.internalEvent.update({
       where: { id: eventId },
       data: { googleEventId, calendarAdminId: adminUserId },
     });
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("[internal-event/calendar sync]", eventId, err);
-    return false;
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: `Google Calendar rechazó el evento (${message.slice(0, 120)}).`,
+    };
   }
 }
 

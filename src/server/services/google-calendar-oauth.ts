@@ -58,23 +58,76 @@ export async function getAuthedOAuthClient(
     expiry_date: connection.tokenExpiry?.getTime(),
   });
 
-  oauth2.on("tokens", async (tokens) => {
+  // EventEmitter no espera listeners async: en serverless el proceso se
+  // congela antes de que termine el UPDATE y el token refrescado se perdía.
+  // Se guarda la promesa para poder esperarla con flushGoogleTokens().
+  oauth2.on("tokens", (tokens) => {
     if (!tokens.access_token) return;
-    await prisma.googleCalendarConnection.update({
-      where: { id: connection.id },
-      data: {
-        accessToken: tokens.access_token,
-        tokenExpiry: tokens.expiry_date
-          ? new Date(tokens.expiry_date)
-          : connection.tokenExpiry,
-        ...(tokens.refresh_token
-          ? { refreshToken: tokens.refresh_token }
-          : {}),
-      },
-    });
+    const write = prisma.googleCalendarConnection
+      .update({
+        where: { id: connection.id },
+        data: {
+          accessToken: tokens.access_token,
+          tokenExpiry: tokens.expiry_date
+            ? new Date(tokens.expiry_date)
+            : connection.tokenExpiry,
+          ...(tokens.refresh_token
+            ? { refreshToken: tokens.refresh_token }
+            : {}),
+          invalidatedAt: null,
+          lastError: null,
+        },
+      })
+      .then(() => undefined)
+      .catch((err) => {
+        console.error("[google-calendar/token-persist]", err);
+      });
+    pendingTokenWrites.set(oauth2, write);
   });
 
   return oauth2;
+}
+
+/** Promesas de guardado de token pendientes, por cliente OAuth. */
+const pendingTokenWrites = new WeakMap<OAuth2Client, Promise<void>>();
+
+/** Espera a que se persista el token refrescado antes de cerrar la request. */
+export async function flushGoogleTokens(client: OAuth2Client): Promise<void> {
+  const pending = pendingTokenWrites.get(client);
+  if (pending) await pending;
+}
+
+/** ¿Google dijo que el permiso ya no vale? */
+export function isGoogleAuthRevokedError(err: unknown): boolean {
+  const data = (err as { response?: { data?: { error?: string } } })?.response
+    ?.data;
+  if (data?.error === "invalid_grant") return true;
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("invalid_grant") ||
+    message.includes("Token has been expired or revoked")
+  );
+}
+
+/**
+ * Marca la conexión como caída para que el panel lo muestre.
+ *
+ * Con la app OAuth en modo "Testing", Google caduca el refresh token a los 7
+ * días; sin esta marca la agenda decía "conectado" y los eventos dejaban de
+ * sincronizarse sin que nadie se enterara.
+ */
+export async function markGoogleConnectionInvalid(
+  userId: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await prisma.googleCalendarConnection.updateMany({
+      where: { userId },
+      data: { invalidatedAt: new Date(), lastError: reason.slice(0, 500) },
+    });
+  } catch (err) {
+    console.error("[google-calendar/mark-invalid]", err);
+  }
 }
 
 export async function saveGoogleCalendarConnection(params: {
@@ -117,6 +170,8 @@ export async function getGoogleCalendarConnectionSummary(userId: string) {
     connectedEmail: row.connectedEmail,
     calendarId: row.calendarId,
     connectedAt: row.updatedAt.toISOString(),
+    invalidatedAt: row.invalidatedAt?.toISOString() ?? null,
+    lastError: row.lastError,
   };
 }
 

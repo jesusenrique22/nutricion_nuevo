@@ -121,7 +121,7 @@ export function InternalEventsPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [message, setMessage] = useState<{
-    tone: "ok" | "error";
+    tone: "ok" | "error" | "warn";
     text: string;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -209,14 +209,19 @@ export function InternalEventsPanel({
         return;
       }
 
-      setMessage({
-        tone: "ok",
-        text: editingId
-          ? "Evento actualizado."
-          : form.attendeeType !== "NONE" && form.notifyAttendee
-            ? "Evento agendado y aviso enviado."
-            : "Evento agendado.",
-      });
+      const base = editingId
+        ? "Evento actualizado."
+        : form.attendeeType !== "NONE" && form.notifyAttendee
+          ? "Evento agendado y aviso enviado."
+          : "Evento agendado.";
+
+      // El warning llega cuando el evento se guardó pero no entró en Google
+      // Calendar: es justo lo que antes fallaba en silencio.
+      setMessage(
+        res.warning
+          ? { tone: "warn", text: `${base} ${res.warning}` }
+          : { tone: "ok", text: base },
+      );
       resetForm();
       router.refresh();
     });
@@ -322,7 +327,9 @@ export function InternalEventsPanel({
           className={`mt-3 rounded-xl px-3 py-2 text-sm font-medium ${
             message.tone === "ok"
               ? "bg-green-50 text-green-800 ring-1 ring-green-200"
-              : "bg-red-50 text-red-700 ring-1 ring-red-200"
+              : message.tone === "warn"
+                ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200"
+                : "bg-red-50 text-red-700 ring-1 ring-red-200"
           }`}
         >
           {message.text}

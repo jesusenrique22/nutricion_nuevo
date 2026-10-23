@@ -796,6 +796,13 @@ model GoogleCalendarConnection {
   calendarId     String    @default("primary")
   connectedEmail String?
 
+  /**
+   * Google revocó el permiso (refresh token muerto). Mientras tenga valor, la
+   * sincronización está caída y hay que volver a conectar la cuenta.
+   */
+  invalidatedAt DateTime?
+  lastError     String?   @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

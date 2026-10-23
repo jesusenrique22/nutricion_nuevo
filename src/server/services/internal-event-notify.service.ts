@@ -5,6 +5,7 @@
  * mismo: todos los datos del encuentro y botones para agregarlo a su calendario
  * sin pasar por la plataforma.
  */
+import { CLINIC_NOTIFICATION_EMAIL, getAdminUserIds } from "@/lib/admin-users";
 import { absoluteUrl, isEmailDeliveryConfigured, sendEmail } from "@/lib/email";
 import { formatClinicDateTimeLong, formatClinicTime } from "@/lib/clinic-timezone";
 import {
@@ -59,16 +60,90 @@ function calendarDescription(event: InternalEventNotifyInput): string {
   return parts.join("\n\n");
 }
 
+/**
+ * Copia para la nutricionista.
+ *
+ * El aviso solo salía para el participante: ella agendaba un evento y no le
+ * quedaba constancia en ningún lado de la plataforma.
+ */
+async function notifyClinicAboutEvent(
+  event: InternalEventNotifyInput,
+  options: { cancelled?: boolean; rescheduled?: boolean } = {},
+): Promise<void> {
+  const when = formatClinicDateTimeLong(event.startTime);
+  const kindLabel = internalEventKindLabel(event.kind);
+  const attendee = event.target.email
+    ? `${event.target.name?.trim() || event.target.email}`
+    : "sin participante";
+
+  const title = options.cancelled
+    ? "Cancelaste un evento de agenda"
+    : options.rescheduled
+      ? "Reprogramaste un evento de agenda"
+      : "Nuevo evento en tu agenda";
+
+  const body = `${event.title} · ${when} · ${attendee}`;
+  const calendarUrl = "/dashboard/admin/calendar";
+
+  const adminIds = await getAdminUserIds();
+  await Promise.all(
+    adminIds.map((id) =>
+      createNotification({
+        recipientId: id,
+        type: options.cancelled
+          ? "APPOINTMENT_CANCELLED"
+          : "APPOINTMENT_CONFIRMED",
+        title,
+        body,
+        payload: { deepLink: calendarUrl, internalEventId: event.id },
+      }),
+    ),
+  );
+
+  if (!isEmailDeliveryConfigured()) return;
+
+  await sendEmail({
+    to: CLINIC_NOTIFICATION_EMAIL,
+    subject: `Anttova — ${title}: ${event.title}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1a1a1a">
+        <p style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#888">Anttova Nutrición</p>
+        <h1 style="font-size:20px;font-weight:600;color:#5a1728">${escapeHtml(title)}</h1>
+        <div style="background:#f9f5f6;border-left:4px solid #5a1728;padding:16px;margin:20px 0;border-radius:4px">
+          <p style="margin:4px 0"><strong>Evento:</strong> ${escapeHtml(event.title)}</p>
+          <p style="margin:4px 0"><strong>Motivo:</strong> ${escapeHtml(kindLabel)}</p>
+          <p style="margin:4px 0"><strong>Cuándo:</strong> ${escapeHtml(when)}</p>
+          <p style="margin:4px 0"><strong>Participa:</strong> ${escapeHtml(attendee)}</p>
+        </div>
+        <p style="margin:24px 0">
+          <a href="${absoluteUrl(calendarUrl)}" style="background:#5a1728;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block">
+            Ver en tu calendario
+          </a>
+        </p>
+      </div>
+    `,
+    text: `${title}\nEvento: ${event.title}\nMotivo: ${kindLabel}\nCuándo: ${when}\nParticipa: ${attendee}\n${absoluteUrl(calendarUrl)}`,
+  });
+}
+
 /** Aviso de evento creado o reprogramado. */
 export async function notifyInternalEventScheduled(
   event: InternalEventNotifyInput,
-  options: { rescheduled?: boolean } = {},
+  options: { rescheduled?: boolean; notifyAttendee?: boolean } = {},
 ): Promise<void> {
   try {
     const rescheduled = options.rescheduled ?? false;
+    // La copia para la clínica es independiente de si se invita o no al
+    // participante: ella siempre tiene que ver lo que agendó.
+    const notifyAttendee = options.notifyAttendee !== false;
     const when = formatClinicDateTimeLong(event.startTime);
     const until = formatClinicTime(event.endTime);
     const kindLabel = internalEventKindLabel(event.kind);
+
+    // La nutricionista se entera aunque el evento no tenga participante.
+    await notifyClinicAboutEvent(event, { rescheduled });
+
+    if (!notifyAttendee) return;
 
     if (event.target.patientId) {
       await createNotification({
@@ -197,6 +272,8 @@ export async function notifyInternalEventCancelled(
 ): Promise<void> {
   try {
     const when = formatClinicDateTimeLong(event.startTime);
+
+    await notifyClinicAboutEvent(event, { cancelled: true });
 
     if (event.target.patientId) {
       await createNotification({

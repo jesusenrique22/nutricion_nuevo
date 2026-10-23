@@ -11,6 +11,9 @@ type ConnectionInfo = {
   connectedEmail: string | null;
   calendarId: string;
   connectedAt: string;
+  /** Con valor, Google revocó el acceso y hay que volver a conectar. */
+  invalidatedAt?: string | null;
+  lastError?: string | null;
 } | null;
 
 const statusMessages: Record<string, string> = {
@@ -89,14 +92,31 @@ function GoogleCalendarConnectInner({
     );
   }
 
+  const revoked = Boolean(connection?.invalidatedAt);
+
   return (
-    <div className="mt-4 rounded-2xl border border-foreground/10 bg-white px-4 py-3 text-sm shadow-sm">
+    <div
+      className={`mt-4 rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+        revoked
+          ? "border-amber-300 bg-amber-50"
+          : "border-foreground/10 bg-white"
+      }`}
+    >
+      {revoked && (
+        <p className="mb-3 rounded-xl bg-amber-100/70 px-3 py-2 text-xs font-medium text-amber-900">
+          <strong>La sincronización está caída.</strong> Google revocó el
+          permiso, así que las citas y los eventos que agendes{" "}
+          <strong>no se están agregando a tu calendario</strong>. Tocá{" "}
+          <strong>Reconectar</strong> para restablecerla.
+          {connection?.lastError ? ` (${connection.lastError})` : ""}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-semibold text-primary">Google Calendar</p>
           {connection ? (
             <p className="mt-0.5 text-xs text-foreground/60">
-              Tu cuenta conectada:{" "}
+              {revoked ? "Cuenta a reconectar: " : "Tu cuenta conectada: "}
               <strong>{connection.connectedEmail ?? "cuenta Google"}</strong>
               {isDefaultCalendarAdmin ? (
                 <>
@@ -185,6 +205,16 @@ function GoogleCalendarConnectInner({
               >
                 Sincronizar desde hoy
               </button>
+              <a
+                href="/api/google/calendar/connect"
+                className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                  revoked
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-foreground/15"
+                }`}
+              >
+                Reconectar
+              </a>
               <button
                 type="button"
                 disabled={isPending}

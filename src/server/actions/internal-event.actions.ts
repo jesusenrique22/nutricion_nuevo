@@ -38,7 +38,7 @@ export interface InternalEventDTO {
 }
 
 export type InternalEventResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; warning?: string }
   | { ok: false; message: string };
 
 const NOT_READY_MESSAGE =
@@ -99,9 +99,12 @@ function toDTO(event: EventWithPatient): InternalEventDTO {
   };
 }
 
-function toNotifyInput(event: EventWithPatient): InternalEventNotifyInput | null {
-  const email = event.patient?.email ?? event.guestEmail;
-  if (!email) return null;
+/**
+ * Siempre devuelve datos, aunque no haya participante: la nutricionista recibe
+ * su copia igual. El servicio decide a quién escribirle según `target.email`.
+ */
+function toNotifyInput(event: EventWithPatient): InternalEventNotifyInput {
+  const email = event.patient?.email ?? event.guestEmail ?? "";
 
   return {
     id: event.id,
@@ -283,42 +286,45 @@ export async function upsertInternalEvent(
   }
 
   // El aviso y el calendario nunca deben tumbar el guardado del evento.
-  if (data.notifyAttendee !== false) {
-    const notifyInput = toNotifyInput(event);
-    if (notifyInput) {
-      const { notifyInternalEventScheduled } = await import(
-        "@/server/services/internal-event-notify.service"
-      );
-      // "Reprogramado" solo si cambió el horario: editar el título o una nota
-      // no justifica decirle al participante que le movimos la fecha.
-      const movedInTime =
-        previous !== null &&
-        (previous.startTime.getTime() !== startTime.getTime() ||
-          previous.endTime.getTime() !== endTime.getTime());
+  {
+    const { notifyInternalEventScheduled } = await import(
+      "@/server/services/internal-event-notify.service"
+    );
+    // "Reprogramado" solo si cambió el horario: editar el título o una nota
+    // no justifica decirle al participante que le movimos la fecha.
+    const movedInTime =
+      previous !== null &&
+      (previous.startTime.getTime() !== startTime.getTime() ||
+        previous.endTime.getTime() !== endTime.getTime());
 
-      await notifyInternalEventScheduled(notifyInput, {
-        rescheduled: movedInTime,
-      });
+    await notifyInternalEventScheduled(toNotifyInput(event), {
+      rescheduled: movedInTime,
+      notifyAttendee: data.notifyAttendee !== false,
+    });
+
+    if (data.notifyAttendee !== false) {
       await prisma.internalEvent
-        .update({
-          where: { id: event.id },
-          data: { notifiedAt: new Date() },
-        })
+        .update({ where: { id: event.id }, data: { notifiedAt: new Date() } })
         .catch(() => {});
     }
   }
 
+  // El resultado se devuelve al panel: si no llegó a Google Calendar, la
+  // nutricionista tiene que verlo, no descubrirlo cuando falte el evento.
+  let warning: string | undefined;
   try {
     const { syncInternalEventToGoogleCalendar } = await import(
       "@/server/services/internal-event-calendar.service"
     );
-    await syncInternalEventToGoogleCalendar(event.id);
+    const sync = await syncInternalEventToGoogleCalendar(event.id);
+    if (!sync.ok) warning = sync.reason;
   } catch (err) {
     console.error("[upsertInternalEvent/calendar]", err);
+    warning = "No se pudo sincronizar con Google Calendar.";
   }
 
   revalidateEventPaths(event.patientId);
-  return { ok: true, id: event.id };
+  return { ok: true, id: event.id, warning };
 }
 
 /** Reenvía la invitación sin tocar la fecha (p. ej. si el correo se perdió). */
@@ -339,7 +345,7 @@ export async function resendInternalEventInvite(
   }
 
   const notifyInput = toNotifyInput(event);
-  if (!notifyInput) {
+  if (!notifyInput.target.email) {
     return {
       ok: false,
       message: "Este evento no tiene participante a quien avisarle.",
@@ -376,13 +382,10 @@ export async function deleteInternalEvent(
   if (!event) return { ok: false, message: "Evento no encontrado." };
 
   if (parsed.data.notify !== false) {
-    const notifyInput = toNotifyInput(event);
-    if (notifyInput) {
-      const { notifyInternalEventCancelled } = await import(
-        "@/server/services/internal-event-notify.service"
-      );
-      await notifyInternalEventCancelled(notifyInput);
-    }
+    const { notifyInternalEventCancelled } = await import(
+      "@/server/services/internal-event-notify.service"
+    );
+    await notifyInternalEventCancelled(toNotifyInput(event));
   }
 
   try {
