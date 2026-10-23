@@ -30,6 +30,9 @@ async function deleteGoogleCalendarEvent(adminUserId: string, eventId: string) {
   return api.deleteGoogleCalendarEvent(adminUserId, eventId);
 }
 
+/** Estados que tienen evento en Google (las completadas se conservan como historial). */
+const SYNCED_STATUSES = new Set(["CONFIRMED", "COMPLETED"]);
+
 function buildEventPayload(appt: {
   status: string;
   flow: string;
@@ -128,7 +131,7 @@ export async function syncAppointmentToGoogleCalendar(
       },
     });
     // Solo se sincroniza a Google Calendar si la cita está CONFIRMADA/ACEPTADA por la administradora
-    if (!appt || appt.status !== "CONFIRMED") return false;
+    if (!appt || !SYNCED_STATUSES.has(appt.status)) return false;
 
     if (!isAppointmentEligibleForGoogleSync(appt.startTime)) {
       return false;
@@ -149,8 +152,20 @@ export async function syncAppointmentToGoogleCalendar(
     const payload = buildEventPayload(appt);
 
     if (appt.googleEventId) {
-      await updateGoogleCalendarEvent(adminUserId, appt.googleEventId, payload);
-      return true;
+      try {
+        await updateGoogleCalendarEvent(adminUserId, appt.googleEventId, payload);
+        return true;
+      } catch (err) {
+        // El evento ya no existe en ese calendario (borrado a mano, cuenta
+        // reconectada o admin distinto): se crea uno nuevo abajo.
+        const status = (err as { code?: number }).code;
+        if (status !== 404 && status !== 410) throw err;
+        console.warn(
+          "[google-calendar/sync] evento no encontrado, se recrea",
+          appointmentId,
+          appt.googleEventId,
+        );
+      }
     }
 
     const eventId = await createGoogleCalendarEvent(adminUserId, payload);
@@ -169,7 +184,7 @@ export async function syncAppointmentToGoogleCalendar(
     });
     return true;
   } catch (err) {
-    console.error("[google-calendar/sync create]", appointmentId, err);
+    console.error("[google-calendar/sync]", appointmentId, err);
     return false;
   }
 }
@@ -265,7 +280,7 @@ export async function refreshAppointmentGoogleCalendar(
     });
     if (!appt) return;
 
-    if (appt.status !== "CONFIRMED") {
+    if (!SYNCED_STATUSES.has(appt.status)) {
       await removeAppointmentFromGoogleCalendar(appointmentId);
       return;
     }

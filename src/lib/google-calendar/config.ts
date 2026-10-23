@@ -1,4 +1,4 @@
-const CALENDAR_EVENTS_SCOPE =
+export const CALENDAR_EVENTS_SCOPE =
   "https://www.googleapis.com/auth/calendar.events";
 const USERINFO_EMAIL_SCOPE =
   "https://www.googleapis.com/auth/userinfo.email";

@@ -19,6 +19,7 @@ import {
   paymentStatusLabels,
 } from "@/lib/appointment-labels";
 import { RescheduleAppointmentForm } from "@/components/booking/reschedule-appointment-form";
+import { ChangeAppointmentServiceForm } from "@/components/calendar/change-appointment-service-form";
 import { DisplayPrice } from "@/components/currency/display-price";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { isTwoPhaseSplit } from "@/lib/payment-policy-resolve";
@@ -57,6 +58,7 @@ export function AppointmentAdminPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [paymentNote, setPaymentNote] = useState("");
   const [rescheduling, setRescheduling] = useState(false);
+  const [changingService, setChangingService] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const actions = statusActions[appointment.status] ?? [];
@@ -296,6 +298,34 @@ export function AppointmentAdminPanel({
                     onClose();
                   }}
                   onCancel={() => setRescheduling(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {["PENDING", "CONFIRMED"].includes(appointment.status) &&
+          new Date(appointment.start) > new Date() && (
+          <div className="mt-6">
+            <h3 className="text-sm font-bold">Servicio</h3>
+            {!changingService ? (
+              <button
+                type="button"
+                onClick={() => setChangingService(true)}
+                className="mt-2 rounded-full border border-foreground/15 px-4 py-2 text-sm font-semibold hover:bg-muted"
+              >
+                Cambiar servicio
+              </button>
+            ) : (
+              <div className="mt-3 rounded-xl border border-foreground/10 p-4">
+                <ChangeAppointmentServiceForm
+                  appointmentId={appointment.id}
+                  currentCode={appointment.consultationCode}
+                  onDone={() => {
+                    setChangingService(false);
+                    onClose();
+                  }}
+                  onCancel={() => setChangingService(false)}
                 />
               </div>
             )}
